@@ -1,0 +1,205 @@
+/* Styles spécifiques pour la page Player (mode élève) */
+
+.exercise-controls {
+  background: linear-gradient(135deg, #1e1e1e 0%, #2a2a2a 100%);
+  border: 1px solid #3a3a3a;
+  border-radius: 12px;
+  padding: 2rem;
+  margin-top: 1.5rem;
+}
+
+.exercise-info {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.exercise-info h2 {
+  font-size: 1.75rem;
+  color: #ffffff;
+  margin: 0 0 0.5rem 0;
+  font-weight: 700;
+}
+
+.exercise-meta {
+  color: #b0b0b0;
+  font-size: 1rem;
+  margin: 0.5rem 0;
+}
+
+.exercise-description {
+  color: #b0b0b0;
+  font-size: 1rem;
+  line-height: 1.6;
+  margin: 1rem 0 0 0;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.exercise-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.exercise-btn {
+  padding: 1rem 2rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  min-width: 200px;
+}
+
+.exercise-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.preview-btn {
+  background: linear-gradient(135deg, #3a3a3a 0%, #4a4a4a 100%);
+  color: #ffffff;
+  border: 2px solid #5a5a5a;
+}
+
+.preview-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #4a4a4a 0%, #3a3a3a 100%);
+  transform: translateY(-2px);
+}
+
+.preview-btn-secondary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  color: #ffffff !important;
+  border: 2px solid #667eea !important;
+  font-size: 1rem !important;
+  padding: 1rem 2rem !important;
+  min-width: 200px !important;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4) !important;
+  order: -1;
+}
+
+.preview-btn-secondary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%) !important;
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6) !important;
+  transform: translateY(-2px);
+}
+
+.quit-btn {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: #ffffff;
+  border: 2px solid #ef4444;
+  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+  order: 1;
+}
+
+.quit-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.5);
+  transform: translateY(-2px);
+}
+
+.start-btn {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  border: 2px solid #10b981;
+  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+}
+
+.start-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.6);
+  transform: translateY(-2px);
+}
+
+.pause-btn {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #ffffff;
+  border: 2px solid #f59e0b;
+  box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+}
+
+.pause-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.6);
+  transform: translateY(-2px);
+}
+
+.finish-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #ffffff;
+  border: 2px solid #667eea;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.finish-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+  transform: translateY(-2px);
+}
+
+.exercise-progress {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.exercise-progress h3 {
+  font-size: 1.25rem;
+  color: #ffffff;
+  margin: 0 0 0.5rem 0;
+  font-weight: 700;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 12px;
+  background: #2a2a2a;
+  border-radius: 6px;
+  overflow: hidden;
+  margin: 1rem 0;
+  border: 1px solid #3a3a3a;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  transition: width 0.3s ease;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+}
+
+.progress-text {
+  color: #b0b0b0;
+  font-size: 0.95rem;
+  margin: 0.5rem 0 0 0;
+}
+
+.video-composer {
+  color: #b0b0b0;
+  font-size: 0.9rem;
+  margin-left: 1rem;
+  font-style: italic;
+}
+
+@media (max-width: 768px) {
+  .exercise-controls {
+    padding: 1.5rem;
+  }
+
+  .exercise-info h2 {
+    font-size: 1.5rem;
+  }
+
+  .exercise-btn {
+    min-width: 100%;
+    font-size: 1rem;
+  }
+
+  .exercise-actions {
+    flex-direction: column;
+  }
+}
+

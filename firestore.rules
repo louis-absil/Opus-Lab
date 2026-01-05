@@ -1,0 +1,95 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function: vérifier si l'utilisateur est authentifié
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function: vérifier si l'utilisateur est le propriétaire
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Helper function: vérifier si l'utilisateur est professeur
+    function isTeacher() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher';
+    }
+    
+    // Collection users
+    match /users/{userId} {
+      // Lecture : uniquement son propre document
+      allow read: if isOwner(userId);
+      
+      // Création : uniquement son propre document avec les champs requis
+      allow create: if isOwner(userId) 
+                   && request.resource.data.keys().hasAll(['email', 'displayName', 'role', 'xp'])
+                   && request.resource.data.role in ['student', 'teacher']
+                   && request.resource.data.xp is int
+                   && request.resource.data.xp >= 0;
+      
+      // Mise à jour : uniquement son propre document, SAUF le champ role (géré par le système)
+      allow update: if isOwner(userId)
+                   && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])
+                       || resource.data.role == request.resource.data.role);
+      
+      // Suppression : interdite (les comptes ne peuvent pas être supprimés côté client)
+      allow delete: if false;
+    }
+    
+    // Collection exercises
+    match /exercises/{exerciseId} {
+      // Lecture : 
+      // - Exercices publiés : lecture publique (même sans authentification)
+      // - Exercices draft : uniquement par l'auteur
+      allow read: if resource.data.status == 'published' 
+                 || (isAuthenticated() && resource.data.authorId == request.auth.uid);
+      
+      // Création : uniquement pour les professeurs authentifiés
+      allow create: if isTeacher()
+                   && request.resource.data.authorId == request.auth.uid
+                   && request.resource.data.keys().hasAll(['authorId', 'authorName', 'status', 'video', 'settings', 'markers'])
+                   && request.resource.data.status in ['draft', 'published'];
+      
+      // Mise à jour : uniquement par l'auteur
+      allow update: if isAuthenticated() 
+                   && resource.data.authorId == request.auth.uid
+                   && request.resource.data.authorId == resource.data.authorId; // L'auteur ne peut pas changer
+      
+      // Suppression : uniquement par l'auteur
+      allow delete: if isAuthenticated() 
+                   && resource.data.authorId == request.auth.uid;
+    }
+    
+    // Collection attempts
+    match /attempts/{attemptId} {
+      // Lecture : uniquement ses propres tentatives
+      allow read: if isAuthenticated() 
+                 && resource.data.userId == request.auth.uid;
+      
+      // Création : un utilisateur authentifié peut créer une tentative avec son propre userId
+      allow create: if isAuthenticated() 
+                   && request.resource.data.userId == request.auth.uid
+                   && request.resource.data.keys().hasAll(['userId', 'exerciseId', 'userAnswers', 'correctAnswers', 'score', 'correctCount', 'totalQuestions']);
+      
+      // Mise à jour : interdite (les tentatives sont immuables)
+      allow update: if false;
+      
+      // Suppression : interdite
+      allow delete: if false;
+    }
+    
+    // Collection authorizedTeachers
+    match /authorizedTeachers/{docId} {
+      // Lecture : publique (pour vérifier si un email est autorisé)
+      allow read: if true;
+      
+      // Écriture : interdite côté client (uniquement via la console Firebase)
+      allow create, update, delete: if false;
+    }
+  }
+}
+
