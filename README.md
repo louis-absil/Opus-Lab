@@ -107,6 +107,34 @@ npm run preview
 
 L'application sera accessible sur `http://localhost:5173` (ou le port indiqué par Vite).
 
+## 🌐 Déploiement sur GitHub Pages
+
+Le projet est configuré pour être déployé automatiquement sur GitHub Pages.
+
+### Déploiement automatique
+
+1. **Activez GitHub Pages** dans les paramètres de votre dépôt :
+   - Allez dans **Settings** → **Pages**
+   - Sélectionnez **Source** : `GitHub Actions`
+
+2. **Poussez le code** sur la branche `main` :
+   ```bash
+   git push origin main
+   ```
+
+3. **Le déploiement se fait automatiquement** :
+   - Le workflow GitHub Actions se déclenche à chaque push
+   - Votre site sera accessible à : `https://VOTRE_USERNAME.github.io/opus-lab/`
+
+### Configuration Firebase pour GitHub Pages
+
+⚠️ **Important** : Assurez-vous que votre configuration Firebase autorise les requêtes depuis votre domaine GitHub Pages.
+
+1. Dans la console Firebase, allez dans **Authentication** → **Settings** → **Authorized domains**
+2. Ajoutez : `VOTRE_USERNAME.github.io`
+
+Pour plus de détails, consultez le guide complet : [`GITHUB_PAGES_SETUP.md`](./GITHUB_PAGES_SETUP.md)
+
 ## 📁 Structure du projet
 
 ```
