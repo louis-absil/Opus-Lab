@@ -207,7 +207,18 @@ Les contributions sont les bienvenues ! Pour contribuer :
 
 ## 📝 Licence
 
-Ce projet est sous licence privée. Tous droits réservés.
+Ce projet est sous licence **Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)**.
+
+### Vous êtes libre de :
+- ✅ **Partager** — copier, distribuer et communiquer le matériel par tous moyens et sous tous formats
+- ✅ **Adapter** — remixer, transformer et créer à partir du matériel
+
+### Sous les conditions suivantes :
+- 📌 **Attribution** — Vous devez créditer l'œuvre et inclure un lien vers la licence
+- 📌 **Attribution et lien** — Lorsque vous créez un lien vers ou référencez ce projet, vous devez fournir une attribution appropriée à l'auteur original et inclure un lien vers le dépôt GitHub
+- ❌ **NonCommercial** — Vous n'êtes pas autorisé à faire un usage commercial de cette œuvre
+
+Pour plus de détails, consultez le fichier [LICENSE](./LICENSE) ou visitez : https://creativecommons.org/licenses/by-nc/4.0/
 
 ## 👤 Auteur
 
