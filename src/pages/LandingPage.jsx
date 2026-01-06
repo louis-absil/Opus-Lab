@@ -213,8 +213,8 @@ function LandingPage() {
         <div className="feature-block feature-left">
           <div className="feature-image">
             <img 
-              src="https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=800&h=600&fit=crop&q=80" 
-              alt="Partition musicale et analyse harmonique"
+              src="https://images.unsplash.com/photo-1520523839897-bd0b52f945a0?w=800&h=600&fit=crop&q=80" 
+              alt="Instruments classiques et partition"
               loading="lazy"
             />
           </div>
