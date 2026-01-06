@@ -62,33 +62,33 @@ Si vous voulez utiliser un domaine personnalisé :
 2. Sous **Custom domain**, entrez votre domaine
 3. Suivez les instructions pour configurer le DNS
 
-### Variables d'environnement
+### Variables d'environnement Firebase
 
-⚠️ **Important** : Les variables d'environnement Firebase doivent être configurées dans votre application.
+⚠️ **Important** : Les variables d'environnement Firebase doivent être configurées comme secrets GitHub pour que le build fonctionne.
 
-Pour GitHub Pages, vous avez deux options :
+#### Configuration des secrets GitHub
 
-#### Option 1 : Variables d'environnement publiques (non recommandé pour les clés secrètes)
+1. **Récupérez vos clés Firebase** :
+   - Allez dans la [Console Firebase](https://console.firebase.google.com)
+   - Sélectionnez votre projet
+   - Allez dans **Paramètres du projet** (icône ⚙️) → **Vos applications**
+   - Si vous n'avez pas encore d'application web, cliquez sur **Ajouter une application** → **Web** (icône `</>`)
+   - Copiez les valeurs de configuration
 
-Créez un fichier `.env.production` à la racine (mais ne le commitez PAS avec des vraies clés) :
+2. **Ajoutez les secrets dans GitHub** :
+   - Allez sur votre dépôt GitHub
+   - Cliquez sur **Settings** → **Secrets and variables** → **Actions**
+   - Cliquez sur **New repository secret** pour chaque variable :
+     - `VITE_FIREBASE_API_KEY` : Votre clé API Firebase
+     - `VITE_FIREBASE_AUTH_DOMAIN` : `votre-projet.firebaseapp.com`
+     - `VITE_FIREBASE_PROJECT_ID` : L'ID de votre projet Firebase
+     - `VITE_FIREBASE_STORAGE_BUCKET` : `votre-projet.appspot.com`
+     - `VITE_FIREBASE_MESSAGING_SENDER_ID` : Votre ID d'expéditeur
+     - `VITE_FIREBASE_APP_ID` : Votre ID d'application
 
-```env
-VITE_FIREBASE_API_KEY=your_api_key
-VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=your_project_id
-VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
-VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-VITE_FIREBASE_APP_ID=your_app_id
-```
+3. **Le workflow utilisera automatiquement ces secrets** lors du build
 
-**Note** : Ces variables seront visibles dans le code compilé. Pour les clés Firebase, c'est acceptable car elles sont destinées à être publiques côté client.
-
-#### Option 2 : Utiliser GitHub Secrets (pour des valeurs vraiment secrètes)
-
-Si vous avez des secrets à protéger :
-1. Allez dans **Settings** → **Secrets and variables** → **Actions**
-2. Ajoutez vos secrets
-3. Modifiez le workflow pour les utiliser
+**Note** : Les clés Firebase côté client sont normalement publiques (elles apparaissent dans le code compilé), mais utiliser des secrets GitHub est une bonne pratique pour la gestion de la configuration.
 
 ## 🐛 Dépannage
 
