@@ -96,11 +96,36 @@ function LandingPage() {
             <div className="device-mockup">
               <div className="device-frame">
                 <div className="device-screen">
-                  <img 
-                    src="https://via.placeholder.com/800x500/667eea/ffffff?text=Opus+Lab+Player+Interface" 
-                    alt="Opus Lab Interface Preview"
-                    className="screen-image"
-                  />
+                  <div className="app-preview">
+                    <div className="preview-header">
+                      <div className="preview-title">Opus Lab - Player</div>
+                    </div>
+                    <div className="preview-video-area">
+                      <div className="video-placeholder">
+                        <svg className="play-icon" viewBox="0 0 24 24" fill="none">
+                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                          <path d="M10 8l6 4-6 4V8z" fill="currentColor"/>
+                        </svg>
+                        <span>Vidéo YouTube</span>
+                      </div>
+                    </div>
+                    <div className="preview-timeline">
+                      <div className="timeline-bar">
+                        <div className="timeline-progress"></div>
+                        <div className="timeline-marker"></div>
+                      </div>
+                      <div className="timeline-chords">
+                        <span className="chord-tag">Do majeur</span>
+                        <span className="chord-tag">Fa majeur</span>
+                        <span className="chord-tag active">Sol majeur</span>
+                      </div>
+                    </div>
+                    <div className="preview-controls">
+                      <button className="control-btn">⏮</button>
+                      <button className="control-btn play">⏸</button>
+                      <button className="control-btn">⏭</button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -113,10 +138,20 @@ function LandingPage() {
         {/* Feature 1 - Image Left */}
         <div className="feature-block feature-left">
           <div className="feature-image">
-            <img 
-              src="https://via.placeholder.com/600x400/764ba2/ffffff?text=Analyse+des+Chefs-d%27œuvre" 
-              alt="Analyse des œuvres classiques"
-            />
+            <div className="feature-illustration illustration-1">
+              <svg viewBox="0 0 200 200" className="illustration-svg">
+                <defs>
+                  <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#667eea" stopOpacity="1" />
+                    <stop offset="100%" stopColor="#764ba2" stopOpacity="1" />
+                  </linearGradient>
+                </defs>
+                <circle cx="100" cy="100" r="80" fill="url(#grad1)" opacity="0.2"/>
+                <path d="M50 100 L90 70 L90 130 Z" fill="url(#grad1)"/>
+                <circle cx="150" cy="100" r="30" fill="url(#grad1)" opacity="0.5"/>
+                <text x="100" y="180" textAnchor="middle" fontSize="16" fill="#667eea" fontWeight="600">Œuvres Classiques</text>
+              </svg>
+            </div>
           </div>
           <div className="feature-content">
             <h2 className="feature-title">Analysez les chefs-d'œuvre</h2>
@@ -139,20 +174,44 @@ function LandingPage() {
             </p>
           </div>
           <div className="feature-image">
-            <img 
-              src="https://via.placeholder.com/600x400/667eea/ffffff?text=Progression+%26+XP" 
-              alt="Suivi de progression"
-            />
+            <div className="feature-illustration illustration-2">
+              <svg viewBox="0 0 200 200" className="illustration-svg">
+                <defs>
+                  <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#667eea" stopOpacity="1" />
+                    <stop offset="100%" stopColor="#764ba2" stopOpacity="1" />
+                  </linearGradient>
+                </defs>
+                <rect x="40" y="140" width="20" height="40" fill="url(#grad2)" opacity="0.6"/>
+                <rect x="70" y="120" width="20" height="60" fill="url(#grad2)" opacity="0.7"/>
+                <rect x="100" y="100" width="20" height="80" fill="url(#grad2)" opacity="0.8"/>
+                <rect x="130" y="80" width="20" height="100" fill="url(#grad2)"/>
+                <circle cx="100" cy="50" r="15" fill="url(#grad2)"/>
+                <text x="100" y="180" textAnchor="middle" fontSize="16" fill="#667eea" fontWeight="600">Progression XP</text>
+              </svg>
+            </div>
           </div>
         </div>
 
         {/* Feature 3 - Image Left */}
         <div className="feature-block feature-left">
           <div className="feature-image">
-            <img 
-              src="https://via.placeholder.com/600x400/764ba2/ffffff?text=Exercices+Ciblés" 
-              alt="Exercices personnalisés"
-            />
+            <div className="feature-illustration illustration-3">
+              <svg viewBox="0 0 200 200" className="illustration-svg">
+                <defs>
+                  <linearGradient id="grad3" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#667eea" stopOpacity="1" />
+                    <stop offset="100%" stopColor="#764ba2" stopOpacity="1" />
+                  </linearGradient>
+                </defs>
+                <rect x="30" y="50" width="140" height="100" rx="10" fill="url(#grad3)" opacity="0.1"/>
+                <rect x="50" y="70" width="100" height="8" rx="4" fill="url(#grad3)"/>
+                <rect x="50" y="90" width="80" height="8" rx="4" fill="url(#grad3)" opacity="0.7"/>
+                <rect x="50" y="110" width="120" height="8" rx="4" fill="url(#grad3)" opacity="0.5"/>
+                <circle cx="170" cy="80" r="8" fill="url(#grad3)"/>
+                <text x="100" y="180" textAnchor="middle" fontSize="16" fill="#667eea" fontWeight="600">Filtres Avancés</text>
+              </svg>
+            </div>
           </div>
           <div className="feature-content">
             <h2 className="feature-title">Entraînement à la carte</h2>
