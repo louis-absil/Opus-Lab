@@ -4,5 +4,5 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: '/opus-lab/', // Chemin de base pour GitHub Pages
+  base: '/Opus-Lab/', // Chemin de base pour GitHub Pages
 })
