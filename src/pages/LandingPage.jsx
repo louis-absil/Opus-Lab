@@ -105,12 +105,16 @@ function LandingPage() {
                       </div>
                     </div>
                     <div className="preview-video-area">
-                      <div className="video-placeholder">
+                      <img 
+                        src="https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=800&h=450&fit=crop&q=80" 
+                        alt="Orchestre symphonique en concert"
+                        className="preview-video-image"
+                      />
+                      <div className="video-overlay">
                         <svg className="play-icon" viewBox="0 0 24 24" fill="none">
-                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="rgba(0,0,0,0.5)"/>
                           <path d="M10 8l6 4-6 4V8z" fill="currentColor"/>
                         </svg>
-                        <span>Extrait musical</span>
                       </div>
                     </div>
                     <div className="preview-timeline-section">
@@ -171,7 +175,7 @@ function LandingPage() {
         <div className="feature-block feature-left">
           <div className="feature-image">
             <img 
-              src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&h=600&fit=crop&q=80" 
+              src="https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=800&h=600&fit=crop&q=80" 
               alt="Orchestre symphonique en concert"
               loading="lazy"
             />
@@ -198,8 +202,8 @@ function LandingPage() {
           </div>
           <div className="feature-image">
             <img 
-              src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&h=600&fit=crop&q=80" 
-              alt="Graphique de progression et statistiques"
+              src="https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=800&h=600&fit=crop&q=80" 
+              alt="Partition musicale et analyse harmonique"
               loading="lazy"
             />
           </div>
