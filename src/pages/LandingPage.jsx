@@ -62,7 +62,7 @@ function LandingPage() {
               Opus Lab
             </h1>
             <p className="hero-subtitle fade-up">
-              Maîtrisez l'analyse harmonique grâce à l'écoute active sur des œuvres réelles.
+              Perfectionnez votre analyse harmonique par l'écoute active d'œuvres du répertoire classique.
             </p>
             <div className="hero-cta fade-up">
               <button
@@ -88,7 +88,7 @@ function LandingPage() {
                 )}
               </button>
               <p className="cta-reassurance">
-                Compte gratuit. Pas de carte requise.
+                Accès gratuit. Aucune carte bancaire requise.
               </p>
             </div>
           </div>
@@ -98,7 +98,11 @@ function LandingPage() {
                 <div className="device-screen">
                   <div className="app-preview">
                     <div className="preview-header">
-                      <div className="preview-title">Opus Lab - Player</div>
+                      <h2 className="preview-app-title">Opus Lab</h2>
+                      <div className="preview-exercise-info">
+                        <span className="preview-exercise-title">Sonate pour piano n°14</span>
+                        <span className="preview-composer">Ludwig van Beethoven</span>
+                      </div>
                     </div>
                     <div className="preview-video-area">
                       <div className="video-placeholder">
@@ -106,18 +110,25 @@ function LandingPage() {
                           <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
                           <path d="M10 8l6 4-6 4V8z" fill="currentColor"/>
                         </svg>
-                        <span>Vidéo YouTube</span>
+                        <span>Extrait musical</span>
                       </div>
                     </div>
-                    <div className="preview-timeline">
-                      <div className="timeline-bar">
-                        <div className="timeline-progress"></div>
-                        <div className="timeline-marker"></div>
+                    <div className="preview-timeline-section">
+                      <div className="preview-timeline">
+                        <div className="timeline-bar">
+                          <div className="timeline-progress"></div>
+                          <div className="timeline-marker"></div>
+                          <div className="timeline-question-marker" style={{left: '25%'}}></div>
+                          <div className="timeline-question-marker answered" style={{left: '50%'}}></div>
+                          <div className="timeline-question-marker" style={{left: '75%'}}></div>
+                        </div>
+                        <div className="timeline-time">
+                          <span>00:15</span>
+                          <span>00:45</span>
+                        </div>
                       </div>
-                      <div className="timeline-chords">
-                        <span className="chord-tag">Do majeur</span>
-                        <span className="chord-tag">Fa majeur</span>
-                        <span className="chord-tag active">Sol majeur</span>
+                      <div className="preview-progress">
+                        <span className="progress-text">Progression : 1/3</span>
                       </div>
                     </div>
                     <div className="preview-controls">
@@ -138,27 +149,18 @@ function LandingPage() {
         {/* Feature 1 - Image Left */}
         <div className="feature-block feature-left">
           <div className="feature-image">
-            <div className="feature-illustration illustration-1">
-              <svg viewBox="0 0 200 200" className="illustration-svg">
-                <defs>
-                  <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#667eea" stopOpacity="1" />
-                    <stop offset="100%" stopColor="#764ba2" stopOpacity="1" />
-                  </linearGradient>
-                </defs>
-                <circle cx="100" cy="100" r="80" fill="url(#grad1)" opacity="0.2"/>
-                <path d="M50 100 L90 70 L90 130 Z" fill="url(#grad1)"/>
-                <circle cx="150" cy="100" r="30" fill="url(#grad1)" opacity="0.5"/>
-                <text x="100" y="180" textAnchor="middle" fontSize="16" fill="#667eea" fontWeight="600">Œuvres Classiques</text>
-              </svg>
-            </div>
+            <img 
+              src="https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=800&h=600&fit=crop&q=80" 
+              alt="Orchestre symphonique en répétition"
+              loading="lazy"
+            />
           </div>
           <div className="feature-content">
-            <h2 className="feature-title">Analysez les chefs-d'œuvre</h2>
+            <h2 className="feature-title">Analyse du répertoire classique</h2>
             <p className="feature-description">
-              Entraînez-vous sur des extraits authentiques de grandes œuvres classiques. 
-              Chaque exercice vous plonge dans l'univers réel des compositeurs, 
-              développant votre oreille harmonique avec des matériaux musicaux authentiques.
+              Travaillez sur des extraits authentiques tirés du répertoire classique occidental. 
+              Chaque exercice vous confronte à des œuvres réelles, développant votre compréhension 
+              harmonique à travers l'écoute active de matériaux musicaux authentiques.
             </p>
           </div>
         </div>
@@ -166,59 +168,37 @@ function LandingPage() {
         {/* Feature 2 - Image Right */}
         <div className="feature-block feature-right">
           <div className="feature-content">
-            <h2 className="feature-title">Visualisez votre succès</h2>
+            <h2 className="feature-title">Suivi pédagogique de la progression</h2>
             <p className="feature-description">
-              Suivez votre progression avec un système de points d'expérience (XP) 
-              et de gamification. Chaque exercice réussi vous rapproche de la maîtrise, 
-              transformant l'apprentissage en parcours motivant et mesurable.
+              Mesurez votre évolution grâce à un système de points d'expérience et de gamification. 
+              Chaque exercice complété contribue à votre progression, transformant l'apprentissage 
+              de l'analyse harmonique en parcours structuré et quantifiable.
             </p>
           </div>
           <div className="feature-image">
-            <div className="feature-illustration illustration-2">
-              <svg viewBox="0 0 200 200" className="illustration-svg">
-                <defs>
-                  <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#667eea" stopOpacity="1" />
-                    <stop offset="100%" stopColor="#764ba2" stopOpacity="1" />
-                  </linearGradient>
-                </defs>
-                <rect x="40" y="140" width="20" height="40" fill="url(#grad2)" opacity="0.6"/>
-                <rect x="70" y="120" width="20" height="60" fill="url(#grad2)" opacity="0.7"/>
-                <rect x="100" y="100" width="20" height="80" fill="url(#grad2)" opacity="0.8"/>
-                <rect x="130" y="80" width="20" height="100" fill="url(#grad2)"/>
-                <circle cx="100" cy="50" r="15" fill="url(#grad2)"/>
-                <text x="100" y="180" textAnchor="middle" fontSize="16" fill="#667eea" fontWeight="600">Progression XP</text>
-              </svg>
-            </div>
+            <img 
+              src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&h=600&fit=crop&q=80" 
+              alt="Graphique de progression et statistiques"
+              loading="lazy"
+            />
           </div>
         </div>
 
         {/* Feature 3 - Image Left */}
         <div className="feature-block feature-left">
           <div className="feature-image">
-            <div className="feature-illustration illustration-3">
-              <svg viewBox="0 0 200 200" className="illustration-svg">
-                <defs>
-                  <linearGradient id="grad3" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#667eea" stopOpacity="1" />
-                    <stop offset="100%" stopColor="#764ba2" stopOpacity="1" />
-                  </linearGradient>
-                </defs>
-                <rect x="30" y="50" width="140" height="100" rx="10" fill="url(#grad3)" opacity="0.1"/>
-                <rect x="50" y="70" width="100" height="8" rx="4" fill="url(#grad3)"/>
-                <rect x="50" y="90" width="80" height="8" rx="4" fill="url(#grad3)" opacity="0.7"/>
-                <rect x="50" y="110" width="120" height="8" rx="4" fill="url(#grad3)" opacity="0.5"/>
-                <circle cx="170" cy="80" r="8" fill="url(#grad3)"/>
-                <text x="100" y="180" textAnchor="middle" fontSize="16" fill="#667eea" fontWeight="600">Filtres Avancés</text>
-              </svg>
-            </div>
+            <img 
+              src="https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=800&h=600&fit=crop&q=80" 
+              alt="Partition musicale et analyse harmonique"
+              loading="lazy"
+            />
           </div>
           <div className="feature-content">
-            <h2 className="feature-title">Entraînement à la carte</h2>
+            <h2 className="feature-title">Parcours pédagogique personnalisé</h2>
             <p className="feature-description">
-              Filtrez les exercices par compositeur, période, difficulté ou type d'accord. 
-              Créez votre parcours personnalisé selon vos objectifs et votre niveau, 
-              pour un apprentissage ciblé et efficace.
+              Sélectionnez vos exercices selon le compositeur, la période historique, le niveau de 
+              difficulté ou le type d'accord étudié. Construisez un parcours d'apprentissage adapté 
+              à vos objectifs pédagogiques et à votre niveau de maîtrise.
             </p>
           </div>
         </div>
@@ -227,7 +207,7 @@ function LandingPage() {
       {/* Final CTA Section */}
       <section className="cta-section" ref={ctaRef}>
         <div className="cta-container">
-          <h2 className="cta-title fade-up">Prêt à améliorer votre oreille ?</h2>
+          <h2 className="cta-title fade-up">Prêt à développer votre oreille harmonique ?</h2>
           <div className="cta-buttons fade-up">
             <button
               className="cta-button-primary"
@@ -255,7 +235,7 @@ function LandingPage() {
 
       {/* Footer */}
       <footer className="landing-footer">
-        <p>© 2024 Opus Lab • Plateforme d'entraînement harmonique</p>
+        <p>© 2024 Opus Lab • Plateforme d'entraînement à l'analyse harmonique</p>
       </footer>
     </div>
   )
