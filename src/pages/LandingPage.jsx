@@ -106,8 +106,8 @@ function LandingPage() {
                     </div>
                     <div className="preview-video-area">
                       <img 
-                        src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&h=450&fit=crop&q=80" 
-                        alt="Orchestre symphonique classique en concert"
+                        src="https://unsplash.com/photos/8J3TaXShe-s/download?w=800&h=450&fit=crop&q=80" 
+                        alt="Chef d'orchestre et orchestre en concert"
                         className="preview-video-image"
                       />
                       <div className="video-overlay">
@@ -175,8 +175,8 @@ function LandingPage() {
         <div className="feature-block feature-left">
           <div className="feature-image">
             <img 
-              src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&h=600&fit=crop&q=80" 
-              alt="Orchestre symphonique classique en concert"
+              src="https://unsplash.com/photos/slbOcNlWNHA/download?w=800&h=600&fit=crop&q=80" 
+              alt="Personnes jouant du violon dans une pièce sombre"
               loading="lazy"
             />
           </div>
@@ -202,8 +202,8 @@ function LandingPage() {
           </div>
           <div className="feature-image">
             <img 
-              src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&h=600&fit=crop&q=80" 
-              alt="Graphique de progression et statistiques"
+              src="https://unsplash.com/photos/RCMlKB9lO7Q/download?w=800&h=600&fit=crop&q=80" 
+              alt="Partition musicale et notes de musique"
               loading="lazy"
             />
           </div>
@@ -213,8 +213,8 @@ function LandingPage() {
         <div className="feature-block feature-left">
           <div className="feature-image">
             <img 
-              src="https://images.unsplash.com/photo-1520523839897-bd0b52f945a0?w=800&h=600&fit=crop&q=80" 
-              alt="Instruments classiques et partition"
+              src="https://unsplash.com/photos/cv1zLZ7j9jw/download?w=800&h=600&fit=crop&q=80" 
+              alt="Femme jouant du violon dans une salle de concert"
               loading="lazy"
             />
           </div>
