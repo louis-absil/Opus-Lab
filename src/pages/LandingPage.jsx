@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import './LandingPage.css'
@@ -7,6 +7,9 @@ function LandingPage() {
   const { signInWithGoogle, loading, enableGuestMode } = useAuth()
   const navigate = useNavigate()
   const [isSigningIn, setIsSigningIn] = useState(false)
+  const heroRef = useRef(null)
+  const featuresRef = useRef(null)
+  const ctaRef = useRef(null)
 
   const handleSignIn = async () => {
     try {
@@ -26,47 +29,44 @@ function LandingPage() {
     navigate('/student-dashboard')
   }
 
+  // Animation au scroll
+  useEffect(() => {
+    const observerOptions = {
+      threshold: 0.1,
+      rootMargin: '0px 0px -100px 0px'
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('fade-up-visible')
+        }
+      })
+    }, observerOptions)
+
+    const elements = document.querySelectorAll('.fade-up')
+    elements.forEach(el => observer.observe(el))
+
+    return () => {
+      elements.forEach(el => observer.unobserve(el))
+    }
+  }, [])
+
   return (
     <div className="landing-page">
-      <div className="landing-container">
-        <div className="landing-hero">
-          <div className="landing-logo">
-            <h1 className="landing-title">Opus Lab</h1>
-            <p className="landing-subtitle">L'entraînement harmonique intelligent</p>
-          </div>
-
-          <div className="landing-content">
-            <h2 className="landing-headline">
-              Maîtrisez l'analyse harmonique<br />
-              grâce à l'écoute active
-            </h2>
-            <p className="landing-description">
-              Opus Lab est une plateforme d'entraînement pour les musiciens qui souhaitent 
-              perfectionner leur oreille harmonique. Analysez des extraits musicaux, 
-              identifiez les accords et progressez à votre rythme.
+      {/* Hero Section - Split Screen */}
+      <section className="hero-section" ref={heroRef}>
+        <div className="hero-container">
+          <div className="hero-content">
+            <h1 className="hero-title fade-up">
+              Opus Lab
+            </h1>
+            <p className="hero-subtitle fade-up">
+              Maîtrisez l'analyse harmonique grâce à l'écoute active sur des œuvres réelles.
             </p>
-
-            <div className="landing-features">
-              <div className="feature-card">
-                <div className="feature-icon">🎵</div>
-                <h3>Extraits réels</h3>
-                <p>Entraînez-vous sur des œuvres classiques authentiques</p>
-              </div>
-              <div className="feature-card">
-                <div className="feature-icon">📊</div>
-                <h3>Suivi de progression</h3>
-                <p>Gagnez de l'XP et suivez vos performances</p>
-              </div>
-              <div className="feature-card">
-                <div className="feature-icon">🎯</div>
-                <h3>Exercices ciblés</h3>
-                <p>Filtrez par compositeur, difficulté ou type d'accord</p>
-              </div>
-            </div>
-
-            <div className="landing-cta">
+            <div className="hero-cta fade-up">
               <button
-                className="cta-button"
+                className="cta-primary"
                 onClick={handleSignIn}
                 disabled={isSigningIn || loading}
               >
@@ -87,35 +87,119 @@ function LandingPage() {
                   </>
                 )}
               </button>
-              <p className="cta-hint">
-                Gratuit et sans engagement • Créez votre compte en un clic
+              <p className="cta-reassurance">
+                Compte gratuit. Pas de carte requise.
               </p>
-              
-              <div className="landing-guest-option">
-                <div className="guest-divider">
-                  <span>ou</span>
+            </div>
+          </div>
+          <div className="hero-visual fade-up">
+            <div className="device-mockup">
+              <div className="device-frame">
+                <div className="device-screen">
+                  <img 
+                    src="https://via.placeholder.com/800x500/667eea/ffffff?text=Opus+Lab+Player+Interface" 
+                    alt="Opus Lab Interface Preview"
+                    className="screen-image"
+                  />
                 </div>
-                <button
-                  className="cta-button guest-button"
-                  onClick={handleGuestMode}
-                >
-                  Continuer en mode invité
-                </button>
-                <p className="guest-hint">
-                  Testez l'application sans créer de compte • Les scores ne seront pas sauvegardés
-                </p>
               </div>
             </div>
           </div>
         </div>
+      </section>
 
-        <div className="landing-footer">
-          <p>© 2024 Opus Lab • Plateforme d'entraînement harmonique</p>
+      {/* Features Section - Alternating Layout */}
+      <section className="features-section" ref={featuresRef}>
+        {/* Feature 1 - Image Left */}
+        <div className="feature-block feature-left">
+          <div className="feature-image">
+            <img 
+              src="https://via.placeholder.com/600x400/764ba2/ffffff?text=Analyse+des+Chefs-d%27œuvre" 
+              alt="Analyse des œuvres classiques"
+            />
+          </div>
+          <div className="feature-content">
+            <h2 className="feature-title">Analysez les chefs-d'œuvre</h2>
+            <p className="feature-description">
+              Entraînez-vous sur des extraits authentiques de grandes œuvres classiques. 
+              Chaque exercice vous plonge dans l'univers réel des compositeurs, 
+              développant votre oreille harmonique avec des matériaux musicaux authentiques.
+            </p>
+          </div>
         </div>
-      </div>
+
+        {/* Feature 2 - Image Right */}
+        <div className="feature-block feature-right">
+          <div className="feature-content">
+            <h2 className="feature-title">Visualisez votre succès</h2>
+            <p className="feature-description">
+              Suivez votre progression avec un système de points d'expérience (XP) 
+              et de gamification. Chaque exercice réussi vous rapproche de la maîtrise, 
+              transformant l'apprentissage en parcours motivant et mesurable.
+            </p>
+          </div>
+          <div className="feature-image">
+            <img 
+              src="https://via.placeholder.com/600x400/667eea/ffffff?text=Progression+%26+XP" 
+              alt="Suivi de progression"
+            />
+          </div>
+        </div>
+
+        {/* Feature 3 - Image Left */}
+        <div className="feature-block feature-left">
+          <div className="feature-image">
+            <img 
+              src="https://via.placeholder.com/600x400/764ba2/ffffff?text=Exercices+Ciblés" 
+              alt="Exercices personnalisés"
+            />
+          </div>
+          <div className="feature-content">
+            <h2 className="feature-title">Entraînement à la carte</h2>
+            <p className="feature-description">
+              Filtrez les exercices par compositeur, période, difficulté ou type d'accord. 
+              Créez votre parcours personnalisé selon vos objectifs et votre niveau, 
+              pour un apprentissage ciblé et efficace.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Final CTA Section */}
+      <section className="cta-section" ref={ctaRef}>
+        <div className="cta-container">
+          <h2 className="cta-title fade-up">Prêt à améliorer votre oreille ?</h2>
+          <div className="cta-buttons fade-up">
+            <button
+              className="cta-button-primary"
+              onClick={handleSignIn}
+              disabled={isSigningIn || loading}
+            >
+              {isSigningIn ? (
+                <>
+                  <span className="spinner-small"></span>
+                  Connexion...
+                </>
+              ) : (
+                'Créer mon compte gratuit'
+              )}
+            </button>
+            <button
+              className="cta-button-secondary"
+              onClick={handleGuestMode}
+            >
+              Essayer une démo sans compte
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="landing-footer">
+        <p>© 2024 Opus Lab • Plateforme d'entraînement harmonique</p>
+      </footer>
     </div>
   )
 }
 
 export default LandingPage
-
