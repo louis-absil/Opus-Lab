@@ -106,8 +106,8 @@ function LandingPage() {
                     </div>
                     <div className="preview-video-area">
                       <img 
-                        src="https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=800&h=450&fit=crop&q=80" 
-                        alt="Orchestre symphonique en concert"
+                        src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&h=450&fit=crop&q=80" 
+                        alt="Orchestre symphonique classique en concert"
                         className="preview-video-image"
                       />
                       <div className="video-overlay">
