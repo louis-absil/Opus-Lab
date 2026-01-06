@@ -100,7 +100,7 @@ function LandingPage() {
                     <div className="preview-header">
                       <h2 className="preview-app-title">Opus Lab</h2>
                       <div className="preview-exercise-info">
-                        <span className="preview-exercise-title">Sonate pour piano n°14</span>
+                        <span className="preview-exercise-title">Symphonie n°5 en ut mineur</span>
                         <span className="preview-composer">Ludwig van Beethoven</span>
                       </div>
                     </div>
@@ -131,6 +131,27 @@ function LandingPage() {
                         <span className="progress-text">Progression : 1/3</span>
                       </div>
                     </div>
+                    <div className="preview-chords">
+                      <div className="chords-label">Identifiez l'accord :</div>
+                      <div className="chords-buttons">
+                        <button className="chord-btn">
+                          <span className="chord-degree">I</span>
+                          <span className="chord-inversion">6</span>
+                        </button>
+                        <button className="chord-btn">
+                          <span className="chord-degree">IV</span>
+                          <span className="chord-inversion">6/4</span>
+                        </button>
+                        <button className="chord-btn active">
+                          <span className="chord-degree">V</span>
+                          <span className="chord-inversion">5/3</span>
+                        </button>
+                        <button className="chord-btn">
+                          <span className="chord-degree">vi</span>
+                          <span className="chord-inversion">6</span>
+                        </button>
+                      </div>
+                    </div>
                     <div className="preview-controls">
                       <button className="control-btn">⏮</button>
                       <button className="control-btn play">⏸</button>
@@ -150,8 +171,8 @@ function LandingPage() {
         <div className="feature-block feature-left">
           <div className="feature-image">
             <img 
-              src="https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=800&h=600&fit=crop&q=80" 
-              alt="Orchestre symphonique en répétition"
+              src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&h=600&fit=crop&q=80" 
+              alt="Orchestre symphonique en concert"
               loading="lazy"
             />
           </div>
