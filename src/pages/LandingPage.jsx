@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { getAuthErrorMessage } from '../utils/errorHandler'
 import './LandingPage.css'
 
 function LandingPage() {
@@ -18,7 +19,15 @@ function LandingPage() {
       // La redirection sera gérée par AppRouter selon le rôle
     } catch (error) {
       console.error('Erreur lors de la connexion:', error)
-      alert('Erreur lors de la connexion. Veuillez réessayer.')
+      
+      // Ne pas afficher d'alerte si l'utilisateur a fermé la popup
+      if (error.code === 'auth/popup-closed-by-user') {
+        return
+      }
+      
+      // Utiliser l'utilitaire pour obtenir un message d'erreur approprié
+      const errorMessage = getAuthErrorMessage(error)
+      alert(errorMessage)
     } finally {
       setIsSigningIn(false)
     }
@@ -109,6 +118,14 @@ function LandingPage() {
                         src="https://unsplash.com/photos/8J3TaXShe-s/download?w=800&h=450&fit=crop&q=80" 
                         alt="Chef d'orchestre et orchestre en concert"
                         className="preview-video-image"
+                        onError={(e) => {
+                          // Fallback vers une couleur de fond si l'image ne charge pas
+                          e.target.style.display = 'none'
+                          e.target.parentElement.style.backgroundColor = '#667eea'
+                          e.target.parentElement.style.display = 'flex'
+                          e.target.parentElement.style.alignItems = 'center'
+                          e.target.parentElement.style.justifyContent = 'center'
+                        }}
                       />
                       <div className="video-overlay">
                         <svg className="play-icon" viewBox="0 0 24 24" fill="none">
@@ -178,6 +195,12 @@ function LandingPage() {
               src="https://unsplash.com/photos/slbOcNlWNHA/download?w=800&h=600&fit=crop&q=80" 
               alt="Personnes jouant du violon dans une pièce sombre"
               loading="lazy"
+              onError={(e) => {
+                // Fallback vers une couleur de fond si l'image ne charge pas
+                e.target.style.display = 'none'
+                e.target.parentElement.style.backgroundColor = '#f0f0f0'
+                e.target.parentElement.style.minHeight = '400px'
+              }}
             />
           </div>
           <div className="feature-content">
@@ -205,6 +228,12 @@ function LandingPage() {
               src="https://unsplash.com/photos/RCMlKB9lO7Q/download?w=800&h=600&fit=crop&q=80" 
               alt="Partition musicale et notes de musique"
               loading="lazy"
+              onError={(e) => {
+                // Fallback vers une couleur de fond si l'image ne charge pas
+                e.target.style.display = 'none'
+                e.target.parentElement.style.backgroundColor = '#f0f0f0'
+                e.target.parentElement.style.minHeight = '400px'
+              }}
             />
           </div>
         </div>
@@ -216,6 +245,12 @@ function LandingPage() {
               src="https://unsplash.com/photos/cv1zLZ7j9jw/download?w=800&h=600&fit=crop&q=80" 
               alt="Femme jouant du violon dans une salle de concert"
               loading="lazy"
+              onError={(e) => {
+                // Fallback vers une couleur de fond si l'image ne charge pas
+                e.target.style.display = 'none'
+                e.target.parentElement.style.backgroundColor = '#f0f0f0'
+                e.target.parentElement.style.minHeight = '400px'
+              }}
             />
           </div>
           <div className="feature-content">
@@ -254,8 +289,8 @@ function LandingPage() {
             >
               Essayer une démo sans compte
             </button>
-          </div>
         </div>
+      </div>
       </section>
 
       {/* Footer */}

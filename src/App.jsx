@@ -408,8 +408,12 @@ function App() {
         setIsSaveModalOpen(true)
       } catch (error) {
         console.error('Erreur lors de la connexion:', error)
-        setSaveMessage({ type: 'error', text: 'Erreur lors de la connexion' })
-        setTimeout(() => setSaveMessage(null), 3000)
+        // Ne pas afficher de message si l'utilisateur a fermé la popup
+        if (error.code !== 'auth/popup-closed-by-user') {
+          const { getAuthErrorMessage } = await import('../utils/errorHandler')
+          setSaveMessage({ type: 'error', text: getAuthErrorMessage(error) })
+          setTimeout(() => setSaveMessage(null), 5000)
+        }
       }
       return
     }
@@ -489,6 +493,12 @@ function App() {
         })
         .catch((error) => {
           console.error('Erreur lors de la connexion:', error)
+          // Ne pas afficher de message si l'utilisateur a fermé la popup
+          if (error.code !== 'auth/popup-closed-by-user') {
+            import('../utils/errorHandler').then(({ getAuthErrorMessage }) => {
+              alert(getAuthErrorMessage(error))
+            })
+          }
         })
     } else {
       // Si connecté, ouvrir la modale

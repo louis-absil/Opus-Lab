@@ -4,6 +4,7 @@ import YouTube from 'react-youtube'
 import ChordSelectorModal from '../ChordSelectorModal'
 import VideoCockpit from '../VideoCockpit'
 import SaveExerciseModal from '../components/SaveExerciseModal'
+import VideoImport from '../components/VideoImport'
 import { useAuth } from '../contexts/AuthContext'
 import { getExerciseById, createExercise, updateExercise } from '../services/exerciseService'
 import '../App.css'
@@ -26,6 +27,7 @@ function Editor() {
   const [videoDuration, setVideoDuration] = useState(0)
   const [videoTitle, setVideoTitle] = useState('')
   const [isEditingUrl, setIsEditingUrl] = useState(true)
+  const [showVideoSearch, setShowVideoSearch] = useState(false)
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState(null)
@@ -83,6 +85,7 @@ function Editor() {
 
       setExerciseId(exerciseId)
       setIsEditingUrl(false)
+      setShowVideoSearch(false)
     } catch (error) {
       console.error('Erreur lors du chargement de l\'exercice:', error)
       setSaveMessage({ type: 'error', text: 'Erreur lors du chargement de l\'exercice' })
@@ -434,7 +437,21 @@ function Editor() {
     }
   }
 
-  const extractedId = extractVideoId(videoId)
+  // Gérer la sélection d'une vidéo depuis VideoSearch
+  const handleVideoSelect = (videoData) => {
+    setVideoId(videoData.id)
+    setVideoTitle(videoData.title)
+    // Parser la durée (format "M:SS" ou "H:MM:SS")
+    const durationParts = videoData.duration.split(':').map(Number)
+    const durationSeconds = durationParts.length === 3
+      ? durationParts[0] * 3600 + durationParts[1] * 60 + durationParts[2]
+      : durationParts.length === 2
+      ? durationParts[0] * 60 + durationParts[1]
+      : durationParts[0]
+    setVideoDuration(durationSeconds || 0)
+    setIsEditingUrl(false)
+    setShowVideoSearch(false)
+  }
 
   // Gérer la sauvegarde de l'exercice
   const handleSaveExercise = async (metadata) => {
@@ -444,8 +461,12 @@ function Editor() {
         setIsSaveModalOpen(true)
       } catch (error) {
         console.error('Erreur lors de la connexion:', error)
-        setSaveMessage({ type: 'error', text: 'Erreur lors de la connexion' })
-        setTimeout(() => setSaveMessage(null), 3000)
+        // Ne pas afficher de message si l'utilisateur a fermé la popup
+        if (error.code !== 'auth/popup-closed-by-user') {
+          const { getAuthErrorMessage } = await import('../utils/errorHandler')
+          setSaveMessage({ type: 'error', text: getAuthErrorMessage(error) })
+          setTimeout(() => setSaveMessage(null), 5000)
+        }
       }
       return
     }
@@ -526,7 +547,15 @@ function Editor() {
     if (!user) {
       signInWithGoogle()
         .then(() => setIsSaveModalOpen(true))
-        .catch((error) => console.error('Erreur lors de la connexion:', error))
+        .catch((error) => {
+          console.error('Erreur lors de la connexion:', error)
+          // Ne pas afficher de message si l'utilisateur a fermé la popup
+          if (error.code !== 'auth/popup-closed-by-user') {
+            import('../utils/errorHandler').then(({ getAuthErrorMessage }) => {
+              alert(getAuthErrorMessage(error))
+            })
+          }
+        })
     } else {
       setIsSaveModalOpen(true)
     }
@@ -556,6 +585,35 @@ function Editor() {
     )
   }
 
+  const extractedId = extractVideoId(videoId) || videoId
+
+  // Afficher VideoSearch si pas de vidéo ou en mode édition
+  if (!extractedId || showVideoSearch || (isEditingUrl && !extractedId)) {
+    return (
+      <div className="app">
+        <div className="container">
+          <div className="app-header">
+            <h1 className="app-title">Opus Lab</h1>
+            <div className="header-content">
+              <div className="header-actions">
+                <button
+                  className="dashboard-new-btn"
+                  onClick={() => navigate('/')}
+                  title="Retour au Dashboard"
+                >
+                  ← Dashboard
+                </button>
+              </div>
+            </div>
+          </div>
+          <VideoImport 
+            onVideoSelect={handleVideoSelect}
+          />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="app">
       <div className="container">
@@ -568,10 +626,10 @@ function Editor() {
                 <span className="video-title">{videoTitle || 'Vidéo YouTube'}</span>
                 <button 
                   className="edit-url-btn"
-                  onClick={() => setIsEditingUrl(true)}
-                  title="Modifier l'URL"
+                  onClick={() => setShowVideoSearch(true)}
+                  title="Changer de vidéo"
                 >
-                  Modifier
+                  Changer
                 </button>
               </div>
             ) : (

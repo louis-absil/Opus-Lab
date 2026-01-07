@@ -58,11 +58,12 @@ function ChordSelectorModal({
   const [isCadence, setIsCadence] = useState(false)
   const [cadence, setCadence] = useState(null)
   const [accidental, setAccidental] = useState('')
-  const [degree, setDegree] = useState('') // Initialisé vide pour permettre la sélection des accords spéciaux
+  const [degree, setDegree] = useState('')
   const [specialRoot, setSpecialRoot] = useState(null)
   const [quality, setQuality] = useState('')
-  const [figure, setFigure] = useState('5') // Remplace inversion/extension/delay
-  const [isBorrowed, setIsBorrowed] = useState(false) // Emprunt (degré entre parenthèses)
+  const [figure, setFigure] = useState('5')
+  const [isBorrowed, setIsBorrowed] = useState(false)
+  const [showShortcuts, setShowShortcuts] = useState(false)
   
   // Refs pour navigation clavier
   const degreeRefs = useRef({})
@@ -80,8 +81,6 @@ function ChordSelectorModal({
     if (specialRoot) {
       const special = SPECIAL_ROOTS.find(s => s.value === specialRoot)
       if (special) {
-        // Pour l'affichage dans la liste, on utilise le format simple
-        // L'aperçu gère le formatage avec exposants
         if (special.value === 'N') {
           label = 'II♭6'
         } else {
@@ -122,7 +121,7 @@ function ChordSelectorModal({
     }
     
     return label.trim()
-  }, [accidental, degree, specialRoot, quality, figure])
+  }, [accidental, degree, specialRoot, quality, figure, isBorrowed])
 
   // Générer l'objet de données complet
   const generateChordData = useCallback(() => {
@@ -155,7 +154,6 @@ function ChordSelectorModal({
       setCadence(initialChord.cadence || null)
       setAccidental(initialChord.accidental || '')
       
-      // Détecter si c'est une racine spéciale
       const isSpecial = SPECIAL_ROOTS.some(s => s.value === initialChord.root)
       if (isSpecial) {
         setSpecialRoot(initialChord.root)
@@ -168,7 +166,6 @@ function ChordSelectorModal({
       setQuality(initialChord.quality || '')
       setIsBorrowed(!!initialChord.isBorrowed)
       
-      // Déterminer la figure à partir de inversion/extension/delay
       if (initialChord.delay === '54') {
         setFigure('54')
       } else if (initialChord.extension) {
@@ -177,11 +174,10 @@ function ChordSelectorModal({
         setFigure(initialChord.inversion || '5')
       }
     } else if (isOpen) {
-      // Reset à l'ouverture
       setIsCadence(false)
       setCadence(null)
       setAccidental('')
-      setDegree('') // Initialisé vide pour permettre la sélection des accords spéciaux
+      setDegree('')
       setSpecialRoot(null)
       setQuality('')
       setFigure('5')
@@ -189,30 +185,24 @@ function ChordSelectorModal({
     }
   }, [initialChord, isOpen])
 
-  // Gérer la sélection d'une racine spéciale (désélectionne le degré pour éviter la confusion)
   const handleSpecialRootClick = (rootValue) => {
-    // Si on clique sur le même bouton, désélectionner, sinon sélectionner
     if (specialRoot === rootValue) {
       setSpecialRoot(null)
     } else {
       setSpecialRoot(rootValue)
-      setDegree('') // Désélectionner le degré pour éviter la confusion
+      setDegree('')
       setAccidental('')
-      // Définir le chiffrage approprié (toujours "6" pour les accords spéciaux)
       setFigure('6')
     }
   }
 
-  // Gérer la sélection d'un degré (désélectionne la racine spéciale pour éviter la confusion)
   const handleDegreeClick = (deg) => {
-    // Si on clique sur le même degré, désélectionner, sinon sélectionner
     if (degree === deg) {
       setDegree('')
-      setIsBorrowed(false) // Réinitialiser l'emprunt si on désélectionne
+      setIsBorrowed(false)
     } else {
       setDegree(deg)
-      setSpecialRoot(null) // Désélectionner la racine spéciale pour éviter la confusion
-      // Garder l'état isBorrowed si on change juste de degré
+      setSpecialRoot(null)
     }
   }
 
@@ -221,7 +211,6 @@ function ChordSelectorModal({
     if (!isOpen) return
 
     const handleKeyDown = (e) => {
-      // Échap : Annuler et fermer (désactivé en mode élève)
       if (e.key === 'Escape') {
         if (!studentMode) {
           onClose()
@@ -229,14 +218,12 @@ function ChordSelectorModal({
         return
       }
 
-      // Entrée : Valider et fermer
       if (e.key === 'Enter' && currentFocusSection.current !== 'cadence') {
         e.preventDefault()
         handleValidate()
         return
       }
 
-      // Backspace/Delete : Reset de la sélection en cours
       if ((e.key === 'Backspace' || e.key === 'Delete') && 
           (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA')) {
         e.preventDefault()
@@ -253,20 +240,15 @@ function ChordSelectorModal({
         return
       }
 
-      // Flèches Gauche/Droite : Navigation entre degrés ET racines spéciales (navigation unifiée)
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         e.preventDefault()
         
-        // Navigation unifiée : on peut naviguer entre degrés et sixtes
-        // Si on est dans la section degrés ou spéciales, on navigue dans les deux groupes
         if (currentFocusSection.current === 'degrees' || currentFocusSection.current === 'specialRoots' || currentFocusSection.current === '') {
-          // Combiner tous les éléments navigables (degrés + sixtes)
           const allNavigableItems = [
             ...DEGREES.map(d => ({ type: 'degree', value: d })),
             ...SPECIAL_ROOTS.map(s => ({ type: 'special', value: s.value }))
           ]
           
-          // Trouver l'index actuel
           let currentIndex = -1
           if (degree) {
             currentIndex = allNavigableItems.findIndex(item => item.type === 'degree' && item.value === degree)
@@ -274,7 +256,6 @@ function ChordSelectorModal({
             currentIndex = allNavigableItems.findIndex(item => item.type === 'special' && item.value === specialRoot)
           }
           
-          // Si aucun n'est sélectionné, commencer par le premier
           if (currentIndex === -1) {
             const firstItem = allNavigableItems[0]
             if (firstItem.type === 'degree') {
@@ -285,7 +266,6 @@ function ChordSelectorModal({
             return
           }
           
-          // Naviguer
           let newIndex
           if (e.key === 'ArrowLeft') {
             newIndex = currentIndex > 0 ? currentIndex - 1 : allNavigableItems.length - 1
@@ -320,12 +300,9 @@ function ChordSelectorModal({
         }
       }
 
-      // Flèches Haut/Bas : Navigation dans les chiffrages
       if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         e.preventDefault()
         
-        // Permettre la navigation même si on n'est pas dans la section figures
-        // Si on est sur un degré, on peut naviguer dans les chiffrages
         if (currentFocusSection.current === 'figures' || currentFocusSection.current === 'degrees' || currentFocusSection.current === 'specialRoots') {
           const currentIndex = ALL_FIGURES.findIndex(f => f.value === figure)
           if (currentIndex === -1) {
@@ -348,7 +325,6 @@ function ChordSelectorModal({
 
     window.addEventListener('keydown', handleKeyDown)
     
-    // Focus initial sur le degré
     if (firstFocusRef.current) {
       setTimeout(() => {
         firstFocusRef.current?.focus()
@@ -359,10 +335,9 @@ function ChordSelectorModal({
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [isOpen, degree, specialRoot, figure, quality, onClose, handleValidate])
+  }, [isOpen, degree, specialRoot, figure, quality, onClose, handleValidate, studentMode])
 
   const handleBackdropClick = (e) => {
-    // En mode élève, permettre de fermer en cliquant dehors (sans enregistrer)
     if (e.target === modalRef.current) {
       onClose()
     }
@@ -379,109 +354,208 @@ function ChordSelectorModal({
       ref={modalRef}
       onClick={handleBackdropClick}
     >
-      <div className="chord-modal-container" onClick={(e) => e.stopPropagation()}>
-        {/* ZONE 1 : RACINES (Haut - Compact) */}
-        <div className="chord-zone root-zone-compact">
-          <div className="root-selector-compact">
-            {/* Altérations */}
-            <div className="accidental-group-compact">
-              {ACCIDENTALS.map((acc) => (
-                <button
-                  key={acc.value}
-                  className={`accidental-btn-compact ${accidental === acc.value ? 'active' : ''} ${specialRoot ? 'disabled' : ''}`}
-                  onClick={() => {
-                    if (!specialRoot) {
-                      setAccidental(acc.value)
+      <div className="chord-modal-sheet" onClick={(e) => e.stopPropagation()}>
+        {/* Zone d'Aperçu (Display) - Héros Visuel */}
+        <div className="chord-display-zone">
+          <div className="chord-display-screen">
+            <div className="chord-display-content">
+              {specialRoot ? (
+                (() => {
+                  const special = SPECIAL_ROOTS.find(s => s.value === specialRoot)
+                  if (special) {
+                    if (special.value === 'N') {
+                      return (
+                        <>
+                          <span className="chord-display-root">II</span>
+                          <span className="chord-display-accidental">♭</span>
+                          <span className="chord-display-figure">6</span>
+                        </>
+                      )
+                    } else {
+                      return (
+                        <>
+                          <span className="chord-display-root">{special.label}</span>
+                          <span className="chord-display-figure">+6</span>
+                        </>
+                      )
                     }
-                  }}
-                  title={acc.label}
-                  disabled={!!specialRoot}
-                >
-                  {acc.symbol}
-                </button>
-              ))}
-            </div>
-
-            {/* Degrés classiques */}
-            <div className="degree-group-compact">
-              {DEGREES.map((deg) => (
-                <button
-                  key={deg}
-                  ref={(el) => {
-                    if (deg === (degree || '')) firstFocusRef.current = el
-                    degreeRefs.current[deg] = el
-                  }}
-                  className={`degree-btn-compact ${degree === deg ? 'active' : ''}`}
-                  onClick={() => handleDegreeClick(deg)}
-                  onFocus={() => currentFocusSection.current = 'degrees'}
-                  // Toujours actif, pas de désactivation
-                  disabled={false}
-                >
-                  {deg}
-                </button>
-              ))}
-            </div>
-
-            {/* Racines spéciales */}
-            <div className="special-root-group-compact">
-              {SPECIAL_ROOTS.map((special) => (
-                <button
-                  key={special.value}
-                  ref={(el) => {
-                    specialRootRefs.current[special.value] = el
-                  }}
-                  className={`special-root-btn-compact ${specialRoot === special.value ? 'active' : ''}`}
-                  onClick={() => handleSpecialRootClick(special.value)}
-                  onFocus={() => currentFocusSection.current = 'specialRoots'}
-                  // Toujours actif, pas de désactivation
-                  disabled={false}
-                  title={special.description}
-                >
-                  <span className="special-root-main">{special.value === 'N' ? 'II' : special.label}</span>
-                  <span className="special-root-suffix">{special.value === 'N' ? '♭6' : '+6'}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Qualités de base (dim, aug) et Emprunt */}
-            <div className="quality-group-compact">
-              <button
-                className={`quality-btn-compact ${quality === '°' ? 'active' : ''} ${specialRoot ? 'disabled' : ''}`}
-                onClick={() => !specialRoot && setQuality(quality === '°' ? '' : '°')}
-                onFocus={() => currentFocusSection.current = 'qualities'}
-                disabled={!!specialRoot}
-                title="Diminué"
-              >
-                °
-              </button>
-              <button
-                className={`quality-btn-compact ${quality === '+' ? 'active' : ''} ${specialRoot ? 'disabled' : ''}`}
-                onClick={() => !specialRoot && setQuality(quality === '+' ? '' : '+')}
-                onFocus={() => currentFocusSection.current = 'qualities'}
-                disabled={!!specialRoot}
-                title="Augmenté"
-              >
-                +
-              </button>
-              <button
-                className={`quality-btn-compact borrowed-btn ${isBorrowed ? 'active' : ''} ${specialRoot || !degree ? 'disabled' : ''}`}
-                onClick={() => !specialRoot && degree && setIsBorrowed(!isBorrowed)}
-                onFocus={() => currentFocusSection.current = 'qualities'}
-                disabled={!!specialRoot || !degree}
-                title="Emprunt (degré entre parenthèses)"
-              >
-                ( )
-              </button>
+                  }
+                  return null
+                })()
+              ) : (
+                <>
+                  {accidental && (
+                    <span className="chord-display-accidental">
+                      {accidental === 'b' ? '♭' : accidental === '#' ? '#' : ''}
+                    </span>
+                  )}
+                  {degree && (
+                    <>
+                      {isBorrowed && <span className="chord-display-paren">(</span>}
+                      <span className="chord-display-root">{degree}</span>
+                      {isBorrowed && <span className="chord-display-paren">)</span>}
+                    </>
+                  )}
+                  {quality && (
+                    <span className="chord-display-quality">{quality}</span>
+                  )}
+                  {!specialRoot && figure && figure !== '5' && (() => {
+                    const fig = ALL_FIGURES.find(f => f.value === figure)
+                    if (fig) {
+                      if (Array.isArray(fig.display)) {
+                        return (
+                          <span className="chord-display-figure-stacked">
+                            <span className="chord-display-figure-top">{fig.display[0]}</span>
+                            <span className="chord-display-figure-bottom">{fig.display[1]}</span>
+                          </span>
+                        )
+                      } else {
+                        return <span className="chord-display-figure">{fig.display}</span>
+                      }
+                    }
+                    return null
+                  })()}
+                </>
+              )}
+              {!displayLabel && (
+                <span className="chord-display-placeholder">Sélectionnez un accord</span>
+              )}
             </div>
           </div>
+          
+          {/* Bouton de validation intégré */}
+          <button 
+            className="chord-validate-fab"
+            onClick={handleValidate}
+            disabled={!displayLabel}
+            aria-label="Valider"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </button>
+          
+          {/* Icône Info pour raccourcis */}
+          <button 
+            className="chord-info-btn"
+            onClick={() => setShowShortcuts(!showShortcuts)}
+            aria-label="Raccourcis clavier"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+          </button>
         </div>
 
-        {/* ZONE 2 : CHIFFRAGES ARABES UNIFIÉS (Bas - Grille compacte) */}
-        <div className="chord-zone figures-zone-compact">
-          <div className="figures-grid-compact">
+        {/* Raccourcis clavier (tooltip) */}
+        {showShortcuts && (
+          <div className="chord-shortcuts-tooltip">
+            <div className="chord-shortcuts-content">
+              <div className="chord-shortcuts-row">
+                <kbd>←</kbd><kbd>→</kbd> <span>Degrés</span>
+              </div>
+              <div className="chord-shortcuts-row">
+                <kbd>↑</kbd><kbd>↓</kbd> <span>Chiffrages</span>
+              </div>
+              <div className="chord-shortcuts-row">
+                <kbd>Entrée</kbd> <span>Valider</span>
+              </div>
+              {!studentMode && (
+                <div className="chord-shortcuts-row">
+                  <kbd>Échap</kbd> <span>Annuler</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Zone des Touches */}
+        <div className="chord-pads-zone">
+          {/* Zone Haute : Modificateurs (Altérations) */}
+          <div className="chord-pads-section chord-pads-modifiers">
+            {ACCIDENTALS.map((acc) => (
+              <button
+                key={acc.value}
+                className={`chord-pad chord-pad-modifier ${accidental === acc.value ? 'active' : ''} ${specialRoot ? 'disabled' : ''}`}
+                onClick={() => {
+                  if (!specialRoot) {
+                    setAccidental(acc.value)
+                  }
+                }}
+                disabled={!!specialRoot}
+                title={acc.label}
+              >
+                {acc.symbol}
+              </button>
+            ))}
+            <button
+              className={`chord-pad chord-pad-modifier ${quality === '°' ? 'active' : ''} ${specialRoot ? 'disabled' : ''}`}
+              onClick={() => !specialRoot && setQuality(quality === '°' ? '' : '°')}
+              disabled={!!specialRoot}
+              title="Diminué"
+            >
+              °
+            </button>
+            <button
+              className={`chord-pad chord-pad-modifier ${quality === '+' ? 'active' : ''} ${specialRoot ? 'disabled' : ''}`}
+              onClick={() => !specialRoot && setQuality(quality === '+' ? '' : '+')}
+              disabled={!!specialRoot}
+              title="Augmenté"
+            >
+              +
+            </button>
+            <button
+              className={`chord-pad chord-pad-modifier ${isBorrowed ? 'active' : ''} ${specialRoot || !degree ? 'disabled' : ''}`}
+              onClick={() => !specialRoot && degree && setIsBorrowed(!isBorrowed)}
+              disabled={!!specialRoot || !degree}
+              title="Emprunt"
+            >
+              ( )
+            </button>
+          </div>
+
+          {/* Zone Centrale : Racines (Degrés + Spéciaux) */}
+          <div className="chord-pads-section chord-pads-roots">
+            {/* Degrés classiques */}
+            {DEGREES.map((deg) => (
+              <button
+                key={deg}
+                ref={(el) => {
+                  if (deg === (degree || '')) firstFocusRef.current = el
+                  degreeRefs.current[deg] = el
+                }}
+                className={`chord-pad chord-pad-root ${degree === deg ? 'active' : ''}`}
+                onClick={() => handleDegreeClick(deg)}
+                onFocus={() => currentFocusSection.current = 'degrees'}
+              >
+                {deg}
+              </button>
+            ))}
+            
+            {/* Racines spéciales */}
+            {SPECIAL_ROOTS.map((special) => (
+              <button
+                key={special.value}
+                ref={(el) => {
+                  specialRootRefs.current[special.value] = el
+                }}
+                className={`chord-pad chord-pad-root chord-pad-special ${specialRoot === special.value ? 'active' : ''}`}
+                onClick={() => handleSpecialRootClick(special.value)}
+                onFocus={() => currentFocusSection.current = 'specialRoots'}
+                title={special.description}
+              >
+                <span className="chord-pad-special-main">{special.value === 'N' ? 'II' : special.label}</span>
+                <span className="chord-pad-special-suffix">{special.value === 'N' ? '♭6' : '+6'}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Zone Basse : Chiffrages */}
+          <div className="chord-pads-section chord-pads-figures">
             {ALL_FIGURES.map((fig) => {
               const isSelected = figure === fig.value
-              const isDelay = fig.type === 'delay'
               
               return (
                 <button
@@ -489,15 +563,15 @@ function ChordSelectorModal({
                   ref={(el) => {
                     figureRefs.current[fig.value] = el
                   }}
-                  className={`figure-btn-compact ${isSelected ? 'active' : ''}`}
+                  className={`chord-pad chord-pad-figure ${isSelected ? 'active' : ''}`}
                   onClick={() => setFigure(fig.value)}
                   onFocus={() => currentFocusSection.current = 'figures'}
                   title={fig.label}
                 >
                   {Array.isArray(fig.display) ? (
-                    <span className="stacked-chord-vertical">
-                      <span className="chord-top">{fig.display[0]}</span>
-                      <span className="chord-bottom">{fig.display[1]}</span>
+                    <span className="chord-pad-figure-stacked">
+                      <span className="chord-pad-figure-top">{fig.display[0]}</span>
+                      <span className="chord-pad-figure-bottom">{fig.display[1]}</span>
                     </span>
                   ) : (
                     <span>{fig.display}</span>
@@ -508,124 +582,49 @@ function ChordSelectorModal({
           </div>
         </div>
 
-        {/* ZONE 3 : FOOTER (Cadence + Aperçu + Actions) */}
-        <div className="chord-zone footer-zone-compact">
-          {/* Raccourcis clavier */}
-          <div className="keyboard-shortcuts-compact">
-            <span className="shortcuts-label">Raccourcis :</span>
-            <span className="shortcuts-list">
-              <kbd>←</kbd><kbd>→</kbd> Degrés | <kbd>↑</kbd><kbd>↓</kbd> Chiffrages | <kbd>Entrée</kbd> Valider | <kbd>Échap</kbd> Annuler
-            </span>
-          </div>
-          
-          {/* Aperçu */}
-          <div className="preview-display-compact">
-            <span className="preview-label-compact">Aperçu :</span>
-            <div className="preview-value-container-compact">
-              <span className="preview-root-compact">
-                {specialRoot ? (
-                  (() => {
-                    const special = SPECIAL_ROOTS.find(s => s.value === specialRoot)
-                    if (special) {
-                      // Pour les accords spéciaux, afficher le label avec le chiffrage en exposant
-                      if (special.value === 'N') {
-                        // Napolitaine : "II♭" avec "6" en exposant (le bémol avant le 6)
-                        return <>II♭<span className="preview-figure-superscript">6</span></>
-                      } else {
-                        // Gr+6, Fr+6, It+6 : "Gr", "Fr", "It" avec "+6" en exposant
-                        return <>{special.label}<span className="preview-figure-superscript">+6</span></>
-                      }
-                    }
-                    return special?.fullLabel
-                  })()
-                ) : (
-                  <>
-                    {accidental === 'b' && '♭'}
-                    {accidental === '#' && '#'}
-                    {isBorrowed ? `(${degree})` : degree}
-                    {quality}
-                  </>
-                )}
-              </span>
-              
-              {/* Afficher le chiffrage pour les degrés normaux (pas pour les accords spéciaux car le chiffrage est déjà intégré) */}
-              {!specialRoot && figure && figure !== '5' && ALL_FIGURES.find(f => f.value === figure)?.display && (
-                <span className="preview-figures-compact">
-                  {(() => {
-                    const fig = ALL_FIGURES.find(f => f.value === figure)
-                    if (fig && Array.isArray(fig.display)) {
-                      return (
-                        <span className="stacked-chord-vertical">
-                          <span className="chord-top">{fig.display[0]}</span>
-                          <span className="chord-bottom">{fig.display[1]}</span>
-                        </span>
-                      )
-                    } else if (fig && fig.type === 'extension') {
-                      // Extensions en exposant
-                      return <span className="preview-figure-superscript">{fig.display}</span>
-                    } else if (fig && (fig.type === 'triad' || fig.type === 'seventh')) {
-                      // Chiffres simples (6, 7, etc.) en exposant
-                      return <span className="preview-figure-superscript">{fig.display}</span>
-                    }
-                    return null
-                  })()}
-                </span>
-              )}
+        {/* Zone Cadence (optionnelle, en bas) */}
+        <div className="chord-cadence-zone">
+          <label className="chord-cadence-toggle">
+            <input
+              type="checkbox"
+              checked={isCadence}
+              onChange={(e) => {
+                setIsCadence(e.target.checked)
+                if (!e.target.checked) setCadence(null)
+              }}
+              onFocus={() => currentFocusSection.current = 'cadence'}
+            />
+            <span>Cadence</span>
+          </label>
+          {isCadence && (
+            <div className="chord-cadence-options">
+              {CADENCES.map((cad) => (
+                <label key={cad.value} className="chord-cadence-option">
+                  <input
+                    type="radio"
+                    name="cadence"
+                    value={cad.value}
+                    checked={cadence === cad.value}
+                    onChange={(e) => setCadence(e.target.value)}
+                  />
+                  <span>{cad.label}</span>
+                </label>
+              ))}
             </div>
-          </div>
+          )}
+        </div>
 
-          {/* Cadence */}
-          <div className="cadence-toggle-compact">
-            <label className="toggle-label-compact">
-              <input
-                type="checkbox"
-                checked={isCadence}
-                onChange={(e) => {
-                  setIsCadence(e.target.checked)
-                  if (!e.target.checked) setCadence(null)
-                }}
-                onFocus={() => currentFocusSection.current = 'cadence'}
-              />
-              <span>Cadence</span>
-            </label>
-            {isCadence && (
-              <div className="cadence-options-compact">
-                {CADENCES.map((cad) => (
-                  <label key={cad.value} className="cadence-radio-compact">
-                    <input
-                      type="radio"
-                      name="cadence"
-                      value={cad.value}
-                      checked={cadence === cad.value}
-                      onChange={(e) => setCadence(e.target.value)}
-                    />
-                    <span>{cad.label}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Actions */}
-          <div className="action-buttons-compact">
-            {!studentMode && (
-              <button 
-                className="action-btn-compact cancel-btn-compact" 
-                onClick={onClose}
-                onFocus={() => currentFocusSection.current = 'cancel'}
-              >
-                Annuler
-              </button>
-            )}
+        {/* Bouton Annuler (si pas en mode élève) */}
+        {!studentMode && (
+          <div className="chord-cancel-zone">
             <button 
-              className="action-btn-compact validate-btn-compact" 
-              onClick={handleValidate}
-              onFocus={() => currentFocusSection.current = 'validate'}
+              className="chord-cancel-btn"
+              onClick={onClose}
             >
-              {studentMode ? 'Valider et continuer' : 'Valider'}
+              Annuler
             </button>
           </div>
-        </div>
+        )}
       </div>
     </div>
   )

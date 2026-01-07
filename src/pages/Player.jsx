@@ -7,7 +7,6 @@ import ExerciseSummary from '../components/ExerciseSummary'
 import { getExerciseById } from '../services/exerciseService'
 import { saveAttempt } from '../services/attemptService'
 import { useAuth } from '../contexts/AuthContext'
-import '../App.css'
 import './Player.css'
 
 function Player() {
@@ -25,10 +24,12 @@ function Player() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(true)
   
   const playerRef = useRef(null)
   const intervalRef = useRef(null)
   const currentTimeRef = useRef(0)
+  const timelineRef = useRef(null)
 
   // Charger l'exercice
   useEffect(() => {
@@ -99,6 +100,9 @@ function Player() {
           if (time >= exercise.settings.endTime) {
             playerRef.current.pauseVideo()
             setIsPlaying(false)
+            // Mettre à jour la référence du temps pour qu'elle reflète la position à la fin
+            currentTimeRef.current = exercise.settings.endTime
+            setCurrentTime(exercise.settings.endTime)
           }
         } catch (error) {
           console.error('Erreur lors de la récupération du temps:', error)
@@ -117,6 +121,35 @@ function Player() {
       }
     }
   }, [isPlaying, mode, exercise])
+
+  // Gérer le scroll du body pour le mode plein écran (doit être avant tous les returns)
+  useEffect(() => {
+    // Ne gérer le scroll que si on n'est pas en mode summary et que l'exercice est chargé
+    if (mode !== 'summary' && !loading && exercise) {
+      document.body.classList.add('player-active')
+      return () => {
+        document.body.classList.remove('player-active')
+      }
+    }
+  }, [mode, loading, exercise])
+
+  // Masquer l'onboarding après 5 secondes ou au premier clic (doit être avant tous les returns)
+  useEffect(() => {
+    if (showOnboarding) {
+      const timer = setTimeout(() => {
+        setShowOnboarding(false)
+      }, 5000)
+      
+      return () => clearTimeout(timer)
+    }
+  }, [showOnboarding])
+  
+  // Masquer l'onboarding au premier clic sur un marqueur (doit être avant tous les returns)
+  useEffect(() => {
+    if (showOnboarding && exercise && Object.values(userAnswers).some(answer => answer !== null)) {
+      setShowOnboarding(false)
+    }
+  }, [userAnswers, showOnboarding, exercise])
 
   // Fonction pour jouer l'extrait complet avec fondus
   const handlePlayFullExtract = () => {
@@ -209,14 +242,14 @@ function Player() {
       playerRef.current.pauseVideo()
       setIsPlaying(false)
     } else {
-      // Mode exercise : reprendre depuis currentTime ou startTime si on est avant
+      // Mode exercise : reprendre depuis currentTime ou startTime si on est avant/après
       const current = currentTimeRef.current || currentTime
       const startTime = exercise.settings.startTime
       const endTime = exercise.settings.endTime
       const fadeDuration = 0.5 // 0.5 secondes
       
-      // Si on est avant le début de l'extrait, aller au début
-      if (current < startTime) {
+      // Si on est avant le début ou après la fin de l'extrait, aller au début
+      if (current < startTime || current >= endTime) {
         playerRef.current.seekTo(startTime, true)
         setCurrentTime(startTime)
         currentTimeRef.current = startTime
@@ -266,6 +299,9 @@ function Player() {
             playerRef.current.pauseVideo()
             playerRef.current.setVolume(100) // Remettre le volume à 100 pour les prochaines lectures
             setIsPlaying(false)
+            // Mettre à jour la référence du temps pour qu'elle reflète la position à la fin
+            currentTimeRef.current = endTime
+            setCurrentTime(endTime)
             clearInterval(checkEndInterval)
           }
         } catch (error) {
@@ -557,79 +593,171 @@ function Player() {
     )
   }
 
+  const formatTimeDisplay = (seconds) => {
+    if (!seconds || seconds < 0) return '00:00'
+    const mins = Math.floor(seconds / 60)
+    const secs = Math.floor(seconds % 60)
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+  }
+
+  // Calculer le temps relatif pour l'affichage
+  const relativeCurrentTime = currentTime - startTime
+  const relativeEndTime = endTime - startTime
+  
+  // Liste des marqueurs déjà répondues
+  const answeredMarkers = Object.keys(userAnswers).filter(i => userAnswers[i] !== null).map(Number)
+  
+  // Trouver le prochain marqueur à répondre (pour l'effet visuel)
+  const getNextMarkerIndex = () => {
+    for (let i = 0; i < markers.length; i++) {
+      if (!answeredMarkers.includes(i)) {
+        return i
+      }
+    }
+    return null
+  }
+  const nextMarkerIndex = getNextMarkerIndex()
+  
+  const handleOnboardingClick = () => {
+    setShowOnboarding(false)
+  }
+
   return (
-    <div className="app">
-      <div className="container">
-        {/* Header minimaliste pour l'élève */}
-        <div className="app-header">
-          <h1 className="app-title">Opus Lab</h1>
-          <div className="header-content">
-            <div className="header-video-info">
-              <span className="video-title">
-                {exercise.metadata?.exerciseTitle || exercise.metadata?.workTitle || 'Exercice'}
-              </span>
-              {exercise.metadata?.composer && (
-                <span className="video-composer">{exercise.metadata.composer}</span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Lecteur vidéo */}
-        <div className="video-section">
-          <div className="video-wrapper">
-            <YouTube
-              videoId={videoId}
-              opts={opts}
-              onReady={handleReady}
-              className="youtube-player"
-            />
-          </div>
-
-          {/* Cockpit adapté pour l'élève */}
-          <VideoCockpit
-            playerRef={playerRef}
-            startTime={startTime}
-            endTime={endTime}
-            currentTime={currentTime}
-            isPlaying={isPlaying}
-            videoDuration={videoDuration}
-            markers={markers}
-            onStartTimeChange={() => {}} // Désactivé en mode élève
-            onEndTimeChange={() => {}} // Désactivé en mode élève
-            onSeek={(time) => {
-              if (playerRef.current) {
-                playerRef.current.seekTo(time, true)
-                setCurrentTime(time)
-                currentTimeRef.current = time
-              }
-            }}
-            onPlayPause={handlePlayPause}
-            onPlaySelection={handleStartExercise}
-            onCreateMarker={() => {}} // Désactivé en mode élève
-            studentMode={true} // Mode élève : masquer les marqueurs
-            answeredMarkers={Object.keys(userAnswers).filter(i => userAnswers[i] !== null).map(Number)}
-            onMarkerClick={handleMarkerClick} // Permettre de cliquer sur un marqueur pour modifier la réponse
-            onQuit={handleQuitExercise} // Bouton quitter dans la toolbar
-            answeredCount={answeredCount} // Nombre de questions répondues
-            totalMarkers={totalMarkers} // Nombre total de questions
-            onFinish={handleFinishExercise} // Bouton terminer dans la toolbar
+    <div className="player-immersive">
+      {/* Zone Vidéo (Haut - 80-85%) */}
+      <div className="player-video-zone">
+        <div className="player-video-wrapper">
+          <YouTube
+            videoId={videoId}
+            opts={opts}
+            onReady={handleReady}
+            className="player-youtube"
           />
         </div>
 
-        {/* Zone de contrôle pour l'exercice - Simplifiée, tout est dans le VideoCockpit */}
+        {/* Bouton Quitter (Haut à droite) */}
+        <button
+          className="player-quit-btn"
+          onClick={handleQuitExercise}
+          aria-label="Quitter l'exercice"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+          <span>Quitter</span>
+        </button>
 
-        {/* Modale de saisie d'accord (mode élève) */}
-        <ChordSelectorModal
-          isOpen={isModalOpen}
-          onClose={handleModalClose}
-          onValidate={handleChordValidate}
-          initialChord={userAnswers[currentMarkerIndex] || null}
-          studentMode={true}
-          currentQuestion={currentMarkerIndex + 1}
-          totalQuestions={totalMarkers}
-        />
+        {/* Overlay d'onboarding temporaire */}
+        {showOnboarding && (
+          <div className="player-onboarding-overlay" onClick={handleOnboardingClick}>
+            <div className="player-onboarding-content">
+              <p>Cliquez sur les marqueurs 🟡 au moment du changement d'accord</p>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Zone de Contrôle (Bas - 15-20%) */}
+      <div className="player-control-zone">
+        {/* Timeline gamifiée */}
+        <div className="player-timeline-container">
+          <div 
+            ref={timelineRef}
+            className="player-timeline-rail"
+            onClick={(e) => {
+              if (!playerRef.current || !exercise) return
+              const rect = e.currentTarget.getBoundingClientRect()
+              const x = e.clientX - rect.left
+              const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100))
+              const time = startTime + (percentage / 100) * (endTime - startTime)
+              playerRef.current.seekTo(time, true)
+              setCurrentTime(time)
+              currentTimeRef.current = time
+            }}
+          >
+            {/* Barre de progression */}
+            <div 
+              className="player-timeline-progress"
+              style={{ width: `${relativeEndTime > 0 ? (relativeCurrentTime / relativeEndTime) * 100 : 0}%` }}
+            ></div>
+            
+            {/* Marqueurs comme cibles cliquables */}
+            {markers.map((marker, index) => {
+              const markerAbsoluteTime = marker
+              if (markerAbsoluteTime < startTime || markerAbsoluteTime > endTime) return null
+              
+              const relativeTime = markerAbsoluteTime - startTime
+              const markerPos = relativeEndTime > 0 
+                ? (relativeTime / relativeEndTime) * 100 
+                : 0
+              
+              const isAnswered = answeredMarkers.includes(index)
+              const isNext = nextMarkerIndex === index
+              
+              return (
+                <button
+                  key={index}
+                  className={`player-timeline-target ${isAnswered ? 'player-timeline-target-answered' : ''} ${isNext ? 'player-timeline-target-next' : ''}`}
+                  style={{ left: `${markerPos}%` }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleMarkerClick(index)
+                  }}
+                  aria-label={isAnswered ? `Question ${index + 1} (répondu)` : `Question ${index + 1}`}
+                >
+                  <span className="player-timeline-target-inner"></span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Contrôles de lecture regroupés */}
+        <div className="player-controls-group">
+          <div className="player-time-display">
+            {formatTimeDisplay(relativeCurrentTime)} / {formatTimeDisplay(relativeEndTime)}
+          </div>
+          
+          <button
+            className="player-play-btn"
+            onClick={handlePlayPause}
+            aria-label={isPlaying ? 'Pause' : 'Lecture'}
+          >
+            {isPlaying ? (
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="4" width="4" height="16"></rect>
+                <rect x="14" y="4" width="4" height="16"></rect>
+              </svg>
+            ) : (
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+              </svg>
+            )}
+          </button>
+
+          {answeredCount === totalMarkers && totalMarkers > 0 && (
+            <button
+              className="player-finish-btn"
+              onClick={handleFinishExercise}
+              aria-label="Terminer l'exercice"
+            >
+              Terminer
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Modale de saisie d'accord (mode élève) */}
+      <ChordSelectorModal
+        isOpen={isModalOpen}
+        onClose={handleModalClose}
+        onValidate={handleChordValidate}
+        initialChord={userAnswers[currentMarkerIndex] || null}
+        studentMode={true}
+        currentQuestion={currentMarkerIndex + 1}
+        totalQuestions={totalMarkers}
+      />
     </div>
   )
 }

@@ -13,6 +13,44 @@ import {
 import { db } from '../firebase'
 
 /**
+ * Fonction utilitaire pour réessayer une opération en cas d'erreur réseau
+ * @param {Function} operation - La fonction async à exécuter
+ * @param {number} maxRetries - Nombre maximum de tentatives (défaut: 3)
+ * @param {number} delay - Délai initial entre les tentatives en ms (défaut: 1000)
+ * @returns {Promise} Le résultat de l'opération
+ */
+async function retryOperation(operation, maxRetries = 3, delay = 1000) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await operation()
+    } catch (error) {
+      // Vérifier si c'est une erreur réseau
+      const isNetworkError = 
+        error.code === 'unavailable' ||
+        error.code === 'deadline-exceeded' ||
+        error.message?.includes('network') ||
+        error.message?.includes('Failed to fetch') ||
+        error.message?.includes('ERR_INTERNET_DISCONNECTED')
+      
+      // Si c'est la dernière tentative ou si ce n'est pas une erreur réseau, lancer l'erreur
+      if (i === maxRetries - 1 || !isNetworkError) {
+        throw error
+      }
+      
+      // Vérifier la connexion avant de réessayer
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        const networkError = new Error('Aucune connexion internet')
+        networkError.code = 'network/offline'
+        throw networkError
+      }
+      
+      // Attendre avant de réessayer (backoff exponentiel)
+      await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, i)))
+    }
+  }
+}
+
+/**
  * Crée ou récupère un utilisateur dans Firestore
  * Vérifie automatiquement si l'email est autorisé et promeut en professeur si nécessaire
  * @param {string} userId - L'ID de l'utilisateur
@@ -20,7 +58,14 @@ import { db } from '../firebase'
  * @param {boolean} forceServer - Si true, force la récupération depuis le serveur (ignore le cache)
  */
 export async function getOrCreateUser(userId, userData, forceServer = false) {
-  try {
+  // Vérifier la connexion
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    const networkError = new Error('Aucune connexion internet')
+    networkError.code = 'network/offline'
+    throw networkError
+  }
+
+  return retryOperation(async () => {
     const userRef = doc(db, 'users', userId)
     // Si forceServer est true, récupérer depuis le serveur pour éviter le cache
     const userSnap = forceServer 
@@ -76,10 +121,10 @@ export async function getOrCreateUser(userId, userData, forceServer = false) {
         ...newUser
       }
     }
-  } catch (error) {
+  }).catch((error) => {
     console.error('Erreur lors de la création/récupération de l\'utilisateur:', error)
     throw error
-  }
+  })
 }
 
 /**
@@ -88,7 +133,14 @@ export async function getOrCreateUser(userId, userData, forceServer = false) {
  * @param {boolean} forceServer - Si true, force la récupération depuis le serveur (ignore le cache)
  */
 export async function getUserById(userId, forceServer = false) {
-  try {
+  // Vérifier la connexion
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    const networkError = new Error('Aucune connexion internet')
+    networkError.code = 'network/offline'
+    throw networkError
+  }
+
+  return retryOperation(async () => {
     const userRef = doc(db, 'users', userId)
     // Si forceServer est true, récupérer depuis le serveur pour éviter le cache
     const userSnap = forceServer 
@@ -102,10 +154,10 @@ export async function getUserById(userId, forceServer = false) {
       }
     }
     return null
-  } catch (error) {
+  }).catch((error) => {
     console.error('Erreur lors de la récupération de l\'utilisateur:', error)
     throw error
-  }
+  })
 }
 
 /**
