@@ -31,6 +31,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify dependencies
+        run: |
+          echo "Checking Tailwind CSS installation..."
+          npm list tailwindcss postcss autoprefixer || echo "Warning: Some dependencies may be missing"
+          echo "Checking package.json scripts..."
+          cat package.json | grep -A 5 '"scripts"'
+
       - name: Build
         env:
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
@@ -39,7 +46,9 @@ jobs:
           VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
-        run: npm run build
+        run: |
+          echo "Building application..."
+          npm run build || (echo "Build failed! Check the error above." && exit 1)
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
