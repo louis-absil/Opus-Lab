@@ -580,16 +580,16 @@
   .dashboard-header {
     padding: 1rem 1.25rem;
   }
-  
+
   .dashboard-title {
     font-size: 1.25rem;
   }
-  
+
   .dashboard-grid {
     grid-template-columns: 1fr;
     gap: 1rem;
   }
-  
+
   .dashboard-content {
     padding: 1rem;
   }

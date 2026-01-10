@@ -226,6 +226,11 @@
   background: rgba(239, 68, 68, 0.05);
 }
 
+.result-item.partial {
+  border-color: rgba(245, 158, 11, 0.5);
+  background: rgba(245, 158, 11, 0.05);
+}
+
 .result-header {
   display: flex;
   align-items: center;
@@ -257,6 +262,10 @@
 
 .incorrect-icon {
   color: #ef4444;
+}
+
+.partial-icon {
+  color: #f59e0b;
 }
 
 .result-content {
@@ -296,6 +305,37 @@
   color: #ef4444;
   background: rgba(239, 68, 68, 0.15);
   border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.result-value.partial {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.result-feedback {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: rgba(245, 158, 11, 0.1);
+  border-left: 3px solid #f59e0b;
+  border-radius: 6px;
+  margin-top: 0.5rem;
+}
+
+.result-feedback-text {
+  font-size: 0.95rem;
+  color: #fbbf24;
+  font-style: italic;
+  flex: 1;
+}
+
+.result-feedback-score {
+  font-size: 0.85rem;
+  color: #f59e0b;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
 }
 
 .summary-actions {

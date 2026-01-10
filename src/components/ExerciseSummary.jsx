@@ -1,10 +1,12 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { validateAnswerWithFunctions } from '../utils/riemannFunctions'
 import './ExerciseSummary.css'
 
-function ExerciseSummary({ exercise, userAnswers, onReplay, isGuest = false }) {
+function ExerciseSummary({ exercise, userAnswers, answerValidations = {}, onReplay, isGuest = false }) {
   const navigate = useNavigate()
   const { disableGuestMode } = useAuth()
+  
   // Comparer les réponses de l'élève avec les solutions
   const compareAnswers = () => {
     if (!exercise.markers) return []
@@ -15,24 +17,47 @@ function ExerciseSummary({ exercise, userAnswers, onReplay, isGuest = false }) {
       const markerTime = typeof marker === 'number' ? marker : (marker.time || marker.absoluteTime)
       const correctAnswer = typeof marker === 'object' && marker.chord ? marker.chord : null
       
-      // Comparaison des réponses
-      const isCorrect = userAnswer && correctAnswer && 
-        userAnswer.displayLabel === correctAnswer.displayLabel
+      // Utiliser la validation fonctionnelle si disponible, sinon validation binaire
+      let validation = answerValidations[index]
+      if (!validation && userAnswer && correctAnswer) {
+        validation = validateAnswerWithFunctions(
+          userAnswer,
+          correctAnswer,
+          userAnswer.function || null
+        )
+      }
+      
+      // Déterminer si la réponse est correcte (niveau 1 = parfait)
+      const isPerfect = validation && validation.level === 1
+      const isPartiallyCorrect = validation && validation.level >= 2
       
       return {
         index,
         time: markerTime,
         userAnswer: userAnswer?.displayLabel || 'Non répondu',
         correctAnswer: correctAnswer?.displayLabel || 'Non défini',
-        isCorrect
+        isCorrect: isPerfect,
+        isPartiallyCorrect,
+        validation: validation || null
       }
     })
   }
 
   const results = compareAnswers()
-  const correctCount = results.filter(r => r.isCorrect).length
+  const perfectCount = results.filter(r => r.isCorrect).length
+  const partialCount = results.filter(r => r.isPartiallyCorrect && !r.isCorrect).length
   const totalCount = results.length
-  const score = totalCount > 0 ? Math.round((correctCount / totalCount) * 10) : 0
+  
+  // Calculer le score pondéré
+  const totalScore = results.reduce((sum, r) => {
+    if (r.validation) {
+      return sum + r.validation.score
+    }
+    return sum + (r.isCorrect ? 100 : 0)
+  }, 0)
+  const maxScore = totalCount * 100
+  const scorePercentage = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0
+  const score = Math.round(scorePercentage / 10) // Score sur 10
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60)
@@ -92,10 +117,14 @@ function ExerciseSummary({ exercise, userAnswers, onReplay, isGuest = false }) {
           </div>
           <div className="score-details">
             <p className="score-text">
-              <strong>{correctCount}</strong> réponse{correctCount > 1 ? 's' : ''} correcte{correctCount > 1 ? 's' : ''} sur <strong>{totalCount}</strong>
+              <strong>{perfectCount}</strong> réponse{perfectCount > 1 ? 's' : ''} parfaite{perfectCount > 1 ? 's' : ''}
+              {partialCount > 0 && (
+                <> et <strong>{partialCount}</strong> réponse{partialCount > 1 ? 's' : ''} partielle{partialCount > 1 ? 's' : ''}</>
+              )}
+              {' '}sur <strong>{totalCount}</strong>
             </p>
             <div className="score-percentage">
-              {Math.round((correctCount / totalCount) * 100)}% de réussite
+              {scorePercentage}% de réussite
             </div>
           </div>
         </div>
@@ -106,13 +135,15 @@ function ExerciseSummary({ exercise, userAnswers, onReplay, isGuest = false }) {
             {results.map((result, index) => (
               <div 
                 key={index} 
-                className={`result-item ${result.isCorrect ? 'correct' : 'incorrect'}`}
+                className={`result-item ${result.isCorrect ? 'correct' : result.isPartiallyCorrect ? 'partial' : 'incorrect'}`}
               >
                 <div className="result-header">
                   <span className="result-question">Question {index + 1}</span>
                   <span className="result-time">à {formatTime(result.time)}</span>
                   {result.isCorrect ? (
                     <span className="result-icon correct-icon">✅</span>
+                  ) : result.isPartiallyCorrect ? (
+                    <span className="result-icon partial-icon">⚠️</span>
                   ) : (
                     <span className="result-icon incorrect-icon">❌</span>
                   )}
@@ -120,10 +151,16 @@ function ExerciseSummary({ exercise, userAnswers, onReplay, isGuest = false }) {
                 <div className="result-content">
                   <div className="result-answer">
                     <span className="result-label">Votre réponse :</span>
-                    <span className={`result-value ${result.isCorrect ? 'correct' : 'incorrect'}`}>
+                    <span className={`result-value ${result.isCorrect ? 'correct' : result.isPartiallyCorrect ? 'partial' : 'incorrect'}`}>
                       {result.userAnswer}
                     </span>
                   </div>
+                  {result.validation && result.validation.feedback && (
+                    <div className="result-feedback">
+                      <span className="result-feedback-text">{result.validation.feedback}</span>
+                      <span className="result-feedback-score">({result.validation.score}% XP)</span>
+                    </div>
+                  )}
                   {!result.isCorrect && (
                     <div className="result-answer">
                       <span className="result-label">Solution :</span>

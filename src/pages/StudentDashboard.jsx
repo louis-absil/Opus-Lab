@@ -173,7 +173,7 @@ function StudentDashboard() {
           </button>
         </div>
       )}
-
+      
       {/* Header minimaliste */}
       <header className="student-header">
         <div className="student-header-content">
@@ -214,8 +214,8 @@ function StudentDashboard() {
                   <div className="level-avatar-container">
                     <div className="level-avatar-wrapper">
                       {user?.photoURL ? (
-                        <img 
-                          src={user.photoURL} 
+                  <img 
+                    src={user.photoURL} 
                           alt={userName} 
                           className="level-avatar"
                         />
@@ -295,31 +295,31 @@ function StudentDashboard() {
                 <div className="filter-group">
                   <label className="filter-label">Compositeur</label>
                   <div className="chips-container">
-                    <button
+                <button 
                       className={`chip ${selectedComposer === '' ? 'chip-active' : ''}`}
                       onClick={() => setSelectedComposer('')}
                     >
                       Tous
-                    </button>
+                </button>
                     {composers.slice(0, 5).map(composer => (
-                      <button
+                <button 
                         key={composer}
                         className={`chip ${selectedComposer === composer ? 'chip-active' : ''}`}
                         onClick={() => setSelectedComposer(composer)}
-                      >
+                >
                         {composer}
-                      </button>
+                </button>
                     ))}
                     {composers.length > 5 && (
-                      <button
+              <button 
                         className="chip chip-more"
                         onClick={() => {/* TODO: Ouvrir modal avec tous les compositeurs */}}
                       >
                         +{composers.length - 5}
-                      </button>
-                    )}
-                  </div>
-                </div>
+              </button>
+            )}
+          </div>
+        </div>
 
                 <div className="filter-group">
                   <label className="filter-label">Difficulté</label>
@@ -339,10 +339,10 @@ function StudentDashboard() {
                         <span className="difficulty-label">{diff}</span>
                       </button>
                     ))}
-                  </div>
-                </div>
-
-                <div className="filter-group">
+              </div>
+            </div>
+            
+            <div className="filter-group">
                   <label className="filter-label">Type d'accord</label>
                   <div className="chord-cards">
                     {chordTypes.map(chord => (
@@ -350,62 +350,62 @@ function StudentDashboard() {
                         key={chord.value}
                         className={`chord-card ${selectedChordType === chord.value ? 'chord-card-active' : ''}`}
                         onClick={() => setSelectedChordType(chord.value)}
-                      >
+              >
                         <span className="chord-icon">{chord.icon}</span>
                         <span className="chord-label">{chord.label}</span>
                       </button>
                     ))}
-                  </div>
-                </div>
-              </div>
-
+            </div>
+            </div>
+          </div>
+          
               {/* CTA Principal */}
-              <button
+          <button
                 className="training-cta"
-                onClick={handleQuickPlay}
-                disabled={isLoadingExercise}
-              >
-                {isLoadingExercise ? (
-                  <>
+            onClick={handleQuickPlay}
+            disabled={isLoadingExercise}
+          >
+            {isLoadingExercise ? (
+              <>
                     <div className="spinner-small"></div>
                     <span>Recherche...</span>
-                  </>
-                ) : (
-                  <>
+              </>
+            ) : (
+              <>
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <polygon points="5 3 19 12 5 21 5 3"></polygon>
                     </svg>
                     <span>Lancer l'entraînement</span>
-                  </>
-                )}
-              </button>
-            </div>
+              </>
+            )}
+          </button>
+        </div>
 
             {/* Section Code Exercice */}
             <div className="code-section">
               <h3 className="code-title">Code Exercice</h3>
               <p className="code-subtitle">Entre le code donné par ton professeur</p>
-              <form onSubmit={handleCodeSubmit} className="code-form">
+          <form onSubmit={handleCodeSubmit} className="code-form">
                 <div className="code-input-wrapper">
-                  <input
-                    type="text"
-                    className="code-input"
+            <input
+              type="text"
+              className="code-input"
                     placeholder="Ex: abc123"
-                    value={exerciseCode}
-                    onChange={(e) => {
-                      setExerciseCode(e.target.value)
-                      setCodeError('')
-                    }}
-                  />
+              value={exerciseCode}
+              onChange={(e) => {
+                setExerciseCode(e.target.value)
+                setCodeError('')
+              }}
+            />
                   <button type="submit" className="code-submit-btn" aria-label="Jouer">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <polygon points="5 3 19 12 5 21 5 3"></polygon>
                     </svg>
-                  </button>
+            </button>
                 </div>
                 {codeError && <p className="code-error">{codeError}</p>}
-              </form>
-            </div>
+          </form>
+        </div>
           </div>
         )}
 
@@ -413,14 +413,14 @@ function StudentDashboard() {
           <div className="student-content">
             <div className="progression-section">
               <h2 className="section-title">Ma Progression</h2>
-              
-              {loadingAttempts ? (
-                <div className="loading-state">
-                  <div className="spinner"></div>
+            
+            {loadingAttempts ? (
+              <div className="loading-state">
+                <div className="spinner"></div>
                   <p>Chargement...</p>
-                </div>
-              ) : attempts.length === 0 ? (
-                <div className="empty-state">
+              </div>
+            ) : attempts.length === 0 ? (
+              <div className="empty-state">
                   <div className="empty-illustration">🎯</div>
                   <h3 className="empty-title">Aucun exercice complété</h3>
                   <p className="empty-text">
@@ -432,15 +432,15 @@ function StudentDashboard() {
                   >
                     Commencer l'entraînement
                   </button>
-                </div>
-              ) : (
-                <div className="attempts-list">
-                  {attempts.map((attempt) => (
-                    <div key={attempt.id} className="attempt-card">
+              </div>
+            ) : (
+              <div className="attempts-list">
+                {attempts.map((attempt) => (
+                  <div key={attempt.id} className="attempt-card">
                       <div className="attempt-main">
                         <div className="attempt-info">
                           <h4 className="attempt-title">
-                            {attempt.exerciseTitle || 'Exercice'}
+                          {attempt.exerciseTitle || 'Exercice'}
                           </h4>
                           <p className="attempt-date">{formatDate(attempt.completedAt)}</p>
                         </div>
@@ -451,16 +451,16 @@ function StudentDashboard() {
                       <div className="attempt-footer">
                         <span className="attempt-stats">
                           ✅ {attempt.correctCount}/{attempt.totalQuestions}
-                        </span>
+                      </span>
                         {attempt.xpGained > 0 && (
                           <span className="attempt-xp">+{attempt.xpGained} XP</span>
                         )}
-                      </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           </div>
         )}
 
@@ -473,13 +473,13 @@ function StudentDashboard() {
                   <h2 className="guest-title">Sauvegarder ta progression</h2>
                   <p className="guest-text">
                     Connecte-toi avec Google pour sauvegarder tes scores, gagner de l'XP et suivre ta progression.
-                  </p>
-                  <button
+            </p>
+            <button
                     className="guest-connect-btn"
-                    onClick={() => navigate('/')}
-                  >
-                    Se connecter avec Google
-                  </button>
+              onClick={() => navigate('/')}
+            >
+              Se connecter avec Google
+            </button>
                   <button
                     className="guest-exit-btn"
                     onClick={() => {

@@ -159,7 +159,7 @@ function Dashboard() {
     <div className="dashboard-container">
       {/* Header simplifié et sticky */}
       <header className="dashboard-header">
-        <h1 className="dashboard-title">Mes Exercices</h1>
+          <h1 className="dashboard-title">Mes Exercices</h1>
         <div className="dashboard-header-right" ref={userMenuRef}>
           <button
             className="dashboard-user-avatar-btn"
@@ -188,10 +188,10 @@ function Dashboard() {
                 </div>
                 <div className="dashboard-user-menu-role">
                   {userData?.role === 'teacher' ? 'Professeur' : 'Élève'}
-                </div>
-              </div>
+            </div>
+          </div>
               <div className="dashboard-user-menu-divider"></div>
-              <button
+              <button 
                 className="dashboard-user-menu-item"
                 onClick={() => {
                   setIsProfileModalOpen(true)
@@ -205,40 +205,40 @@ function Dashboard() {
                 <span>Profil et statistiques</span>
               </button>
               {userData?.role === 'teacher' && (
-                <button
+              <button 
                   className="dashboard-user-menu-item"
                   onClick={() => {
                     navigate('/student-dashboard')
                     setIsUserMenuOpen(false)
                   }}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                    <circle cx="12" cy="12" r="3"></circle>
-                  </svg>
-                  <span>Voir interface élève</span>
-                </button>
-              )}
-              <div className="dashboard-user-menu-divider"></div>
-              <button
-                className="dashboard-user-menu-item dashboard-user-menu-item-danger"
-                onClick={async () => {
-                  try {
-                    await logout()
-                    navigate('/')
-                  } catch (error) {
-                    console.error('Erreur lors de la déconnexion:', error)
-                  }
-                  setIsUserMenuOpen(false)
-                }}
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                  <polyline points="16 17 21 12 16 7"></polyline>
-                  <line x1="21" y1="12" x2="9" y2="12"></line>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
                 </svg>
-                <span>Déconnexion</span>
+                <span>Voir interface élève</span>
               </button>
+          )}
+              <div className="dashboard-user-menu-divider"></div>
+          <button 
+                className="dashboard-user-menu-item dashboard-user-menu-item-danger"
+            onClick={async () => {
+              try {
+                await logout()
+                navigate('/')
+              } catch (error) {
+                console.error('Erreur lors de la déconnexion:', error)
+              }
+                  setIsUserMenuOpen(false)
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+                <span>Déconnexion</span>
+          </button>
             </div>
           )}
         </div>
@@ -250,7 +250,7 @@ function Dashboard() {
           <div className="dashboard-loading">
             <div className="spinner"></div>
             <p>Chargement des exercices...</p>
-          </div>
+      </div>
         ) : exercises.length === 0 ? (
           <div className="dashboard-empty">
             <div className="dashboard-empty-icon">📚</div>
@@ -265,11 +265,11 @@ function Dashboard() {
               const isMenuOpen = openMenuId === exercise.id
               
               return (
-                <div 
-                  key={exercise.id} 
-                  className="dashboard-card"
-                  onClick={() => navigate(`/editor/${exercise.id}`)}
-                >
+            <div 
+              key={exercise.id} 
+              className="dashboard-card"
+              onClick={() => navigate(`/editor/${exercise.id}`)}
+            >
                   {/* Miniature vidéo ou placeholder */}
                   <div className="dashboard-card-thumbnail">
                     {thumbnailUrl ? (
@@ -292,8 +292,8 @@ function Dashboard() {
                         <circle cx="6" cy="18" r="3"></circle>
                         <circle cx="18" cy="16" r="3"></circle>
                       </svg>
-                    </div>
-                    
+              </div>
+
                     {/* Badge de statut */}
                     <div className={`dashboard-card-status-badge ${exercise.status || 'draft'}`}>
                       {exercise.status === 'published' ? 'Publié' : 'Brouillon'}
@@ -357,36 +357,36 @@ function Dashboard() {
                             </svg>
                             <span>{deletingId === exercise.id ? 'Suppression...' : 'Supprimer'}</span>
                           </button>
-                        </div>
-                      )}
-                    </div>
+                  </div>
+                )}
+                  </div>
 
                     {exercise.metadata?.composer && (
                       <p className="dashboard-card-composer">
                         {exercise.metadata.composer}
                       </p>
-                    )}
+                )}
 
                     {/* Tags avec défilement horizontal */}
-                    {exercise.autoTags && exercise.autoTags.length > 0 && (
-                      <div className="dashboard-card-tags">
+                {exercise.autoTags && exercise.autoTags.length > 0 && (
+                  <div className="dashboard-card-tags">
                         <div className="dashboard-card-tags-scroll">
                           {exercise.autoTags.slice(0, 2).map((tag, index) => (
-                            <span key={index} className="dashboard-tag">
-                              {tag}
-                            </span>
-                          ))}
+                      <span key={index} className="dashboard-tag">
+                        {tag}
+                      </span>
+                    ))}
                           {exercise.autoTags.length > 2 && (
-                            <span className="dashboard-tag-more">
+                      <span className="dashboard-tag-more">
                               +{exercise.autoTags.length - 2}
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                      </span>
                     )}
+                        </div>
+                  </div>
+                )}
 
                     {/* Footer avec métadonnées */}
-                    <div className="dashboard-card-footer">
+                <div className="dashboard-card-footer">
                       <div className="dashboard-card-meta">
                         <span className="dashboard-card-meta-item">
                           {exercise.markers?.length || 0} marqueur{exercise.markers?.length !== 1 ? 's' : ''}
@@ -397,9 +397,9 @@ function Dashboard() {
                           </span>
                         )}
                       </div>
-                      <span className="dashboard-card-date">
-                        {formatDate(exercise.createdAt)}
-                      </span>
+                  <span className="dashboard-card-date">
+                    {formatDate(exercise.createdAt)}
+                  </span>
                     </div>
                   </div>
                 </div>

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
 import { 
   signInWithPopup, 
   signOut, 
@@ -21,7 +21,10 @@ export function AuthProvider({ children }) {
   })
 
   // Charger les données utilisateur depuis Firestore
-  const loadUserData = async (firebaseUser, forceServer = false) => {
+  // #region agent log
+  const loadUserData = useCallback(async (firebaseUser, forceServer = false) => {
+    fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:loadUserData',message:'loadUserData appelé',data:{uid:firebaseUser?.uid,forceServer},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     if (!firebaseUser) {
       setUserData(null)
       return
@@ -43,6 +46,9 @@ export function AuthProvider({ children }) {
         displayName: firebaseUser.displayName,
         photoURL: firebaseUser.photoURL
       }, forceServer)
+      // #region agent log
+      fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:loadUserData',message:'setUserData appelé',data:{role:userData?.role,uid:userData?.uid},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       setUserData(userData)
       console.log('Données utilisateur chargées:', userData.role) // Debug
     } catch (error) {
@@ -73,9 +79,25 @@ export function AuthProvider({ children }) {
         // Même en cas d'erreur, ne pas bloquer l'application
       }
     }
-  }
+  }, [])
+  // #endregion
+
+  // Refs pour éviter les dépendances dans handleNetworkOnline
+  const userRef = useRef(user)
+  const userDataRef = useRef(userData)
+  const isGuestRef = useRef(isGuest)
+  
+  // Mettre à jour les refs quand les valeurs changent
+  useEffect(() => {
+    userRef.current = user
+    userDataRef.current = userData
+    isGuestRef.current = isGuest
+  }, [user, userData, isGuest])
 
   useEffect(() => {
+    // #region agent log
+    fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:useEffect',message:'useEffect exécuté',data:{isGuest,hasUser:!!user,hasUserData:!!userData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
     // Timeout de sécurité pour éviter un blocage infini
     const timeoutId = setTimeout(() => {
       console.warn('AuthContext: Timeout - onAuthStateChanged ne s\'est pas déclenché dans les 5 secondes')
@@ -85,9 +107,10 @@ export function AuthProvider({ children }) {
     // Écouter les événements de reconnexion réseau
     const handleNetworkOnline = async () => {
       // Quand la connexion revient, recharger les données utilisateur si nécessaire
-      if (user && !userData) {
+      // Utiliser les refs pour éviter les dépendances
+      if (userRef.current && !userDataRef.current) {
         console.log('Reconnexion détectée - rechargement des données utilisateur')
-        await loadUserData(user, true)
+        await loadUserData(userRef.current, true)
       }
     }
 
@@ -95,12 +118,15 @@ export function AuthProvider({ children }) {
 
     try {
       const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        // #region agent log
+        fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:onAuthStateChanged',message:'onAuthStateChanged callback',data:{hasFirebaseUser:!!firebaseUser,uid:firebaseUser?.uid},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
         clearTimeout(timeoutId)
         setUser(firebaseUser)
         
         if (firebaseUser) {
           // Si l'utilisateur se connecte, désactiver le mode invité
-          if (isGuest) {
+          if (isGuestRef.current) {
             setIsGuest(false)
             localStorage.removeItem(GUEST_MODE_KEY)
           }
@@ -127,7 +153,7 @@ export function AuthProvider({ children }) {
       clearTimeout(timeoutId)
       setLoading(false)
     }
-  }, [isGuest, user, userData])
+  }, [isGuest, loadUserData]) // Retirer user et userData des dépendances
 
   const signInWithGoogle = async () => {
     let timeoutId = null

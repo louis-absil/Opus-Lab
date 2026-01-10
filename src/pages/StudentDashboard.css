@@ -788,7 +788,7 @@
 .guest-illustration {
   font-size: 4rem;
   margin-bottom: 1rem;
-}
+  }
 
 .guest-title {
   font-size: 1.5rem;
@@ -951,7 +951,7 @@
 
 .nav-item {
   display: flex;
-  flex-direction: column;
+    flex-direction: column;
   align-items: center;
   gap: 0.25rem;
   padding: 0.5rem 1rem;
@@ -963,19 +963,19 @@
   font-size: 0.75rem;
   font-weight: 500;
   flex: 1;
-}
+  }
 
 .nav-item svg {
   flex-shrink: 0;
-}
+  }
 
 .nav-item:hover {
   color: #667eea;
-}
+  }
 
 .nav-item-active {
   color: #667eea;
-}
+  }
 
 .nav-item-active svg {
   stroke-width: 2.5;
@@ -995,11 +995,11 @@
 @media (min-width: 768px) {
   .student-main {
     padding: 2rem 1.5rem;
-  }
+}
 
   .student-content {
     gap: 2rem;
-  }
+}
 
   .gamification-content {
     gap: 2rem;
@@ -1025,7 +1025,7 @@
 
   .difficulty-cards {
     grid-template-columns: repeat(4, 1fr);
-  }
+}
 
   .chord-cards {
     grid-template-columns: repeat(4, 1fr);
@@ -1035,7 +1035,7 @@
 @media (max-width: 480px) {
   .student-header {
     padding: 0.875rem 1rem;
-  }
+}
 
   .student-greeting h1 {
     font-size: 1.25rem;
@@ -1048,11 +1048,11 @@
   .gamification-content {
     flex-direction: column;
     align-items: center;
-    text-align: center;
-  }
+  text-align: center;
+}
 
   .gamification-stats {
-    width: 100%;
+  width: 100%;
   }
 
   .difficulty-cards {
@@ -1061,7 +1061,7 @@
 
   .chord-cards {
     grid-template-columns: 1fr;
-  }
+}
 
   .nav-item span {
     font-size: 0.6875rem;

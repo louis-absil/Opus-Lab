@@ -7,6 +7,8 @@ import ExerciseSummary from '../components/ExerciseSummary'
 import { getExerciseById } from '../services/exerciseService'
 import { saveAttempt } from '../services/attemptService'
 import { useAuth } from '../contexts/AuthContext'
+import { validateAnswerWithFunctions } from '../utils/riemannFunctions'
+import { Play, Pause, SkipBack, SkipForward } from 'lucide-react'
 import './Player.css'
 
 function Player() {
@@ -20,7 +22,9 @@ function Player() {
   // États de l'exercice
   const [mode, setMode] = useState('exercise') // 'exercise' | 'summary' (suppression du mode preview)
   const [currentMarkerIndex, setCurrentMarkerIndex] = useState(0)
+  const [selectedMarkerId, setSelectedMarkerId] = useState(null) // Marqueur actuellement sélectionné pour navigation
   const [userAnswers, setUserAnswers] = useState({}) // { markerIndex: chordData }
+  const [answerValidations, setAnswerValidations] = useState({}) // { markerIndex: { level, score, feedback } }
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -73,6 +77,54 @@ function Player() {
   // Gestion du lecteur YouTube
   const handleReady = (event) => {
     playerRef.current = event.target
+  }
+
+  // Synchroniser l'état React avec l'état réel du lecteur YouTube
+  const handleStateChange = (event) => {
+    if (!playerRef.current || !exercise) return
+    
+    const state = event.data
+    // YouTube.PlayerState.PLAYING = 1
+    // YouTube.PlayerState.PAUSED = 2
+    // YouTube.PlayerState.ENDED = 0
+    
+    if (state === 1) { // PLAYING
+      // Si la lecture démarre, synchroniser l'état React et mettre à jour le temps
+      if (!isPlaying) {
+        setIsPlaying(true)
+        // Mettre à jour le temps actuel immédiatement pour que le compteur soit correct
+        try {
+          const time = playerRef.current.getCurrentTime()
+          setCurrentTime(time)
+          currentTimeRef.current = time
+        } catch (error) {
+          console.error('Erreur lors de la mise à jour du temps:', error)
+        }
+      }
+    } else if (state === 2 || state === 0) { // PAUSED ou ENDED
+      // Si la lecture s'arrête, synchroniser l'état React
+      if (isPlaying) {
+        setIsPlaying(false)
+      }
+      
+      // Si la vidéo est terminée, s'assurer qu'on est à la fin de l'extrait
+      if (state === 0) {
+        const endTime = exercise.settings.endTime
+        if (playerRef.current) {
+          try {
+            const currentTime = playerRef.current.getCurrentTime()
+            // Si on est après la fin de l'extrait, revenir à la fin
+            if (currentTime > endTime) {
+              playerRef.current.seekTo(endTime, true)
+              setCurrentTime(endTime)
+              currentTimeRef.current = endTime
+            }
+          } catch (error) {
+            console.error('Erreur lors de la vérification de fin:', error)
+          }
+        }
+      }
+    }
   }
 
   // Nettoyer les intervalles de fade si la lecture est arrêtée
@@ -417,15 +469,62 @@ function Player() {
       setCurrentTime(markerTime)
       currentTimeRef.current = markerTime
       
-      // S'assurer que la vidéo est en pause
-      if (isPlaying) {
+      // Toujours forcer la pause après seekTo pour éviter une reprise automatique
+      // Utiliser setTimeout pour s'assurer que le seekTo est terminé
+      setTimeout(() => {
+        if (playerRef.current) {
+          try {
+            const playerState = playerRef.current.getPlayerState()
+            // YouTube.PlayerState.PLAYING = 1
+            if (playerState === 1) {
+              playerRef.current.pauseVideo()
+            }
+          } catch (error) {
+            // Si on ne peut pas vérifier l'état, forcer la pause quand même
         playerRef.current.pauseVideo()
+          }
+        }
+      }, 100)
+      
+      // Mettre à jour l'état React immédiatement
         setIsPlaying(false)
-      }
+      
+      // Mettre à jour le marqueur sélectionné pour la navigation
+      setSelectedMarkerId(markerIndex)
       
       // Ouvrir la modale pour ce marqueur
       setCurrentMarkerIndex(markerIndex)
       setIsModalOpen(true)
+    }
+  }
+
+  // Fonction pour naviguer vers un marqueur (sans ouvrir la modale)
+  const handleSeekToMarker = (markerIndex) => {
+    if (!playerRef.current || !exercise) return
+    
+    const markers = exercise.markers.map(m => typeof m === 'number' ? m : m.time || m.absoluteTime)
+    const markerTime = markers[markerIndex]
+    
+    if (markerTime !== undefined) {
+      playerRef.current.seekTo(markerTime, true)
+      setCurrentTime(markerTime)
+      currentTimeRef.current = markerTime
+      setSelectedMarkerId(markerIndex)
+      
+      // Forcer la pause
+      setTimeout(() => {
+        if (playerRef.current) {
+          try {
+            const playerState = playerRef.current.getPlayerState()
+            if (playerState === 1) {
+              playerRef.current.pauseVideo()
+            }
+          } catch (error) {
+            playerRef.current.pauseVideo()
+          }
+        }
+      }, 100)
+      setIsPlaying(false)
     }
   }
 
@@ -435,6 +534,30 @@ function Player() {
       ...prev,
       [currentMarkerIndex]: chordData
     }))
+    
+    // Valider avec le système de fonctions de Riemann
+    if (exercise && exercise.markers && exercise.markers[currentMarkerIndex]) {
+      const marker = exercise.markers[currentMarkerIndex]
+      const correctAnswer = typeof marker === 'object' && marker.chord ? marker.chord : null
+      
+      if (correctAnswer) {
+        const validation = validateAnswerWithFunctions(
+          chordData,
+          correctAnswer,
+          chordData.function || null
+        )
+        
+        setAnswerValidations(prev => ({
+          ...prev,
+          [currentMarkerIndex]: validation
+        }))
+        
+        // Afficher un feedback temporaire (optionnel)
+        if (validation.feedback && validation.level > 0) {
+          // Le feedback sera affiché dans l'interface si nécessaire
+        }
+      }
+    }
     
     setIsModalOpen(false)
     
@@ -463,15 +586,32 @@ function Player() {
           typeof marker === 'object' && marker.chord ? marker.chord : null
         )
         
-        // Calculer le score
-        const correctCount = correctAnswersArray.filter((correct, index) => {
-          const userAnswer = answersArray[index]
-          return userAnswer && correct && 
-                 userAnswer.displayLabel === correct.displayLabel
-        }).length
+        // Calculer le score avec le système pondéré de fonctions de Riemann
+        let totalScore = 0
+        let maxScore = 0
         
-        const totalQuestions = correctAnswersArray.length
-        const score = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0
+        correctAnswersArray.forEach((correct, index) => {
+          const userAnswer = answersArray[index]
+          if (userAnswer && correct) {
+            const validation = answerValidations[index]
+            if (validation) {
+              totalScore += validation.score
+            } else {
+              // Fallback : validation binaire si pas de validation fonctionnelle
+              const validation = validateAnswerWithFunctions(
+                userAnswer,
+                correct,
+                userAnswer.function || null
+              )
+              totalScore += validation.score
+            }
+            maxScore += 100
+          } else if (correct) {
+            maxScore += 100
+          }
+        })
+        
+        const score = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0
         
         // Sauvegarder la tentative
         await saveAttempt(
@@ -526,11 +666,6 @@ function Player() {
     }
   }
 
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = Math.floor(seconds % 60)
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
-  }
 
   if (loading) {
     return (
@@ -570,6 +705,37 @@ function Player() {
   const totalMarkers = markers.length
   const answeredCount = Object.values(userAnswers).filter(a => a !== null).length
 
+  // Format du temps relatif (pour le timer général)
+  const formatRelativeTime = (seconds) => {
+    if (!exercise) return '00:00.0'
+    const relativeTime = Math.max(0, seconds - startTime)
+    return formatTimeDetailed(relativeTime)
+  }
+
+  // Trouver le marqueur précédent par rapport à la position actuelle
+  const findPreviousMarker = (currentTimePos) => {
+    if (!markers || markers.length === 0) return null
+    // Trouver le dernier marqueur qui est avant la position actuelle
+    for (let i = markers.length - 1; i >= 0; i--) {
+      if (markers[i] < currentTimePos) {
+        return i
+      }
+    }
+    return null // Aucun marqueur avant la position actuelle
+  }
+
+  // Trouver le marqueur suivant par rapport à la position actuelle
+  const findNextMarker = (currentTimePos) => {
+    if (!markers || markers.length === 0) return null
+    // Trouver le premier marqueur qui est après la position actuelle
+    for (let i = 0; i < markers.length; i++) {
+      if (markers[i] > currentTimePos) {
+        return i
+      }
+    }
+    return null // Aucun marqueur après la position actuelle
+  }
+
   const opts = {
     height: '100%',
     width: '100%',
@@ -587,6 +753,7 @@ function Player() {
       <ExerciseSummary
         exercise={exercise}
         userAnswers={userAnswers}
+          answerValidations={answerValidations}
         onReplay={handleReplay}
         isGuest={isGuest}
       />
@@ -598,6 +765,13 @@ function Player() {
     const mins = Math.floor(seconds / 60)
     const secs = Math.floor(seconds % 60)
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+  }
+
+  const formatTimeDetailed = (seconds) => {
+    if (!seconds || seconds < 0) return '00:00.0'
+    const mins = Math.floor(seconds / 60)
+    const secs = (seconds % 60).toFixed(1)
+    return `${mins.toString().padStart(2, '0')}:${secs.padStart(4, '0')}`
   }
 
   // Calculer le temps relatif pour l'affichage
@@ -627,13 +801,14 @@ function Player() {
       {/* Zone Vidéo (Haut - 80-85%) */}
       <div className="player-video-zone">
         <div className="player-video-wrapper">
-          <YouTube
-            videoId={videoId}
-            opts={opts}
-            onReady={handleReady}
-            className="player-youtube"
-          />
-        </div>
+            <YouTube
+              videoId={videoId}
+              opts={opts}
+              onReady={handleReady}
+              onStateChange={handleStateChange}
+              className="player-youtube"
+            />
+          </div>
 
         {/* Bouton Quitter (Haut à droite) */}
         <button
@@ -659,86 +834,141 @@ function Player() {
       </div>
 
       {/* Zone de Contrôle (Bas - 15-20%) */}
-      <div className="player-control-zone">
+      <div className="player-control-zone bg-zinc-900/80 backdrop-blur-xl border-t border-white/5">
         {/* Timeline gamifiée */}
         <div className="player-timeline-container">
-          <div 
-            ref={timelineRef}
-            className="player-timeline-rail"
-            onClick={(e) => {
-              if (!playerRef.current || !exercise) return
-              const rect = e.currentTarget.getBoundingClientRect()
-              const x = e.clientX - rect.left
-              const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100))
-              const time = startTime + (percentage / 100) * (endTime - startTime)
-              playerRef.current.seekTo(time, true)
-              setCurrentTime(time)
-              currentTimeRef.current = time
-            }}
-          >
-            {/* Barre de progression */}
-            <div 
-              className="player-timeline-progress"
-              style={{ width: `${relativeEndTime > 0 ? (relativeCurrentTime / relativeEndTime) * 100 : 0}%` }}
-            ></div>
-            
-            {/* Marqueurs comme cibles cliquables */}
-            {markers.map((marker, index) => {
-              const markerAbsoluteTime = marker
-              if (markerAbsoluteTime < startTime || markerAbsoluteTime > endTime) return null
-              
-              const relativeTime = markerAbsoluteTime - startTime
-              const markerPos = relativeEndTime > 0 
-                ? (relativeTime / relativeEndTime) * 100 
-                : 0
-              
-              const isAnswered = answeredMarkers.includes(index)
-              const isNext = nextMarkerIndex === index
-              
-              return (
-                <button
-                  key={index}
-                  className={`player-timeline-target ${isAnswered ? 'player-timeline-target-answered' : ''} ${isNext ? 'player-timeline-target-next' : ''}`}
-                  style={{ left: `${markerPos}%` }}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleMarkerClick(index)
-                  }}
-                  aria-label={isAnswered ? `Question ${index + 1} (répondu)` : `Question ${index + 1}`}
-                >
-                  <span className="player-timeline-target-inner"></span>
-                </button>
-              )
-            })}
-          </div>
+              <div 
+                ref={timelineRef}
+                className="player-timeline-rail"
+                onClick={(e) => {
+                  if (!playerRef.current || !exercise) return
+                  const rect = e.currentTarget.getBoundingClientRect()
+                  const x = e.clientX - rect.left
+                  const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100))
+                  const time = startTime + (percentage / 100) * (endTime - startTime)
+                playerRef.current.seekTo(time, true)
+                setCurrentTime(time)
+                currentTimeRef.current = time
+                }}
+              >
+                {/* Barre de progression */}
+                <div 
+                  className="player-timeline-progress"
+                  style={{ width: `${relativeEndTime > 0 ? (relativeCurrentTime / relativeEndTime) * 100 : 0}%` }}
+                ></div>
+                
+                {/* Marqueurs comme cibles cliquables */}
+                {markers.map((marker, index) => {
+                  const markerAbsoluteTime = marker
+                  if (markerAbsoluteTime < startTime || markerAbsoluteTime > endTime) return null
+                  
+                  const relativeTime = markerAbsoluteTime - startTime
+                  const markerPos = relativeEndTime > 0 
+                    ? (relativeTime / relativeEndTime) * 100 
+                    : 0
+                  
+                  const isAnswered = answeredMarkers.includes(index)
+                  const isNext = nextMarkerIndex === index
+                  
+                  return (
+                    <button
+                      key={index}
+                      className={`player-timeline-target ${isAnswered ? 'player-timeline-target-answered' : ''} ${isNext ? 'player-timeline-target-next' : ''}`}
+                      style={{ left: `${markerPos}%` }}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleMarkerClick(index)
+                      }}
+                      aria-label={isAnswered ? `Question ${index + 1} (répondu)` : `Question ${index + 1}`}
+                    >
+                      <span className="player-timeline-target-inner"></span>
+                    </button>
+                  )
+                })}
+              </div>
         </div>
 
-        {/* Contrôles de lecture regroupés */}
-        <div className="player-controls-group">
-          <div className="player-time-display">
-            {formatTimeDisplay(relativeCurrentTime)} / {formatTimeDisplay(relativeEndTime)}
-          </div>
-          
+        {/* Contrôles de lecture regroupés - Style unifié avec Editor */}
+        <div className="flex items-center justify-center gap-4">
+          {/* Bouton Prev */}
           <button
-            className="player-play-btn"
-            onClick={handlePlayPause}
-            aria-label={isPlaying ? 'Pause' : 'Lecture'}
+            onClick={() => {
+              const currentPos = currentTimeRef.current || currentTime
+              const prevIndex = findPreviousMarker(currentPos)
+              
+              if (prevIndex !== null) {
+                // Aller au marqueur précédent
+                handleSeekToMarker(prevIndex)
+              } else {
+                // Si pas de marqueur précédent, revenir au début de l'extrait
+                if (playerRef.current && exercise) {
+                  playerRef.current.seekTo(startTime, true)
+                  setCurrentTime(startTime)
+                  currentTimeRef.current = startTime
+                  setSelectedMarkerId(null)
+                }
+              }
+            }}
+            className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-zinc-800 border border-white/10 hover:border-white/20 hover:bg-zinc-700 transition-all duration-200 flex items-center justify-center shadow-lg active:scale-95"
+            title="Marqueur précédent"
           >
-            {isPlaying ? (
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="6" y="4" width="4" height="16"></rect>
-                <rect x="14" y="4" width="4" height="16"></rect>
-              </svg>
-            ) : (
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                <polygon points="5 3 19 12 5 21 5 3"></polygon>
-              </svg>
-            )}
+            <SkipBack className="w-5 h-5 md:w-6 md:h-6 text-white/70" />
           </button>
 
+          {/* Timer général + Bouton PLAY Héros */}
+          <div className="flex flex-col items-center gap-2">
+            {/* Timer général */}
+            <div className="px-4 py-2 rounded-xl bg-zinc-800/50 backdrop-blur-sm border border-white/10">
+              <div className="text-lg md:text-xl font-mono text-white font-bold text-center">
+                {formatRelativeTime(currentTime)}
+              </div>
+            </div>
+            {/* Bouton PLAY Héros */}
+            <button
+              onClick={handlePlayPause}
+              className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 border-4 border-white/10 shadow-2xl shadow-indigo-500/40 hover:shadow-indigo-500/60 transition-all duration-200 flex items-center justify-center active:scale-95"
+              title="Play/Pause (Espace)"
+              aria-label={isPlaying ? 'Pause' : 'Lecture'}
+            >
+              {isPlaying ? (
+                <Pause className="w-8 h-8 md:w-10 md:h-10 text-white" />
+              ) : (
+                <Play className="w-8 h-8 md:w-10 md:h-10 text-white ml-1" />
+              )}
+            </button>
+          </div>
+
+          {/* Bouton Next */}
+          <button
+            onClick={() => {
+              const currentPos = currentTimeRef.current || currentTime
+              const nextIndex = findNextMarker(currentPos)
+              
+              if (nextIndex !== null) {
+                // Aller au marqueur suivant
+                handleSeekToMarker(nextIndex)
+              } else if (markers.length > 0) {
+                // Si pas de marqueur suivant mais qu'il y a des marqueurs, aller au premier
+                handleSeekToMarker(0)
+              } else {
+                // Si pas de marqueurs, aller à la fin
+                if (playerRef.current && exercise) {
+                  playerRef.current.seekTo(endTime, true)
+                  setCurrentTime(endTime)
+                  currentTimeRef.current = endTime
+                }
+              }
+            }}
+            className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-zinc-800 border border-white/10 hover:border-white/20 hover:bg-zinc-700 transition-all duration-200 flex items-center justify-center shadow-lg active:scale-95"
+            title="Marqueur suivant"
+          >
+            <SkipForward className="w-5 h-5 md:w-6 md:h-6 text-white/70" />
+          </button>
+
+          {/* Bouton Terminer (si toutes les questions sont répondues) */}
           {answeredCount === totalMarkers && totalMarkers > 0 && (
             <button
-              className="player-finish-btn"
+              className="px-4 py-2 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold shadow-lg shadow-indigo-500/40 hover:shadow-indigo-500/60 transition-all duration-200 active:scale-95"
               onClick={handleFinishExercise}
               aria-label="Terminer l'exercice"
             >
@@ -748,16 +978,24 @@ function Player() {
         </div>
       </div>
 
-      {/* Modale de saisie d'accord (mode élève) */}
-      <ChordSelectorModal
-        isOpen={isModalOpen}
-        onClose={handleModalClose}
-        onValidate={handleChordValidate}
-        initialChord={userAnswers[currentMarkerIndex] || null}
-        studentMode={true}
-        currentQuestion={currentMarkerIndex + 1}
-        totalQuestions={totalMarkers}
-      />
+      {/* Modale Flottante de Saisie d'Accord (HUD Glassmorphism) */}
+        <ChordSelectorModal
+          isOpen={isModalOpen}
+          onClose={handleModalClose}
+          onValidate={handleChordValidate}
+          initialChord={userAnswers[currentMarkerIndex] || null}
+          studentMode={true}
+          currentQuestion={currentMarkerIndex + 1}
+          totalQuestions={totalMarkers}
+        embedded={true}
+        />
+      
+      {/* Affichage du feedback de validation (optionnel, peut être intégré dans l'UI) */}
+      {answerValidations[currentMarkerIndex] && (
+        <div className="player-validation-feedback" style={{ display: 'none' }}>
+          {answerValidations[currentMarkerIndex].feedback}
+      </div>
+      )}
     </div>
   )
 }

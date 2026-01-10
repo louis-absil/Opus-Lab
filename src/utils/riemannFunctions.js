@@ -1,0 +1,156 @@
+/**
+ * Utilitaires pour la théorie des fonctions de Riemann
+ * Mapping des fonctions (T, SD, D) vers les degrés
+ */
+
+// Mapping des fonctions vers les degrés
+export const FUNCTION_TO_DEGREES = {
+  T: ['I', 'VI', 'III'], // Tonique : I, VI, et III (selon contexte)
+  SD: ['IV', 'II'],      // Sous-Dominante : IV, II
+  D: ['V', 'VII']        // Dominante : V, VII
+}
+
+// Mapping inverse : degré vers fonction(s)
+export const DEGREE_TO_FUNCTIONS = {
+  'I': ['T'],
+  'II': ['SD'],
+  'III': ['T'],
+  'IV': ['SD'],
+  'V': ['D'],
+  'VI': ['T'],
+  'VII': ['D']
+}
+
+// Couleurs pour chaque fonction
+export const FUNCTION_COLORS = {
+  T: {
+    primary: '#3b82f6',   // Bleu
+    secondary: '#60a5fa',
+    glow: 'rgba(59, 130, 246, 0.4)'
+  },
+  SD: {
+    primary: '#f59e0b',   // Orange
+    secondary: '#fbbf24',
+    glow: 'rgba(245, 158, 11, 0.4)'
+  },
+  D: {
+    primary: '#ef4444',  // Rouge
+    secondary: '#f87171',
+    glow: 'rgba(239, 68, 68, 0.4)'
+  }
+}
+
+/**
+ * Obtient la fonction d'un degré
+ * @param {string} degree - Le degré (I, II, III, etc.)
+ * @returns {string[]} - Tableau des fonctions associées
+ */
+export function getFunctionFromDegree(degree) {
+  return DEGREE_TO_FUNCTIONS[degree] || []
+}
+
+/**
+ * Obtient les degrés d'une fonction
+ * @param {string} functionName - La fonction (T, SD, D)
+ * @returns {string[]} - Tableau des degrés associés
+ */
+export function getDegreesFromFunction(functionName) {
+  return FUNCTION_TO_DEGREES[functionName] || []
+}
+
+/**
+ * Vérifie si deux degrés appartiennent à la même fonction
+ * @param {string} degree1 - Premier degré
+ * @param {string} degree2 - Deuxième degré
+ * @returns {boolean} - True si les degrés partagent au moins une fonction
+ */
+export function areDegreesInSameFunction(degree1, degree2) {
+  const func1 = getFunctionFromDegree(degree1)
+  const func2 = getFunctionFromDegree(degree2)
+  return func1.some(f => func2.includes(f))
+}
+
+/**
+ * Compare une réponse utilisateur avec la solution correcte
+ * Retourne un objet avec le niveau de précision et le score
+ * @param {Object} userAnswer - Réponse de l'utilisateur { root, displayLabel, ... }
+ * @param {Object} correctAnswer - Solution correcte { root, displayLabel, ... }
+ * @param {string} selectedFunction - Fonction sélectionnée par l'utilisateur (optionnel)
+ * @returns {Object} - { level: 1|2|3, score: 0-100, feedback: string }
+ */
+export function validateAnswerWithFunctions(userAnswer, correctAnswer, selectedFunction = null) {
+  if (!userAnswer || !correctAnswer) {
+    return {
+      level: 0,
+      score: 0,
+      feedback: 'Réponse manquante'
+    }
+  }
+
+  const userRoot = userAnswer.root || userAnswer.displayLabel?.match(/^[♭#]?[IVX]+/)?.[0]?.replace(/[♭#]/g, '')
+  const correctRoot = correctAnswer.root || correctAnswer.displayLabel?.match(/^[♭#]?[IVX]+/)?.[0]?.replace(/[♭#]/g, '')
+
+  // Niveau 1 : Réponse parfaite (100% XP)
+  if (userAnswer.displayLabel === correctAnswer.displayLabel) {
+    return {
+      level: 1,
+      score: 100,
+      feedback: 'Parfait !'
+    }
+  }
+
+  // Si l'utilisateur a sélectionné uniquement une fonction (sans degré spécifique)
+  if (selectedFunction && !userRoot) {
+    const correctFunctions = getFunctionFromDegree(correctRoot)
+    if (correctFunctions.includes(selectedFunction)) {
+      return {
+        level: 3,
+        score: 30,
+        feedback: `Bonne fonction (${selectedFunction === 'T' ? 'Tonique' : selectedFunction === 'SD' ? 'Sous-Dominante' : 'Dominante'}) ! Mais essayez de trouver le degré exact.`
+      }
+    }
+  }
+
+  // Si l'utilisateur a sélectionné une fonction ET un degré
+  if (selectedFunction && userRoot) {
+    const userFunctions = getFunctionFromDegree(userRoot)
+    const correctFunctions = getFunctionFromDegree(correctRoot)
+    
+    // Vérifier si la fonction sélectionnée correspond à la solution
+    if (correctFunctions.includes(selectedFunction)) {
+      // Si le degré est aussi correct
+      if (userRoot === correctRoot) {
+        return {
+          level: 1,
+          score: 100,
+          feedback: 'Parfait !'
+        }
+      }
+      // Si la fonction est correcte mais pas le degré
+      if (userFunctions.includes(selectedFunction)) {
+        return {
+          level: 2,
+          score: 65,
+          feedback: `Presque ! C'est la bonne fonction (${selectedFunction === 'T' ? 'Tonique' : selectedFunction === 'SD' ? 'Sous-Dominante' : 'Dominante'}), mais pas le bon degré.`
+        }
+      }
+    }
+  }
+
+  // Niveau 2 : Substitution fonctionnelle (même fonction, degré différent)
+  if (userRoot && correctRoot && areDegreesInSameFunction(userRoot, correctRoot)) {
+    return {
+      level: 2,
+      score: 65,
+      feedback: 'Bonne fonction, mais essayez de trouver le degré exact.'
+    }
+  }
+
+  // Niveau 0 : Faux
+  return {
+    level: 0,
+    score: 0,
+    feedback: 'Incorrect. Essayez encore !'
+  }
+}
+

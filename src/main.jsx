@@ -9,10 +9,10 @@ import NetworkStatus from './components/NetworkStatus'
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <NetworkProvider>
-      <AuthProvider>
+    <AuthProvider>
         <NetworkStatus />
-        <AppRouter />
-      </AuthProvider>
+      <AppRouter />
+    </AuthProvider>
     </NetworkProvider>
   </StrictMode>,
 )
