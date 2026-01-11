@@ -23,7 +23,7 @@ function ExerciseSummary({ exercise, userAnswers, answerValidations = {}, onRepl
         validation = validateAnswerWithFunctions(
           userAnswer,
           correctAnswer,
-          userAnswer.function || null
+          userAnswer.selectedFunction || userAnswer.function || null
         )
       }
       

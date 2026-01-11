@@ -544,7 +544,7 @@ function Player() {
         const validation = validateAnswerWithFunctions(
           chordData,
           correctAnswer,
-          chordData.function || null
+          chordData.selectedFunction || chordData.function || null
         )
         
         setAnswerValidations(prev => ({
@@ -601,7 +601,7 @@ function Player() {
               const validation = validateAnswerWithFunctions(
                 userAnswer,
                 correct,
-                userAnswer.function || null
+                userAnswer.selectedFunction || userAnswer.function || null
               )
               totalScore += validation.score
             }

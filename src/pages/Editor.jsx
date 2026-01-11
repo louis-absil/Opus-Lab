@@ -4,7 +4,9 @@ import YouTube from 'react-youtube'
 import ChordSelectorModal from '../ChordSelectorModal'
 import VideoCockpit from '../VideoCockpit'
 import SaveExerciseModal from '../components/SaveExerciseModal'
+import ConfirmExitModal from '../components/ConfirmExitModal'
 import VideoImport from '../components/VideoImport'
+import PWAInstallPrompt from '../components/PWAInstallPrompt'
 import { useAuth } from '../contexts/AuthContext'
 import { getExerciseById, createExercise, updateExercise } from '../services/exerciseService'
 import { 
@@ -19,6 +21,22 @@ import {
   ArrowLeft,
   Flag
 } from 'lucide-react'
+import { DEGREE_TO_FUNCTIONS } from '../utils/riemannFunctions'
+
+// Constantes pour les chiffrages (identique à ChordSelectorModal)
+const FIGURES = [
+  { value: '5', label: 'Quinte', display: '5' },
+  { value: '6', label: 'Sixte', display: '6' },
+  { value: '64', label: 'Quarte-sixte', display: '6/4', isStacked: true, displayArray: ['6', '4'] },
+  { value: '7', label: 'Septième', display: '7' },
+  { value: '65', label: 'Sixte-quinte', display: '6/5', isStacked: true, displayArray: ['6', '5'] },
+  { value: '43', label: 'Quarte-tierce', display: '4/3', isStacked: true, displayArray: ['4', '3'] },
+  { value: '2', label: 'Seconde', display: '2' },
+  { value: '9', label: 'Neuvième', display: '9' },
+  { value: '11', label: 'Onzième', display: '11' },
+  { value: '13', label: 'Treizième', display: '13' },
+  { value: '54', label: 'Quinte-quarte', display: '5/4', isStacked: true, displayArray: ['5', '4'] }
+]
 
 function Editor() {
   const { id } = useParams()
@@ -44,6 +62,8 @@ function Editor() {
   const [saveMessage, setSaveMessage] = useState(null)
   const [loading, setLoading] = useState(!!id)
   const [exerciseId, setExerciseId] = useState(id || null)
+  const [isConfirmExitModalOpen, setIsConfirmExitModalOpen] = useState(false)
+  const [lastSavedState, setLastSavedState] = useState(null) // État sauvegardé pour comparaison
   const [isDraggingTime, setIsDraggingTime] = useState(null) // 'in' | 'out' | 'marker-{index}' | null
   const [dragStartX, setDragStartX] = useState(0)
   const [dragStartTime, setDragStartTime] = useState(0)
@@ -66,6 +86,46 @@ function Editor() {
       navigate('/')
     }
   }, [id, user])
+
+  // Détecter les partages depuis Web Share Target (Android PWA)
+  useEffect(() => {
+    // Parser les query params depuis l'URL (HashRouter ne gère pas query params dans hash)
+    const urlParams = new URLSearchParams(window.location.search)
+    const sharedUrl = urlParams.get('url') || urlParams.get('text')
+    
+    if (sharedUrl) {
+      // Extraire l'ID YouTube de l'URL partagée
+      const videoIdFromShare = extractVideoId(sharedUrl)
+      
+      // Vérifier si c'est une URL YouTube valide (extractVideoId retourne l'ID ou l'URL originale)
+      const isValidYouTubeUrl = /(?:youtube\.com|youtu\.be)/.test(sharedUrl)
+      
+      if (isValidYouTubeUrl && videoIdFromShare && videoIdFromShare.length === 11) {
+        // Charger la vidéo automatiquement
+        setVideoId(videoIdFromShare)
+        setIsEditingUrl(false)
+        setShowVideoSearch(false)
+        
+        // Nettoyer les paramètres d'URL après traitement
+        window.history.replaceState({}, '', window.location.pathname + window.location.hash)
+        
+        // Afficher un message de confirmation
+        setSaveMessage({ 
+          type: 'success', 
+          text: 'Vidéo reçue depuis le partage !' 
+        })
+        setTimeout(() => setSaveMessage(null), 3000)
+      } else if (sharedUrl && !isValidYouTubeUrl) {
+        // Si ce n'est pas une URL YouTube valide
+        setSaveMessage({ 
+          type: 'error', 
+          text: 'L\'URL partagée ne semble pas être une vidéo YouTube valide' 
+        })
+        setTimeout(() => setSaveMessage(null), 3000)
+        window.history.replaceState({}, '', window.location.pathname + window.location.hash)
+      }
+    }
+  }, [])
 
   const loadExercise = async (exerciseId) => {
     try {
@@ -104,6 +164,24 @@ function Editor() {
       setExerciseId(exerciseId)
       setIsEditingUrl(false)
       setShowVideoSearch(false)
+      
+      // Sauvegarder l'état initial comme état sauvegardé
+      const loadedMarkers = exercise.markers ? exercise.markers.map(m => m.time) : []
+      const loadedChordData = {}
+      if (exercise.markers) {
+        exercise.markers.forEach((marker, index) => {
+          if (marker.chord) {
+            loadedChordData[index] = marker.chord
+          }
+        })
+      }
+      setLastSavedState({
+        markers: loadedMarkers,
+        chordData: loadedChordData,
+        startTime: exercise.settings?.startTime || 0,
+        endTime: exercise.settings?.endTime || 60,
+        videoId: exercise.video?.id || ''
+      })
     } catch (error) {
       console.error('Erreur lors du chargement de l\'exercice:', error)
       setSaveMessage({ type: 'error', text: 'Erreur lors du chargement de l\'exercice' })
@@ -759,6 +837,15 @@ function Editor() {
         }
       }
       
+      // Sauvegarder l'état actuel comme état sauvegardé
+      setLastSavedState({
+        markers: [...markers],
+        chordData: { ...chordData },
+        startTime,
+        endTime,
+        videoId: extractedId
+      })
+      
       setSaveMessage({ 
         type: 'success', 
         text: `Exercice ${exerciseId ? 'mis à jour' : 'sauvegardé'} !` 
@@ -795,18 +882,189 @@ function Editor() {
     }
   }
 
+  // Vérifier s'il y a des modifications non sauvegardées
+  const hasUnsavedChanges = () => {
+    // Si pas de marqueurs, pas de modifications
+    if (markers.length === 0) {
+      return false
+    }
+    
+    // Si pas d'état sauvegardé, il y a des modifications
+    if (!lastSavedState) {
+      return true
+    }
+    
+    // Comparer les marqueurs
+    if (markers.length !== lastSavedState.markers.length) {
+      return true
+    }
+    
+    // Comparer les temps des marqueurs
+    for (let i = 0; i < markers.length; i++) {
+      if (Math.abs(markers[i] - lastSavedState.markers[i]) > 0.01) {
+        return true
+      }
+    }
+    
+    // Comparer les accords
+    const currentChordKeys = Object.keys(chordData).sort()
+    const savedChordKeys = Object.keys(lastSavedState.chordData).sort()
+    if (currentChordKeys.length !== savedChordKeys.length) {
+      return true
+    }
+    
+    for (let i = 0; i < currentChordKeys.length; i++) {
+      if (currentChordKeys[i] !== savedChordKeys[i]) {
+        return true
+      }
+      // Comparer les objets d'accord (simplifié)
+      const currentChord = JSON.stringify(chordData[currentChordKeys[i]])
+      const savedChord = JSON.stringify(lastSavedState.chordData[savedChordKeys[i]])
+      if (currentChord !== savedChord) {
+        return true
+      }
+    }
+    
+    // Comparer startTime et endTime
+    if (Math.abs(startTime - lastSavedState.startTime) > 0.01 ||
+        Math.abs(endTime - lastSavedState.endTime) > 0.01) {
+      return true
+    }
+    
+    // Comparer videoId
+    const currentVideoId = extractVideoId(videoId) || videoId
+    if (currentVideoId !== lastSavedState.videoId) {
+      return true
+    }
+    
+    return false
+  }
+
+  const handleBackClick = () => {
+    if (hasUnsavedChanges()) {
+      setIsConfirmExitModalOpen(true)
+    } else {
+      navigate('/')
+    }
+  }
+
+  const handleConfirmExit = () => {
+    setIsConfirmExitModalOpen(false)
+    navigate('/')
+  }
+
   // La timeline affiche toujours la sélection IN-OUT sur 100% de la largeur
   const selectionDuration = endTime - startTime
 
   // Formatage des accords pour l'affichage
+  // Mapping des racines spéciales vers les fonctions
+  const SPECIAL_ROOT_TO_FUNCTION = {
+    'N': 'SD',   // Sixte napolitaine → Sous-Dominante
+    'It': 'D',   // Sixte italienne → Dominante
+    'Fr': 'D',   // Sixte française → Dominante
+    'Gr': 'D'    // Sixte allemande → Dominante
+  }
+
+  // Fonction pour déterminer la fonction tonale d'un accord
+  const getChordFunction = (chord) => {
+    if (!chord) return null
+    
+    const { degree, specialRoot, selectedFunction } = chord
+    
+    // 1. Si une fonction est explicitement sélectionnée, l'utiliser
+    if (selectedFunction) {
+      return selectedFunction
+    }
+    
+    // 2. Si c'est une racine spéciale, utiliser le mapping
+    if (specialRoot) {
+      return SPECIAL_ROOT_TO_FUNCTION[specialRoot] || null
+    }
+    
+    // 3. Si c'est un degré, utiliser le mapping (prendre la première fonction si plusieurs)
+    if (degree) {
+      const functions = DEGREE_TO_FUNCTIONS[degree] || []
+      return functions.length > 0 ? functions[0] : null
+    }
+    
+    return null
+  }
+
+  // Fonction pour obtenir le label d'un degré selon le mode
+  const getDegreeLabel = (deg, mode = 'generic') => {
+    const degreeMap = {
+      'I': {
+        generic: 'I',
+        major: 'I',
+        minor: 'i'
+      },
+      'II': {
+        generic: 'II',
+        major: 'ii',
+        minor: 'ii°'
+      },
+      'III': {
+        generic: 'III',
+        major: 'iii',
+        minor: 'III'
+      },
+      'IV': {
+        generic: 'IV',
+        major: 'IV',
+        minor: 'iv'
+      },
+      'V': {
+        generic: 'V',
+        major: 'V',
+        minor: 'V'
+      },
+      'VI': {
+        generic: 'VI',
+        major: 'vi',
+        minor: 'VI'
+      },
+      'VII': {
+        generic: 'VII',
+        major: 'vii°',
+        minor: 'vii°'
+      }
+    }
+    return degreeMap[deg]?.[mode] || deg
+  }
+
   const formatChordLabel = (chord) => {
     if (!chord) return null
     
-    const { degree, accidental, quality, figure, isBorrowed, specialRoot } = chord
+    // Extraire le degreeMode, avec 'generic' comme défaut seulement si vraiment absent
+    // Si l'accord n'a pas de degreeMode, essayer de le récupérer depuis localStorage
+    let degreeMode = chord.degreeMode
+    if (!degreeMode) {
+      const savedMode = localStorage.getItem('chordSelectorDegreeMode')
+      degreeMode = savedMode || 'generic'
+    }
+    const { degree, accidental, quality, figure, isBorrowed, specialRoot, selectedFunction } = chord
+    
+    // Si seule une fonction est sélectionnée (sans degré)
+    if (selectedFunction && !degree && !specialRoot) {
+      return { 
+        function: selectedFunction,
+        isFunctionOnly: true
+      }
+    }
     
     if (specialRoot) {
       if (specialRoot === 'N') {
-        return { degree: 'II', accidental: '♭', figure: '6' }
+        // Adapter la napolitaine selon le mode
+        const napolitaineLabel = getDegreeLabel('II', degreeMode)
+        // Extraire le symbole ° si présent
+        const hasDiminished = napolitaineLabel.includes('°')
+        const degreeWithoutSymbol = napolitaineLabel.replace('°', '')
+        return { 
+          degree: degreeWithoutSymbol, 
+          accidental: '♭', 
+          figure: '6',
+          quality: hasDiminished ? '°' : ''
+        }
       } else {
         const special = { 'It': 'It', 'Fr': 'Fr', 'Gr': 'Gr' }[specialRoot]
         return { degree: special, figure: '+6' }
@@ -815,10 +1073,31 @@ function Editor() {
     
     if (!degree) return null
     
+    // Utiliser getDegreeLabel pour adapter l'affichage selon le mode
+    const displayDegree = getDegreeLabel(degree, degreeMode)
+    // Extraire le symbole ° si présent dans le label adapté
+    const hasDiminished = displayDegree.includes('°')
+    const degreeWithoutSymbol = displayDegree.replace('°', '').trim()
+    
+    // Si le label adapté contient déjà °, l'utiliser comme quality
+    // (sauf si quality contient déjà autre chose que °, auquel cas on garde la quality originale)
+    let finalQuality = quality
+    if (hasDiminished) {
+      // Le symbole est dans le label adapté, l'utiliser comme quality
+      // Sauf si quality contient déjà autre chose (comme '+'), auquel cas on garde la quality originale
+      if (!quality || quality === '°') {
+        finalQuality = '°'
+      }
+      // Si quality contient autre chose (comme '+'), on garde la quality originale
+    } else if (!quality) {
+      // Si le label adapté ne contient pas ° et qu'il n'y a pas de quality, on ne met rien
+      finalQuality = ''
+    }
+    
     return {
-      degree,
+      degree: degreeWithoutSymbol,
       accidental: accidental === 'b' ? '♭' : accidental === '#' ? '♯' : accidental === 'natural' ? '♮' : '',
-      quality,
+      quality: finalQuality,
       figure: figure && figure !== '5' ? figure : '',
       isBorrowed
     }
@@ -874,7 +1153,7 @@ function Editor() {
             <div className="flex items-center justify-between">
               <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">Opus Lab</h1>
                 <button 
-                onClick={() => navigate('/')}
+                onClick={handleBackClick}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white transition-colors"
                 >
                 <ArrowLeft className="w-4 h-4" />
@@ -908,7 +1187,7 @@ function Editor() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
-                onClick={() => navigate('/')}
+                onClick={handleBackClick}
                 className="p-2 rounded-lg bg-white/5 hover:bg-white/10 backdrop-blur-md transition-colors"
                 title="Retour au Dashboard"
               >
@@ -1040,6 +1319,28 @@ function Editor() {
                 const chord = chordData[index]
                 const chordLabel = formatChordLabel(chord)
                 const isSelected = selectedMarkerId === index
+                const chordFunction = getChordFunction(chord)
+                
+                // Déterminer les classes de couleur selon la fonction
+                let functionColorClasses = ''
+                if (chordFunction === 'T') {
+                  functionColorClasses = isSelected 
+                    ? 'border-blue-500 bg-blue-500/20 shadow-lg shadow-blue-500/30' 
+                    : 'border-blue-500/40 bg-blue-500/10 hover:bg-blue-500/15 hover:border-blue-500/60'
+                } else if (chordFunction === 'SD') {
+                  functionColorClasses = isSelected 
+                    ? 'border-amber-500 bg-amber-500/20 shadow-lg shadow-amber-500/30' 
+                    : 'border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/15 hover:border-amber-500/60'
+                } else if (chordFunction === 'D') {
+                  functionColorClasses = isSelected 
+                    ? 'border-rose-500 bg-rose-500/20 shadow-lg shadow-rose-500/30' 
+                    : 'border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/15 hover:border-rose-500/60'
+                } else {
+                  // Pas de fonction déterminée
+                  functionColorClasses = isSelected 
+                    ? 'border-indigo-500 bg-indigo-500/20 shadow-lg shadow-indigo-500/30' 
+                    : 'border-white/10 hover:border-white/20'
+                }
                 
                 return (
                   <div 
@@ -1051,31 +1352,55 @@ function Editor() {
                       onClick={() => handleMarkerClick(index)}
                       className={`
                         w-24 h-24 rounded-xl border-2 transition-all duration-200 cursor-pointer
-                        backdrop-blur-md bg-white/5 hover:bg-white/10
+                        backdrop-blur-md
                         flex flex-col items-center justify-center gap-1
-                        ${isSelected ? 'border-indigo-500 bg-indigo-500/20 shadow-lg shadow-indigo-500/30' : 'border-white/10 hover:border-white/20'}
+                        ${functionColorClasses}
                       `}
                     >
                       {chordLabel ? (
                         <>
-                          <span className="font-serif text-3xl font-bold text-white">
-                            {chordLabel.accidental && <span className="text-amber-400">{chordLabel.accidental}</span>}
-                            {chordLabel.isBorrowed && <span className="text-zinc-500">(</span>}
-                            {chordLabel.degree}
-                            {chordLabel.isBorrowed && <span className="text-zinc-500">)</span>}
-                          </span>
-                          {chordLabel.figure && (
-                            <span className="text-xs font-sans text-white/70 font-medium">
-                              {chordLabel.figure.includes('/') ? (
-                                <span className="flex flex-col leading-none">
-                                  {chordLabel.figure.split('/').map((f, i) => (
-                                    <span key={i}>{f}</span>
-                                  ))}
-                                </span>
-                              ) : (
-                                chordLabel.figure
-                              )}
+                          {chordLabel.isFunctionOnly ? (
+                            <span className={`font-serif text-4xl font-bold ${
+                              chordLabel.function === 'T' ? 'text-blue-400' :
+                              chordLabel.function === 'SD' ? 'text-amber-400' :
+                              'text-rose-400'
+                            }`}>
+                              {chordLabel.function}
                             </span>
+                          ) : (
+                            <div className={`flex items-center gap-0.5 ${chordLabel.isBorrowed ? 'px-1' : ''}`}>
+                              {chordLabel.isBorrowed && <span className="text-zinc-500 text-2xl leading-none">(</span>}
+                              <div className="flex flex-col items-center">
+                                <span className="font-serif text-3xl font-bold text-white relative inline-flex items-baseline">
+                                  {chordLabel.accidental && <span className="text-amber-400">{chordLabel.accidental}</span>}
+                                  <span className="relative inline-flex items-baseline">
+                                    {chordLabel.degree}
+                                    {chordLabel.quality && <span className="text-zinc-300">{chordLabel.quality}</span>}
+                                    {chordLabel.figure && (() => {
+                                      // Trouver la figure dans FIGURES pour savoir si elle est empilée
+                                      // La figure stockée est la valeur (ex: "64", "43"), pas le display
+                                      const figObj = FIGURES.find(f => f.value === chordLabel.figure)
+                                      const isStacked = figObj?.isStacked || false
+                                      
+                                      return (
+                                        <span className="relative inline-block align-top font-sans text-white/70 font-medium ml-0.5" style={{ fontSize: '0.45em', top: '-0.3em' }}>
+                                          {isStacked && figObj?.displayArray ? (
+                                            <span className="flex flex-col leading-none" style={{ lineHeight: '0.85' }}>
+                                              {figObj.displayArray.map((f, i) => (
+                                                <span key={i} style={{ fontSize: '0.9em' }}>{f}</span>
+                                              ))}
+                                            </span>
+                                          ) : (
+                                            <span>{chordLabel.figure}</span>
+                                          )}
+                                        </span>
+                                      )
+                                    })()}
+                                  </span>
+                                </span>
+                              </div>
+                              {chordLabel.isBorrowed && <span className="text-zinc-500 text-2xl leading-none">)</span>}
+                            </div>
                           )}
                         </>
                       ) : (
@@ -1126,7 +1451,7 @@ function Editor() {
             
             {/* Crochets de cadences - Collés aux accords */}
             {getCadences.length > 0 && (
-              <div className="absolute top-0 left-0 h-6 pointer-events-none z-10" style={{ width: chordRibbonRef.current?.scrollWidth || '100%' }}>
+              <div className="absolute -top-3 left-0 h-6 pointer-events-none z-10" style={{ width: chordRibbonRef.current?.scrollWidth || '100%' }}>
                 {getCadences.map((cadence, idx) => {
                   if (cadence.startMarker === null || cadence.endMarker === null) return null
                   
@@ -1141,8 +1466,9 @@ function Editor() {
                     perfect: 'Parfaite',
                     imperfect: 'Imparfaite',
                     plagal: 'Plagale',
-                    deceptive: 'Déceptive',
-                    half: 'Demi'
+                    rompue: 'Rompue',
+                    évitée: 'Évitée',
+                    'demi-cadence': 'Demi-cadence'
                   }
                   
                   return (
@@ -1471,6 +1797,13 @@ function Editor() {
           isEditMode={!!exerciseId}
         />
         
+        {/* Modale de confirmation de sortie */}
+        <ConfirmExitModal
+          isOpen={isConfirmExitModalOpen}
+          onClose={() => setIsConfirmExitModalOpen(false)}
+          onConfirm={handleConfirmExit}
+        />
+        
         {/* Message de notification */}
         {saveMessage && (
         <div className={`fixed top-4 right-4 px-6 py-4 rounded-xl backdrop-blur-md border shadow-2xl z-50 ${
@@ -1481,6 +1814,9 @@ function Editor() {
             {saveMessage.text}
           </div>
         )}
+
+      {/* PWA Install Prompt (Android uniquement) */}
+      <PWAInstallPrompt />
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import './VideoImport.css'
+import InstructionsIOS from './InstructionsIOS'
 
 // Fonction pour extraire l'ID YouTube depuis une URL
 const extractVideoId = (url) => {
@@ -17,6 +18,11 @@ const isYouTubeUrl = (input) => {
 // Fonction pour encoder les mots-clés pour l'URL de recherche YouTube
 const encodeSearchQuery = (query) => {
   return encodeURIComponent(query.trim())
+}
+
+// Fonction pour détecter iOS
+const detectIOS = () => {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream
 }
 
 // Simuler la récupération des métadonnées (à remplacer par l'API YouTube Data v3)
@@ -53,7 +59,23 @@ function VideoImport({ onVideoSelect }) {
   const [videoMetadata, setVideoMetadata] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [isIOS, setIsIOS] = useState(false)
+  const [showIOSInstructions, setShowIOSInstructions] = useState(false)
   const inputRef = useRef(null)
+
+  // Détecter iOS au montage du composant
+  useEffect(() => {
+    const ios = detectIOS()
+    setIsIOS(ios)
+    
+    // Afficher les instructions iOS une seule fois (première fois)
+    if (ios) {
+      const instructionsShown = localStorage.getItem('opuslab_ios_instructions_shown')
+      if (!instructionsShown) {
+        setShowIOSInstructions(true)
+      }
+    }
+  }, [])
 
   // Focus automatique sur le champ au chargement
   useEffect(() => {
@@ -121,9 +143,50 @@ function VideoImport({ onVideoSelect }) {
     // Laisser le comportement par défaut, puis le useEffect détectera le changement
   }
 
+  const handlePasteFromClipboard = async () => {
+    try {
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        const text = await navigator.clipboard.readText()
+        if (text) {
+          setInputValue(text)
+          // Le useEffect détectera automatiquement si c'est une URL YouTube
+        }
+      } else {
+        // Fallback : focus sur l'input et suggérer le collage manuel
+        inputRef.current?.focus()
+        setError('Appuyez longuement dans le champ et sélectionnez "Coller"')
+        setTimeout(() => setError(null), 3000)
+      }
+    } catch (err) {
+      console.error('Erreur lecture presse-papiers:', err)
+      setError('Permission refusée. Veuillez coller manuellement.')
+      setTimeout(() => setError(null), 3000)
+    }
+  }
+
+  const getPlaceholder = () => {
+    if (isIOS) {
+      return "Appuyez ici et sélectionnez 'Coller' après avoir copié l'URL YouTube"
+    }
+    return "Collez le lien YouTube ici (Ctrl+V / Cmd+V)"
+  }
+
   const handleSearchOnYouTube = () => {
     const trimmedValue = inputValue.trim()
     
+    if (isIOS) {
+      // Sur iOS, utiliser m.youtube.com pour tenter de forcer l'ouverture dans Safari
+      if (trimmedValue && !isYouTubeUrl(trimmedValue)) {
+        const searchQuery = encodeSearchQuery(trimmedValue)
+        window.open(`https://m.youtube.com/results?search_query=${searchQuery}`, '_blank')
+      } else {
+        window.open('https://m.youtube.com', '_blank')
+      }
+      // Note : iOS peut quand même ouvrir l'app YouTube si elle est installée
+      return
+    }
+    
+    // Comportement normal pour Android/Desktop
     if (trimmedValue && !isYouTubeUrl(trimmedValue)) {
       // L'utilisateur a tapé des mots-clés
       const searchQuery = encodeSearchQuery(trimmedValue)
@@ -166,6 +229,15 @@ function VideoImport({ onVideoSelect }) {
     return 'Rechercher sur YouTube ↗'
   }
 
+  const handleCloseIOSInstructions = () => {
+    setShowIOSInstructions(false)
+    localStorage.setItem('opuslab_ios_instructions_shown', 'true')
+  }
+
+  const handleShowIOSInstructions = () => {
+    setShowIOSInstructions(true)
+  }
+
   return (
     <div className="video-import-container">
       <div className="video-import-content">
@@ -181,7 +253,7 @@ function VideoImport({ onVideoSelect }) {
               value={inputValue}
               onChange={handleInputChange}
               onPaste={handlePaste}
-              placeholder="Collez le lien YouTube ici (Ctrl+V)"
+              placeholder={getPlaceholder()}
               className={`video-import-input ${error ? 'error' : ''} ${isLoading ? 'loading' : ''}`}
               autoFocus
             />
@@ -207,6 +279,17 @@ function VideoImport({ onVideoSelect }) {
           )}
         </div>
 
+        {/* Bouton Coller depuis presse-papiers (iOS uniquement) */}
+        {isIOS && (
+          <button
+            className="ios-paste-btn"
+            onClick={handlePasteFromClipboard}
+            type="button"
+          >
+            📋 Coller l'URL YouTube
+          </button>
+        )}
+
         {/* Bouton d'aide "Aller chercher" */}
         <button
           className="video-import-search-btn"
@@ -215,6 +298,25 @@ function VideoImport({ onVideoSelect }) {
         >
           {getSearchButtonText()}
         </button>
+
+        {/* Bouton Aide iOS */}
+        {isIOS && (
+          <button
+            className="ios-help-btn"
+            onClick={handleShowIOSInstructions}
+            type="button"
+          >
+            ❓ Aide
+          </button>
+        )}
+
+        {/* Instructions iOS */}
+        {isIOS && showIOSInstructions && (
+          <InstructionsIOS
+            onPaste={handlePasteFromClipboard}
+            onClose={handleCloseIOSInstructions}
+          />
+        )}
 
         {/* Zone de prévisualisation */}
         {videoMetadata && !isLoading && (
