@@ -10,6 +10,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '../firebase'
 import { incrementUserXP } from './userService'
+import { validateAnswerWithFunctions } from '../utils/riemannFunctions'
 
 /**
  * Sauvegarde une tentative d'exercice
@@ -17,10 +18,18 @@ import { incrementUserXP } from './userService'
 export async function saveAttempt(userId, exerciseId, userAnswers, correctAnswers, score, exerciseTitle = null) {
   try {
     // Calculer le nombre de bonnes réponses pour l'XP
+    // Utiliser validateAnswerWithFunctions pour une comparaison robuste
     const correctCount = correctAnswers.filter((correct, index) => {
       const userAnswer = userAnswers[index]
-      return userAnswer && correct && 
-             userAnswer.displayLabel === correct.displayLabel
+      if (!userAnswer || !correct) return false
+      // Utiliser validateAnswerWithFunctions pour une validation robuste
+      const validation = validateAnswerWithFunctions(
+        userAnswer,
+        correct,
+        userAnswer.selectedFunction || userAnswer.function || null
+      )
+      // Niveau 1 = réponse parfaite (correcte)
+      return validation.level === 1
     }).length
     
     // Sauvegarder la tentative
@@ -29,6 +38,7 @@ export async function saveAttempt(userId, exerciseId, userAnswers, correctAnswer
       exerciseId,
       exerciseTitle, // Titre de l'exercice pour l'affichage
       userAnswers,
+      correctAnswers, // Sauvegarder les bonnes réponses pour les statistiques
       score, // Score en pourcentage (0-100)
       correctCount,
       totalQuestions: correctAnswers.length,

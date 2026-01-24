@@ -114,6 +114,30 @@ export async function searchPublicExercises(filters = {}) {
       })
     }
     
+    // Recherche textuelle (filtrage côté client)
+    // Recherche dans workTitle, exerciseTitle, et composer
+    if (filters.searchText && filters.searchText.trim()) {
+      const searchLower = filters.searchText.toLowerCase().trim()
+      return exercises.filter(exercise => {
+        const workTitle = exercise.metadata?.workTitle || ''
+        const exerciseTitle = exercise.metadata?.exerciseTitle || ''
+        const composer = exercise.metadata?.composer || ''
+        return (
+          workTitle.toLowerCase().includes(searchLower) ||
+          exerciseTitle.toLowerCase().includes(searchLower) ||
+          composer.toLowerCase().includes(searchLower)
+        )
+      })
+    }
+    
+    // Filtre par genre (inféré depuis workTitle)
+    if (filters.genre) {
+      return exercises.filter(exercise => {
+        const workTitle = exercise.metadata?.workTitle || ''
+        return workTitle.toLowerCase().includes(filters.genre.toLowerCase())
+      })
+    }
+    
     return exercises
   } catch (error) {
     console.error('Erreur lors de la recherche d\'exercices:', error)

@@ -21,10 +21,7 @@ export function AuthProvider({ children }) {
   })
 
   // Charger les données utilisateur depuis Firestore
-  // #region agent log
   const loadUserData = useCallback(async (firebaseUser, forceServer = false) => {
-    fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:loadUserData',message:'loadUserData appelé',data:{uid:firebaseUser?.uid,forceServer},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     if (!firebaseUser) {
       setUserData(null)
       return
@@ -46,9 +43,6 @@ export function AuthProvider({ children }) {
         displayName: firebaseUser.displayName,
         photoURL: firebaseUser.photoURL
       }, forceServer)
-      // #region agent log
-      fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:loadUserData',message:'setUserData appelé',data:{role:userData?.role,uid:userData?.uid},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       setUserData(userData)
       console.log('Données utilisateur chargées:', userData.role) // Debug
     } catch (error) {

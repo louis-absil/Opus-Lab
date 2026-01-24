@@ -153,127 +153,415 @@
   overflow: visible;
 }
 
-/* Timeline gamifiée (Rail d'interaction) */
-.player-timeline-container {
-  width: 100%;
-  position: relative;
+/* Timeline avec cases superposée sur la vidéo */
+.player-timeline-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 120px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.6) 50%, transparent 100%);
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+  z-index: 15;
+  display: flex;
+  align-items: flex-end;
+  padding: 0 1rem 1rem 1rem;
 }
 
-.player-timeline-rail {
+.player-timeline-with-segments {
   position: relative;
   width: 100%;
-  height: 8px;
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 4px;
+  height: 80px;
+  background: rgba(39, 39, 42, 0.7);
+  backdrop-filter: blur(12px);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   cursor: pointer;
-  transition: height 0.2s ease;
-  overflow: visible;
+  pointer-events: auto;
+  overflow: hidden; /* Couper ce qui dépasse pour éviter le débordement */
+  padding: 8px;
+  box-sizing: border-box; /* Inclure le padding dans la largeur totale */
 }
 
-.player-timeline-rail:hover {
-  height: 10px;
-  background: rgba(255, 255, 255, 0.2);
+/* Conteneur interne pour les cases - compense le padding */
+.player-timeline-segments-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  /* Les cases seront positionnées par rapport à ce conteneur, pas le parent avec padding */
 }
 
-.player-timeline-progress {
+/* Curseur de lecture */
+.player-timeline-playhead {
   position: absolute;
   top: 0;
-  left: 0;
-  height: 100%;
-  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-  border-radius: 4px;
-  transition: width 0.1s linear;
-  box-shadow: 0 0 12px rgba(102, 126, 234, 0.6);
+  bottom: 0;
+  width: 2px;
+  background: #fbbf24;
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.8);
+  z-index: 20;
+  pointer-events: none;
+  transform: translateX(-50%);
+  transition: left 0.1s linear;
 }
 
-/* Marqueurs comme cibles cliquables */
-.player-timeline-target {
+.player-timeline-playhead-indicator {
   position: absolute;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 32px;
-  height: 32px;
-  background: transparent;
-  border: 3px solid rgba(255, 255, 255, 0.6);
+  top: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 12px;
+  height: 12px;
+  background: #fbbf24;
+  border: 2px solid rgba(0, 0, 0, 0.8);
   border-radius: 50%;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.9);
+}
+
+/* Cases d'accords */
+.player-chord-segment {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  min-width: 60px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.3s ease;
-  pointer-events: auto;
-  z-index: 10;
+  transition: all 0.2s ease;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
+  pointer-events: auto;
+  background: rgba(255, 255, 255, 0.05);
 }
 
-.player-timeline-target-inner {
-  width: 12px;
-  height: 12px;
-  background: rgba(255, 255, 255, 0.8);
-  border-radius: 50%;
-  transition: all 0.3s ease;
+/* Dernière case : alignement avec la bordure droite */
+.player-chord-segment-last {
+  right: 8px;
+  /* Ne pas utiliser width, laisser le navigateur calculer automatiquement */
+  width: auto !important;
+  /* La largeur sera calculée automatiquement entre left et right */
+  box-sizing: border-box;
 }
 
-.player-timeline-target:hover {
-  width: 40px;
-  height: 40px;
-  border-color: rgba(255, 255, 255, 1);
-  box-shadow: 0 0 16px rgba(255, 255, 255, 0.6);
+.player-chord-segment:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-.player-timeline-target:hover .player-timeline-target-inner {
-  width: 16px;
-  height: 16px;
-  background: rgba(255, 255, 255, 1);
+/* Couleurs selon la fonction */
+.player-chord-segment-t {
+  border-color: rgba(59, 130, 246, 0.5);
+  background: rgba(59, 130, 246, 0.1);
 }
 
-/* Marqueur répondu (vert) */
-.player-timeline-target-answered {
-  border-color: #10b981;
-  box-shadow: 0 0 12px rgba(16, 185, 129, 0.5);
+.player-chord-segment-t:hover {
+  border-color: rgba(59, 130, 246, 0.8);
+  background: rgba(59, 130, 246, 0.2);
 }
 
-.player-timeline-target-answered .player-timeline-target-inner {
-  background: #10b981;
+.player-chord-segment-sd {
+  border-color: rgba(245, 158, 11, 0.5);
+  background: rgba(245, 158, 11, 0.1);
 }
 
-.player-timeline-target-answered:hover {
-  border-color: #059669;
-  box-shadow: 0 0 20px rgba(16, 185, 129, 0.8);
+.player-chord-segment-sd:hover {
+  border-color: rgba(245, 158, 11, 0.8);
+  background: rgba(245, 158, 11, 0.2);
 }
 
-/* Prochain marqueur (effet visuel spécial) */
-.player-timeline-target-next {
-  animation: pulseGlow 2s ease-in-out infinite;
-  border-color: #fbbf24;
-  box-shadow: 0 0 20px rgba(251, 191, 36, 0.8);
+.player-chord-segment-d {
+  border-color: rgba(225, 29, 72, 0.5);
+  background: rgba(225, 29, 72, 0.1);
 }
 
-.player-timeline-target-next .player-timeline-target-inner {
-  background: #fbbf24;
-  animation: pulseInner 2s ease-in-out infinite;
+.player-chord-segment-d:hover {
+  border-color: rgba(225, 29, 72, 0.8);
+  background: rgba(225, 29, 72, 0.2);
 }
 
-@keyframes pulseGlow {
-  0%, 100% {
-    box-shadow: 0 0 20px rgba(251, 191, 36, 0.8);
-    transform: translate(-50%, -50%) scale(1);
+.player-chord-segment-empty {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Case répondue */
+.player-chord-segment-answered {
+  border-width: 3px;
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.4);
+}
+
+.player-chord-segment-answered.player-chord-segment-t {
+  border-color: rgba(59, 130, 246, 0.8);
+  background: rgba(59, 130, 246, 0.25);
+}
+
+.player-chord-segment-answered.player-chord-segment-sd {
+  border-color: rgba(245, 158, 11, 0.8);
+  background: rgba(245, 158, 11, 0.25);
+}
+
+.player-chord-segment-answered.player-chord-segment-d {
+  border-color: rgba(225, 29, 72, 0.8);
+  background: rgba(225, 29, 72, 0.25);
+}
+
+/* États de validation */
+.player-chord-segment-correct {
+  border-color: rgba(34, 197, 94, 0.9) !important;
+  background: rgba(34, 197, 94, 0.2) !important;
+  box-shadow: 0 0 24px rgba(34, 197, 94, 0.6), inset 0 0 20px rgba(34, 197, 94, 0.1) !important;
+  animation: chordValidationCorrect 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.player-chord-segment-incorrect {
+  border-color: rgba(239, 68, 68, 0.9) !important;
+  background: rgba(239, 68, 68, 0.2) !important;
+  box-shadow: 0 0 24px rgba(239, 68, 68, 0.6), inset 0 0 20px rgba(239, 68, 68, 0.1) !important;
+  animation: chordValidationIncorrect 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.player-chord-segment-partial {
+  border-color: rgba(251, 191, 36, 0.9) !important;
+  background: rgba(251, 191, 36, 0.2) !important;
+  box-shadow: 0 0 24px rgba(251, 191, 36, 0.6), inset 0 0 20px rgba(251, 191, 36, 0.1) !important;
+  animation: chordValidationPartial 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.player-chord-segment-animated {
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Solution au-dessus de l'accord incorrect */
+.player-chord-solution-overlay {
+  position: absolute;
+  top: -55px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 15;
+  pointer-events: none;
+  animation: solutionSlideDown 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  min-width: max-content;
+}
+
+.player-chord-solution-label {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.95) 0%, rgba(16, 185, 129, 0.95) 100%);
+  backdrop-filter: blur(12px);
+  border: 2px solid rgba(34, 197, 94, 0.8);
+  border-radius: 8px;
+  padding: 6px 12px;
+  box-shadow: 0 4px 16px rgba(34, 197, 94, 0.4), 0 0 24px rgba(34, 197, 94, 0.3);
+  white-space: nowrap;
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-weight: bold;
+  color: white;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Ajustements pour mobile */
+@media (max-width: 768px) {
+  .player-chord-solution-overlay {
+    top: -50px;
   }
-  50% {
-    box-shadow: 0 0 30px rgba(251, 191, 36, 1);
-    transform: translate(-50%, -50%) scale(1.1);
-}
+  
+  .player-chord-solution-label {
+    padding: 4px 10px;
+    font-size: 0.9em;
+  }
 }
 
-@keyframes pulseInner {
-  0%, 100% {
-    opacity: 1;
+@media (max-width: 480px) {
+  .player-chord-solution-overlay {
+    top: -45px;
+  }
+  
+  .player-chord-solution-label {
+    padding: 3px 8px;
+    font-size: 0.85em;
+  }
+}
+
+/* Animations de validation */
+@keyframes chordValidationCorrect {
+  0% {
     transform: scale(1);
+    box-shadow: 0 0 0 rgba(34, 197, 94, 0);
   }
   50% {
-    opacity: 0.8;
-    transform: scale(1.2);
+    transform: scale(1.08);
+    box-shadow: 0 0 32px rgba(34, 197, 94, 0.8), inset 0 0 30px rgba(34, 197, 94, 0.2);
   }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 24px rgba(34, 197, 94, 0.6), inset 0 0 20px rgba(34, 197, 94, 0.1);
+  }
+}
+
+@keyframes chordValidationIncorrect {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 rgba(239, 68, 68, 0);
+  }
+  50% {
+    transform: scale(1.08);
+    box-shadow: 0 0 32px rgba(239, 68, 68, 0.8), inset 0 0 30px rgba(239, 68, 68, 0.2);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 24px rgba(239, 68, 68, 0.6), inset 0 0 20px rgba(239, 68, 68, 0.1);
+  }
+}
+
+@keyframes chordValidationPartial {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 rgba(251, 191, 36, 0);
+  }
+  50% {
+    transform: scale(1.08);
+    box-shadow: 0 0 32px rgba(251, 191, 36, 0.8), inset 0 0 30px rgba(251, 191, 36, 0.2);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 24px rgba(251, 191, 36, 0.6), inset 0 0 20px rgba(251, 191, 36, 0.1);
+  }
+}
+
+@keyframes solutionSlideDown {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px) scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+/* Prochaine case à répondre */
+.player-chord-segment-next {
+  animation: pulseGlowSegment 2s ease-in-out infinite;
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.6);
+}
+
+@keyframes pulseGlowSegment {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(251, 191, 36, 0.6);
+    transform: translateY(-2px);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(251, 191, 36, 0.9);
+    transform: translateY(-4px);
+  }
+}
+
+/* Jauge de progression dans la case */
+.player-chord-segment-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  background: rgba(251, 191, 36, 0.3);
+  transition: width 0.1s linear;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Contenu de l'accord */
+.player-chord-segment-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-weight: bold;
+  color: white;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.player-chord-function {
+  font-size: 1.5rem;
+  font-weight: 900;
+}
+
+.player-chord-function-t {
+  color: #60a5fa;
+}
+
+.player-chord-function-sd {
+  color: #fbbf24;
+}
+
+.player-chord-function-d {
+  color: #fb7185;
+}
+
+.player-chord-label {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  font-size: 1.25rem;
+}
+
+.player-chord-accidental {
+  color: #fbbf24;
+  font-size: 1rem;
+}
+
+.player-chord-degree {
+  font-size: 1.5rem;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.player-chord-quality {
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.player-chord-figure {
+  font-size: 0.6rem;
+  font-family: sans-serif;
+  color: rgba(255, 255, 255, 0.7);
+  margin-left: 2px;
+  vertical-align: super;
+  position: relative;
+  top: -0.3em;
+}
+
+.player-chord-figure-stacked {
+  display: flex;
+  flex-direction: column;
+  line-height: 0.85;
+  font-size: 0.9em;
+}
+
+.player-chord-borrowed {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 1.2rem;
+}
+
+.player-chord-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.player-chord-empty-icon {
+  font-size: 1.5rem;
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: bold;
 }
 
 /* Contrôles de lecture regroupés */
@@ -379,32 +667,34 @@
     font-size: 1.25rem;
   }
 
-  .player-timeline-rail {
-    height: 6px;
+  .player-timeline-overlay {
+    height: 100px;
+    padding: 0 0.75rem 0.75rem 0.75rem;
   }
 
-  .player-timeline-rail:hover {
-    height: 8px;
+  .player-timeline-with-segments {
+    height: 70px;
+    padding: 6px;
   }
 
-  .player-timeline-target {
-    width: 28px;
-    height: 28px;
+  .player-chord-segment {
+    min-width: 50px;
   }
 
-  .player-timeline-target:hover {
-    width: 36px;
-    height: 36px;
+  .player-chord-segment-last {
+    right: 6px;
   }
 
-  .player-timeline-target-inner {
-    width: 10px;
-    height: 10px;
+  .player-chord-label {
+    font-size: 1rem;
   }
 
-  .player-timeline-target:hover .player-timeline-target-inner {
-    width: 14px;
-    height: 14px;
+  .player-chord-degree {
+    font-size: 1.25rem;
+  }
+
+  .player-chord-function {
+    font-size: 1.25rem;
   }
 
   .player-controls-group {
@@ -456,33 +746,34 @@
     font-size: 1.125rem;
   }
 
-  .player-timeline-rail {
-    height: 5px;
+  .player-timeline-overlay {
+    height: 90px;
+    padding: 0 0.5rem 0.5rem 0.5rem;
   }
 
-  .player-timeline-rail:hover {
-    height: 7px;
+  .player-timeline-with-segments {
+    height: 60px;
+    padding: 4px;
   }
 
-  .player-timeline-target {
-    width: 24px;
-    height: 24px;
-    border-width: 2px;
+  .player-chord-segment {
+    min-width: 40px;
   }
 
-  .player-timeline-target:hover {
-    width: 32px;
-    height: 32px;
+  .player-chord-segment-last {
+    right: 4px;
   }
 
-  .player-timeline-target-inner {
-    width: 8px;
-    height: 8px;
+  .player-chord-label {
+    font-size: 0.875rem;
   }
 
-  .player-timeline-target:hover .player-timeline-target-inner {
-    width: 12px;
-    height: 12px;
+  .player-chord-degree {
+    font-size: 1rem;
+  }
+
+  .player-chord-function {
+    font-size: 1rem;
   }
 
   .player-controls-group {
@@ -523,4 +814,186 @@ body.player-active {
   position: fixed;
   width: 100%;
   height: 100%;
+}
+
+/* ============================================
+   MODE REVIEW - Interface de Correction
+   ============================================ */
+
+.player-review-mode {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Zone Supérieure : Dashboard */
+.player-review-upper-zone {
+  position: relative;
+  flex: 0 1 40%;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: stretch;
+}
+
+.player-video-blurred {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+}
+
+.player-review-mode .player-youtube {
+  filter: blur(20px) brightness(0.3);
+  opacity: 0.2;
+  pointer-events: none;
+  width: 100%;
+  height: 100%;
+}
+
+.player-review-mode .player-youtube iframe {
+  width: 100%;
+  height: 100%;
+}
+
+/* Zone Milieu : Timeline Interactive */
+.player-review-timeline-zone {
+  flex: 0 0 auto;
+  padding: clamp(0.3rem, 0.8vh, 0.6rem) clamp(0.5rem, 2vw, 1rem);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  z-index: 150;
+}
+
+.player-review-timeline-container {
+  max-width: 100%;
+  overflow-x: auto;
+  position: relative;
+  /* Permettre l'affichage des cadences au-dessus */
+  padding-top: 30px;
+  margin-top: -30px;
+}
+
+.player-review-timeline {
+  position: relative;
+  height: clamp(55px, 7vh, 85px);
+  background: rgba(39, 39, 42, 0.8);
+  backdrop-filter: blur(12px);
+  border-radius: clamp(8px, 1vh, 12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: clamp(4px, 0.5vh, 7px);
+  cursor: default;
+}
+
+.player-review-segment {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.player-review-segment:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 16px rgba(255, 255, 255, 0.2);
+}
+
+.player-segment-selected {
+  border: 3px solid rgba(255, 255, 255, 0.9) !important;
+  box-shadow: 0 0 24px rgba(255, 255, 255, 0.6), 0 0 48px rgba(255, 255, 255, 0.3) !important;
+  z-index: 25 !important;
+  animation: segmentPulse 2s ease-in-out infinite;
+}
+
+@keyframes segmentPulse {
+  0%, 100% {
+    box-shadow: 0 0 24px rgba(255, 255, 255, 0.6), 0 0 48px rgba(255, 255, 255, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 32px rgba(255, 255, 255, 0.8), 0 0 64px rgba(255, 255, 255, 0.5);
+  }
+}
+
+/* Zone Inférieure : Panneau de Correction (géré par ReviewDetailPanel.css) */
+
+/* Animation de transition vers le mode review */
+.player-immersive {
+  transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.player-review-mode {
+  animation: reviewModeTransition 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes reviewModeTransition {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* Responsive pour le mode review - Utilisation de proportions adaptatives */
+/* Les valeurs clamp() s'adaptent automatiquement, pas besoin de media queries pour les tailles */
+
+/* Bouton mobile pour ouvrir la modale de l'accord actuel */
+.player-open-chord-btn {
+  position: fixed;
+  bottom: 6rem;
+  right: 1rem;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 8px 24px rgba(79, 70, 229, 0.5);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 30;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.player-open-chord-btn:hover {
+  background: linear-gradient(135deg, #4338ca 0%, #6d28d9 100%);
+  box-shadow: 0 12px 32px rgba(79, 70, 229, 0.7);
+  transform: translateY(-2px) scale(1.05);
+}
+
+.player-open-chord-btn:active {
+  transform: translateY(0) scale(0.95);
+}
+
+.player-open-chord-btn svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* Masquer le bouton mobile sur desktop (le bouton est maintenant dans la barre de contrôle) */
+@media (min-width: 768px) {
+  .player-open-chord-btn {
+    display: none;
+  }
+}
+
+/* Ajustements pour très petits écrans */
+@media (max-width: 480px) {
+  .player-open-chord-btn {
+    bottom: 5.5rem;
+    right: 0.75rem;
+    width: 3rem;
+    height: 3rem;
+  }
+
+  .player-open-chord-btn svg {
+    width: 20px;
+    height: 20px;
+  }
 }

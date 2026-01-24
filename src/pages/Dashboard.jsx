@@ -16,6 +16,7 @@ function Dashboard() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
   const [openMenuId, setOpenMenuId] = useState(null)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
+  const [tagsTooltipId, setTagsTooltipId] = useState(null)
   const menuRefs = useRef({})
   const userMenuRef = useRef(null)
 
@@ -43,6 +44,11 @@ function Dashboard() {
           setOpenMenuId(null)
         }
       })
+      
+      // Fermer le tooltip des tags si on clique ailleurs
+      if (!event.target.closest('.dashboard-card-tags')) {
+        setTagsTooltipId(null)
+      }
     }
 
     document.addEventListener('mousedown', handleClickOutside)
@@ -370,7 +376,13 @@ function Dashboard() {
                     {/* Tags avec défilement horizontal */}
                 {exercise.autoTags && exercise.autoTags.length > 0 && (
                   <div className="dashboard-card-tags">
-                        <div className="dashboard-card-tags-scroll">
+                        <div 
+                          className="dashboard-card-tags-scroll"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setTagsTooltipId(tagsTooltipId === exercise.id ? null : exercise.id)
+                          }}
+                        >
                           {exercise.autoTags.slice(0, 2).map((tag, index) => (
                       <span key={index} className="dashboard-tag">
                         {tag}
@@ -382,6 +394,35 @@ function Dashboard() {
                       </span>
                     )}
                         </div>
+                        
+                        {/* Tooltip avec tous les tags au clic */}
+                        {tagsTooltipId === exercise.id && (
+                          <div 
+                            className="dashboard-card-tags-tooltip"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="dashboard-card-tags-tooltip-header">
+                              <strong>Tags ({exercise.autoTags.length})</strong>
+                              <button
+                                className="dashboard-card-tags-tooltip-close"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setTagsTooltipId(null)
+                                }}
+                                aria-label="Fermer"
+                              >
+                                ×
+                              </button>
+                            </div>
+                            <div className="dashboard-card-tags-tooltip-content">
+                              {exercise.autoTags.map((tag, index) => (
+                                <span key={index} className="dashboard-tag-tooltip">
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                   </div>
                 )}
 

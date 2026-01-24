@@ -1,14 +1,20 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, useMemo } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { searchPublicExercises, getRandomPublicExercise, getExerciseById } from '../services/exerciseService'
-import { getUserAttempts } from '../services/attemptService'
+import { getUserAttempts, getAllUserAttempts } from '../services/attemptService'
+import { validateAnswerWithFunctions } from '../utils/riemannFunctions'
 import ProfileModal from '../components/ProfileModal'
+import FreeMode from './FreeMode'
+import SkillsRadar from '../components/SkillsRadar'
+import ActivityHeatmap from '../components/ActivityHeatmap'
+import PerformanceDetails from '../components/PerformanceDetails'
 import './StudentDashboard.css'
 
 function StudentDashboard() {
   const { user, userData, logout, isGuest, disableGuestMode } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [activeTab, setActiveTab] = useState('home')
   
   // États pour Quick Play
@@ -26,6 +32,14 @@ function StudentDashboard() {
   const [attempts, setAttempts] = useState([])
   const [loadingAttempts, setLoadingAttempts] = useState(true)
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
+  
+  // États pour Profil
+  const [profileStats, setProfileStats] = useState(null)
+  const [loadingProfileStats, setLoadingProfileStats] = useState(false)
+  const [allAttempts, setAllAttempts] = useState([])
+  
+  // État pour toutes les tentatives (pour le calcul du streak)
+  const [allAttemptsForStreak, setAllAttemptsForStreak] = useState([])
 
   // Charger les compositeurs disponibles
   useEffect(() => {
@@ -36,10 +50,37 @@ function StudentDashboard() {
   useEffect(() => {
     if (user && !isGuest) {
       loadAttempts()
+      loadAllAttemptsForStreak()
     } else {
       setLoadingAttempts(false)
     }
   }, [user, isGuest])
+  
+  // Recharger les tentatives quand on revient au dashboard (pour mettre à jour le streak)
+  useEffect(() => {
+    if (user && !isGuest && location.pathname === '/student-dashboard') {
+      loadAttempts()
+      loadAllAttemptsForStreak()
+    }
+  }, [location.pathname, user, isGuest])
+  
+  // Fonction pour charger toutes les tentatives pour le calcul du streak
+  const loadAllAttemptsForStreak = async () => {
+    if (!user || isGuest) return
+    try {
+      const data = await getAllUserAttempts(user.uid)
+      setAllAttemptsForStreak(data)
+    } catch (error) {
+      console.error('Erreur lors du chargement de toutes les tentatives:', error)
+    }
+  }
+
+  // Charger toutes les tentatives pour les stats du profil
+  useEffect(() => {
+    if (user && !isGuest && activeTab === 'profile') {
+      loadProfileStats()
+    }
+  }, [user, isGuest, activeTab])
 
   const loadComposers = async () => {
     try {
@@ -156,6 +197,354 @@ function StudentDashboard() {
   const userName = userData?.displayName || user?.displayName || 'Élève'
   const firstName = userName.split(' ')[0]
 
+  // Calculer la série (streak) quotidienne
+  const calculateStreak = (attempts) => {
+    if (!attempts || attempts.length === 0) {
+      return 0
+    }
+
+    // Grouper les tentatives par jour (sans heure) - utiliser l'heure locale pour cohérence
+    const daysWithActivity = new Set()
+    attempts.forEach(attempt => {
+      if (!attempt.completedAt) return
+      const date = attempt.completedAt.toDate ? attempt.completedAt.toDate() : new Date(attempt.completedAt)
+      // Utiliser l'heure locale pour créer la clé de date (au lieu de UTC)
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      const dateKey = `${year}-${month}-${day}`
+      daysWithActivity.add(dateKey)
+    })
+
+    if (daysWithActivity.size === 0) {
+      return 0
+    }
+
+    // Trier les dates
+    const sortedDates = Array.from(daysWithActivity).sort().reverse()
+    
+    // Calculer la série consécutive depuis aujourd'hui - utiliser l'heure locale
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const year = today.getFullYear()
+    const month = String(today.getMonth() + 1).padStart(2, '0')
+    const day = String(today.getDate()).padStart(2, '0')
+    const todayKey = `${year}-${month}-${day}`
+    
+    let streak = 0
+    let currentDate = new Date(today)
+    
+    // Vérifier si aujourd'hui a une activité
+    if (sortedDates.includes(todayKey)) {
+      streak = 1
+      currentDate.setDate(currentDate.getDate() - 1)
+    } else {
+      // Si pas d'activité aujourd'hui, commencer depuis hier
+      currentDate.setDate(currentDate.getDate() - 1)
+    }
+
+    // Continuer à compter les jours consécutifs
+    while (true) {
+      const year = currentDate.getFullYear()
+      const month = String(currentDate.getMonth() + 1).padStart(2, '0')
+      const day = String(currentDate.getDate()).padStart(2, '0')
+      const dateKey = `${year}-${month}-${day}`
+      if (sortedDates.includes(dateKey)) {
+        streak++
+        currentDate.setDate(currentDate.getDate() - 1)
+      } else {
+        break
+      }
+    }
+
+    return streak
+  }
+
+  // Charger les statistiques du profil
+  const loadProfileStats = async () => {
+    if (!user || isGuest) return
+    
+    try {
+      setLoadingProfileStats(true)
+      const attempts = await getAllUserAttempts(user.uid)
+      setAllAttempts(attempts)
+      
+      // Calculer les stats globales
+      const totalAttempts = attempts.length
+      const totalQuestions = attempts.reduce((sum, a) => sum + (a.totalQuestions || 0), 0)
+      const totalCorrect = attempts.reduce((sum, a) => sum + (a.correctCount || 0), 0)
+      const averageScore = totalAttempts > 0 
+        ? attempts.reduce((sum, a) => sum + (a.score || 0), 0) / totalAttempts 
+        : 0
+
+      // Analyser par degré et cadence
+      const degreeStats = {}
+      const cadenceStats = {}
+      const borrowedStats = { total: 0, correct: 0 }
+
+      attempts.forEach(attempt => {
+        if (attempt.correctAnswers && Array.isArray(attempt.correctAnswers)) {
+          attempt.correctAnswers.forEach((correct, index) => {
+            if (!correct) return
+            
+            const userAnswer = attempt.userAnswers?.[index]
+            // Utiliser validateAnswerWithFunctions pour une validation robuste au lieu de displayLabel
+            let isCorrect = false
+            if (userAnswer && correct) {
+              const validation = validateAnswerWithFunctions(
+                userAnswer,
+                correct,
+                userAnswer.selectedFunction || userAnswer.function || null
+              )
+              // Niveau 1 = réponse parfaite (correcte)
+              isCorrect = validation.level === 1
+            }
+
+            // Stats par degré - utiliser degree au lieu de root
+            const degree = correct.degree || ''
+            if (degree) {
+              if (!degreeStats[degree]) {
+                degreeStats[degree] = { total: 0, correct: 0 }
+              }
+              degreeStats[degree].total++
+              if (isCorrect) {
+                degreeStats[degree].correct++
+              }
+            }
+
+            // Stats par cadence
+            const cadence = correct.cadence || ''
+            if (cadence) {
+              if (!cadenceStats[cadence]) {
+                cadenceStats[cadence] = { total: 0, correct: 0 }
+              }
+              cadenceStats[cadence].total++
+              if (isCorrect) {
+                cadenceStats[cadence].correct++
+              }
+            }
+
+            // Stats pour les emprunts (isBorrowed === true)
+            if (correct.isBorrowed === true) {
+              borrowedStats.total++
+              if (isCorrect) {
+                borrowedStats.correct++
+              }
+            }
+          })
+        }
+      })
+
+      setProfileStats({
+        totalAttempts,
+        totalQuestions,
+        totalCorrect,
+        averageScore,
+        degreeStats,
+        cadenceStats,
+        borrowedStats,
+        streak: calculateStreak(attempts)
+      })
+    } catch (error) {
+      console.error('Erreur lors du chargement des stats:', error)
+    } finally {
+      setLoadingProfileStats(false)
+    }
+  }
+
+  // Calculer les données pour le radar
+  const radarData = useMemo(() => {
+    if (!profileStats || !allAttempts || allAttempts.length === 0) {
+      return []
+    }
+
+    // Paramètres configurables
+    const MIN_PRACTICE_ATTEMPTS = 10 // Seuil minimum de tentatives pour pratique suffisante
+    const HIGH_ACCURACY_THRESHOLD = 90 // Seuil de précision élevée (en %)
+    const ACCURACY_WEIGHT = 0.6 // Poids de la précision (60%)
+    const PRACTICE_WEIGHT = 0.4 // Poids de la pratique (40%)
+
+    // Fonction pour calculer le score de pratique basé sur le nombre de tentatives
+    const calculatePracticeScore = (attemptCount) => {
+      if (attemptCount === 0) return 0
+      // Fonction sigmoïde : atteint ~95% à MIN_PRACTICE_ATTEMPTS, 100% à 2*MIN_PRACTICE_ATTEMPTS
+      const normalized = Math.min(100, (attemptCount / MIN_PRACTICE_ATTEMPTS) * 95)
+      return Math.round(normalized)
+    }
+
+    // Fonction pour calculer le score de précision avec réponses partielles
+    const calculateAccuracyScore = (validations) => {
+      if (!validations || validations.length === 0) return 0
+      
+      // Calculer la moyenne pondérée des scores
+      // Les scores sont déjà en pourcentage (0-100)
+      const totalScore = validations.reduce((sum, v) => sum + (v.score || 0), 0)
+      const averageScore = totalScore / validations.length
+      
+      return Math.round(averageScore)
+    }
+
+    // Fonction pour combiner précision et pratique
+    const combineScores = (accuracyScore, practiceScore) => {
+      const combined = (accuracyScore * ACCURACY_WEIGHT) + (practiceScore * PRACTICE_WEIGHT)
+      return Math.round(Math.min(100, combined))
+    }
+
+    // Collecter toutes les validations par catégorie
+    const tonicValidations = []
+    const subdominantValidations = []
+    const dominantValidations = []
+    const cadenceValidations = []
+    const borrowedValidations = []
+
+    // Compteurs de tentatives par catégorie
+    const tonicAttempts = new Set()
+    const subdominantAttempts = new Set()
+    const dominantAttempts = new Set()
+    const cadenceAttempts = new Set()
+    const borrowedAttempts = new Set()
+
+    // Parcourir toutes les tentatives pour recalculer les validations
+    allAttempts.forEach((attempt) => {
+      if (!attempt.correctAnswers || !Array.isArray(attempt.correctAnswers)) return
+
+      attempt.correctAnswers.forEach((correct, index) => {
+        if (!correct) return
+
+        const userAnswer = attempt.userAnswers?.[index]
+        if (!userAnswer) return
+
+        // Recalculer la validation avec validateAnswerWithFunctions
+        const validation = validateAnswerWithFunctions(
+          userAnswer,
+          correct,
+          userAnswer.selectedFunction || userAnswer.function || null
+        )
+
+        // Classer par catégorie selon le degré (normaliser en majuscules pour la comparaison)
+        const degree = (correct.degree || '').toUpperCase()
+        
+        // Tonique (T) : I, III, VI
+        if (degree === 'I' || degree === 'III' || degree === 'VI') {
+          tonicValidations.push(validation)
+          tonicAttempts.add(attempt.id)
+        }
+
+        // Sous-dominante (SD) : IV, II
+        if (degree === 'IV' || degree === 'II') {
+          subdominantValidations.push(validation)
+          subdominantAttempts.add(attempt.id)
+        }
+
+        // Dominante (D) : V, VII°
+        if (degree === 'V' || degree === 'VII°' || degree === 'VII') {
+          dominantValidations.push(validation)
+          dominantAttempts.add(attempt.id)
+        }
+
+        // Stats par cadence
+        const cadence = correct.cadence || ''
+        if (cadence) {
+          cadenceValidations.push(validation)
+          cadenceAttempts.add(attempt.id)
+        }
+
+        // Stats pour les emprunts (isBorrowed === true)
+        if (correct.isBorrowed === true) {
+          borrowedValidations.push(validation)
+          borrowedAttempts.add(attempt.id)
+        }
+      })
+    })
+
+    // Calculer les scores pour chaque catégorie
+    const tonicAccuracy = calculateAccuracyScore(tonicValidations)
+    const tonicPractice = calculatePracticeScore(tonicAttempts.size)
+    const tonicValue = combineScores(tonicAccuracy, tonicPractice)
+
+    const subdominantAccuracy = calculateAccuracyScore(subdominantValidations)
+    const subdominantPractice = calculatePracticeScore(subdominantAttempts.size)
+    const subdominantValue = combineScores(subdominantAccuracy, subdominantPractice)
+
+    const dominantAccuracy = calculateAccuracyScore(dominantValidations)
+    const dominantPractice = calculatePracticeScore(dominantAttempts.size)
+    const dominantValue = combineScores(dominantAccuracy, dominantPractice)
+
+    const cadenceAccuracy = calculateAccuracyScore(cadenceValidations)
+    const cadencePractice = calculatePracticeScore(cadenceAttempts.size)
+    const cadenceValue = combineScores(cadenceAccuracy, cadencePractice)
+
+    const borrowedAccuracy = calculateAccuracyScore(borrowedValidations)
+    const borrowedPractice = calculatePracticeScore(borrowedAttempts.size)
+    const borrowedValue = combineScores(borrowedAccuracy, borrowedPractice)
+
+    const result = [
+      { axis: 'Tonique', value: tonicValue },
+      { axis: 'Sous-Dom.', value: subdominantValue },
+      { axis: 'Dominante', value: dominantValue },
+      { axis: 'Cadences', value: cadenceValue },
+      { axis: 'Emprunts', value: borrowedValue }
+    ]
+    
+    return result
+  }, [profileStats, allAttempts])
+
+  // Trouver le point fort et le point faible
+  const { strongestPoint, weakestPoint } = useMemo(() => {
+    if (!profileStats) return { strongestPoint: null, weakestPoint: null }
+
+    const { degreeStats, cadenceStats } = profileStats
+    const cadenceLabels = {
+      perfect: 'Cadence Parfaite',
+      imperfect: 'Cadence Imparfaite',
+      plagal: 'Cadence Plagale',
+      deceptive: 'Cadence Rompue',
+      half: 'Demi-Cadence'
+    }
+
+    const allStats = []
+
+    // Ajouter les stats de degrés
+    Object.entries(degreeStats).forEach(([degree, stats]) => {
+      const percentage = stats.total > 0 
+        ? Math.round((stats.correct / stats.total) * 100) 
+        : 0
+      allStats.push({
+        name: degree,
+        percentage,
+        total: stats.total
+      })
+    })
+
+    // Ajouter les stats de cadences
+    Object.entries(cadenceStats).forEach(([cadence, stats]) => {
+      const percentage = stats.total > 0 
+        ? Math.round((stats.correct / stats.total) * 100) 
+        : 0
+      allStats.push({
+        name: cadenceLabels[cadence] || cadence,
+        percentage,
+        total: stats.total
+      })
+    })
+
+    // Filtrer ceux qui ont au moins 3 tentatives
+    const validStats = allStats.filter(s => s.total >= 3)
+    
+    if (validStats.length === 0) {
+      return { strongestPoint: null, weakestPoint: null }
+    }
+
+    const sorted = [...validStats].sort((a, b) => b.percentage - a.percentage)
+    const strongest = sorted[0]
+    const weakest = sorted[sorted.length - 1]
+
+    return {
+      strongestPoint: strongest,
+      weakestPoint: weakest
+    }
+  }, [profileStats])
+
   return (
     <div className="student-dashboard">
       {/* Bannière Preview pour les professeurs */}
@@ -185,7 +574,7 @@ function StudentDashboard() {
           </div>
           <button
             className="student-avatar-btn"
-            onClick={() => !isGuest && setIsProfileModalOpen(true)}
+            onClick={() => !isGuest && setActiveTab('profile')}
             aria-label="Profil"
           >
             {!isGuest && user?.photoURL ? (
@@ -278,7 +667,9 @@ function StudentDashboard() {
                     </div>
                     <div className="gamification-streak">
                       <span className="streak-icon">🔥</span>
-                      <span className="streak-text">Série: 0 jours</span>
+                      <span className="streak-text">
+                        Série: {calculateStreak(allAttemptsForStreak)} jour{calculateStreak(allAttemptsForStreak) !== 1 ? 's' : ''}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -464,76 +855,187 @@ function StudentDashboard() {
           </div>
         )}
 
+        {activeTab === 'free-mode' && (
+          <FreeMode />
+        )}
+
         {activeTab === 'profile' && (
-          <div className="student-content">
-            <div className="profile-section">
-              {isGuest ? (
-                <div className="guest-connect-card">
-                  <div className="guest-illustration">💾</div>
-                  <h2 className="guest-title">Sauvegarder ta progression</h2>
-                  <p className="guest-text">
-                    Connecte-toi avec Google pour sauvegarder tes scores, gagner de l'XP et suivre ta progression.
-            </p>
-            <button
-                    className="guest-connect-btn"
-              onClick={() => navigate('/')}
-            >
-              Se connecter avec Google
-            </button>
-                  <button
-                    className="guest-exit-btn"
-                    onClick={() => {
-                      disableGuestMode()
-                      navigate('/')
-                    }}
-                  >
-                    Quitter le mode invité
-                  </button>
-                </div>
-              ) : (
-                <div className="profile-content">
-                  <div className="profile-header">
-                    {user?.photoURL ? (
-                      <img 
-                        src={user.photoURL} 
-                        alt={userName} 
-                        className="profile-avatar"
-                      />
-                    ) : (
-                      <div className="profile-avatar-placeholder">
-                        {firstName[0]?.toUpperCase() || 'E'}
+          <div className="student-content profile-page">
+            {isGuest ? (
+              <div className="guest-connect-card">
+                <div className="guest-illustration">💾</div>
+                <h2 className="guest-title">Sauvegarder ta progression</h2>
+                <p className="guest-text">
+                  Connecte-toi avec Google pour sauvegarder tes scores, gagner de l'XP et suivre ta progression.
+                </p>
+                <button
+                  className="guest-connect-btn"
+                  onClick={() => navigate('/')}
+                >
+                  Se connecter avec Google
+                </button>
+                <button
+                  className="guest-exit-btn"
+                  onClick={() => {
+                    disableGuestMode()
+                    navigate('/')
+                  }}
+                >
+                  Quitter le mode invité
+                </button>
+              </div>
+            ) : loadingProfileStats ? (
+              <div className="profile-loading">
+                <div className="spinner"></div>
+                <p>Chargement des statistiques...</p>
+              </div>
+            ) : (
+              <>
+                {/* Section 1: Header & Global (Gamification) */}
+                <div className="profile-header-section">
+                  <div className="profile-header-gamification">
+                    <div className="profile-avatar-container">
+                      {user?.photoURL ? (
+                        <img 
+                          src={user.photoURL} 
+                          alt={userName} 
+                          className="profile-page-avatar"
+                        />
+                      ) : (
+                        <div className="profile-page-avatar-placeholder">
+                          {firstName[0]?.toUpperCase() || 'E'}
+                        </div>
+                      )}
+                    </div>
+                    <div className="profile-header-info">
+                      <h2 className="profile-page-name">{userName}</h2>
+                      <div className="profile-header-stats">
+                        <div className="profile-stat-item">
+                          <span className="profile-stat-label">Niveau</span>
+                          <span className="profile-stat-value">{level}</span>
+                        </div>
+                        <div className="profile-stat-item">
+                          <span className="profile-stat-label">XP</span>
+                          <span className="profile-stat-value">{xp}</span>
+                        </div>
+                        <div className="profile-stat-item">
+                          <span className="profile-stat-label streak-label">
+                            <span className="streak-icon">🔥</span>
+                            Série
+                          </span>
+                          <span className="profile-stat-value">
+                            {profileStats?.streak || 0} jour{profileStats?.streak !== 1 ? 's' : ''}
+                          </span>
+                        </div>
                       </div>
-                    )}
-                    <h2 className="profile-name">{userName}</h2>
-                    <p className="profile-role">Élève • Niveau {level}</p>
+                    </div>
                   </div>
-                  <button
-                    className="profile-stats-btn"
-                    onClick={() => setIsProfileModalOpen(true)}
-                  >
-                    Voir mes statistiques détaillées
-                  </button>
-                  <button
-                    className="profile-logout-btn"
-                    onClick={async () => {
-                      try {
-                        await logout()
-                        navigate('/')
-                      } catch (error) {
-                        console.error('Erreur lors de la déconnexion:', error)
-                      }
-                    }}
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                      <polyline points="16 17 21 12 16 7"></polyline>
-                      <line x1="21" y1="12" x2="9" y2="12"></line>
-                    </svg>
-                    Déconnexion
-                  </button>
+
+                  {/* Bloc 3 Grosses Stats */}
+                  {profileStats && (
+                    <div className="profile-big-stats">
+                      <div className="big-stat-card">
+                        <div className="big-stat-value">{profileStats.totalAttempts}</div>
+                        <div className="big-stat-label">Exercices complétés</div>
+                      </div>
+                      <div className="big-stat-card">
+                        <div className="big-stat-value">{Math.round(profileStats.averageScore)}%</div>
+                        <div className="big-stat-label">Score moyen</div>
+                      </div>
+                      <div className="big-stat-card">
+                        <div className="big-stat-value">{profileStats.totalCorrect}</div>
+                        <div className="big-stat-label">Réponses correctes</div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+
+                {/* Section 2: Radar des Compétences */}
+                {radarData.length > 0 && (
+                  <div className="profile-section-card">
+                    <h3 className="profile-section-title">Radar des Compétences</h3>
+                    <SkillsRadar data={radarData} />
+                  </div>
+                )}
+
+                {/* Section 3: Analyse Tactique */}
+                {(strongestPoint || weakestPoint) && (
+                  <div className="profile-section-card">
+                    <h3 className="profile-section-title">Analyse Tactique</h3>
+                    <div className="tactical-analysis">
+                      {strongestPoint && (
+                        <div className="tactical-card tactical-card-strong">
+                          <div className="tactical-card-icon">⭐</div>
+                          <div className="tactical-card-content">
+                            <h4 className="tactical-card-title">Ta Spécialité</h4>
+                            <p className="tactical-card-item">{strongestPoint.name}</p>
+                            <p className="tactical-card-percentage">{strongestPoint.percentage}% de réussite</p>
+                          </div>
+                        </div>
+                      )}
+                      {weakestPoint && (
+                        <div className="tactical-card tactical-card-weak">
+                          <div className="tactical-card-icon">🎯</div>
+                          <div className="tactical-card-content">
+                            <h4 className="tactical-card-title">Ta Némésis</h4>
+                            <p className="tactical-card-item">{weakestPoint.name}</p>
+                            <p className="tactical-card-percentage">{weakestPoint.percentage}% de réussite</p>
+                            <button 
+                              className="tactical-card-action"
+                              onClick={() => {
+                                // TODO: Implémenter la fonctionnalité d'entraînement ciblé
+                                alert('Fonctionnalité à venir : entraînement ciblé sur ce point faible')
+                              }}
+                            >
+                              Travailler ce point faible
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Section 4: Historique d'Activité (Heatmap) */}
+                {allAttempts.length > 0 && (
+                  <div className="profile-section-card">
+                    <h3 className="profile-section-title">Historique d'Activité</h3>
+                    <ActivityHeatmap attempts={allAttempts} />
+                  </div>
+                )}
+
+                {/* Section 5: Détails des Performances */}
+                {profileStats && (Object.keys(profileStats.degreeStats).length > 0 || Object.keys(profileStats.cadenceStats).length > 0) && (
+                  <div className="profile-section-card">
+                    <h3 className="profile-section-title">Détails des Performances</h3>
+                    <PerformanceDetails 
+                      degreeStats={profileStats.degreeStats}
+                      cadenceStats={profileStats.cadenceStats}
+                    />
+                  </div>
+                )}
+
+                {/* Bouton Déconnexion */}
+                <button
+                  className="profile-logout-btn"
+                  onClick={async () => {
+                    try {
+                      await logout()
+                      navigate('/')
+                    } catch (error) {
+                      console.error('Erreur lors de la déconnexion:', error)
+                    }
+                  }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                  </svg>
+                  Déconnexion
+                </button>
+              </>
+            )}
           </div>
         )}
       </main>
@@ -558,6 +1060,16 @@ function StudentDashboard() {
             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
           </svg>
           <span>Progression</span>
+        </button>
+        <button
+          className={`nav-item ${activeTab === 'free-mode' ? 'nav-item-active' : ''}`}
+          onClick={() => setActiveTab('free-mode')}
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.35-4.35"></path>
+          </svg>
+          <span>Mode Libre</span>
         </button>
         <button
           className={`nav-item ${activeTab === 'profile' ? 'nav-item-active' : ''}`}

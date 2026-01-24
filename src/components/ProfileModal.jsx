@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { getAllUserAttempts } from '../services/attemptService'
 import { getExercisesByAuthor } from '../services/exerciseService'
+import { validateAnswerWithFunctions } from '../utils/riemannFunctions'
 import './ProfileModal.css'
 
 function ProfileModal({ isOpen, onClose, userRole, isPreviewMode = false }) {
@@ -89,18 +90,27 @@ function ProfileModal({ isOpen, onClose, userRole, isPreviewMode = false }) {
           
           totalAnalyzed++
           const userAnswer = attempt.userAnswers?.[index]
-          const isCorrect = userAnswer && correct && 
-                           userAnswer.displayLabel === correct.displayLabel
+          // Utiliser validateAnswerWithFunctions pour une validation robuste
+          let isCorrect = false
+          if (userAnswer && correct) {
+            const validation = validateAnswerWithFunctions(
+              userAnswer,
+              correct,
+              userAnswer.selectedFunction || userAnswer.function || null
+            )
+            // Niveau 1 = réponse parfaite (correcte)
+            isCorrect = validation.level === 1
+          }
 
-          // Stats par degré
-          const root = correct.root || ''
-          if (root) {
-            if (!degreeStats[root]) {
-              degreeStats[root] = { total: 0, correct: 0 }
+          // Stats par degré - utiliser degree au lieu de root
+          const degree = correct.degree || ''
+          if (degree) {
+            if (!degreeStats[degree]) {
+              degreeStats[degree] = { total: 0, correct: 0 }
             }
-            degreeStats[root].total++
+            degreeStats[degree].total++
             if (isCorrect) {
-              degreeStats[root].correct++
+              degreeStats[degree].correct++
             }
           }
 
@@ -225,7 +235,7 @@ function ProfileModal({ isOpen, onClose, userRole, isPreviewMode = false }) {
                       <div className="stat-label">Score moyen</div>
                     </div>
                     <div className="stat-card">
-                      <div className="stat-value">{studentStats.totalCorrect}/{studentStats.totalQuestions}</div>
+                      <div className="stat-value">{studentStats.totalCorrect}</div>
                       <div className="stat-label">Réponses correctes</div>
                     </div>
                   </div>

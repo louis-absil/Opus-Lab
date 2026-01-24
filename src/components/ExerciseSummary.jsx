@@ -29,7 +29,7 @@ function ExerciseSummary({ exercise, userAnswers, answerValidations = {}, onRepl
       
       // Déterminer si la réponse est correcte (niveau 1 = parfait)
       const isPerfect = validation && validation.level === 1
-      const isPartiallyCorrect = validation && validation.level >= 2
+      const isPartiallyCorrect = validation && (validation.level === 2 || validation.level === 3)
       
       return {
         index,

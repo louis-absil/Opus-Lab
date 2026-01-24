@@ -1,0 +1,155 @@
+.skills-radar-container {
+  width: 100%;
+  position: relative;
+  padding: 1.5rem 0;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.03) 0%, rgba(102, 126, 234, 0.02) 100%);
+  border-radius: 16px;
+  transition: all 0.3s ease;
+  overflow: visible;
+}
+
+.skills-radar-container:hover {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(102, 126, 234, 0.04) 100%);
+}
+
+.skills-radar-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #6b7280;
+  font-size: 0.875rem;
+  background: #f9fafb;
+  border-radius: 12px;
+  border: 1px dashed #e5e7eb;
+}
+
+/* Tooltip personnalisé */
+.skills-radar-tooltip {
+  background: rgba(17, 24, 39, 0.95);
+  backdrop-filter: blur(8px);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15), 0 4px 10px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  min-width: 120px;
+}
+
+.skills-radar-tooltip-label {
+  color: #ffffff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0 0 0.25rem 0;
+  text-transform: capitalize;
+  letter-spacing: 0.3px;
+}
+
+.skills-radar-tooltip-value {
+  color: #a78bfa;
+  font-size: 1.125rem;
+  font-weight: 700;
+  margin: 0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Animations pour les éléments du graphique */
+.skills-radar-container :global(.recharts-radar) {
+  animation: fadeInRadar 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes fadeInRadar {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Grille d'arrière-plan - subtile mais claire */
+.skills-radar-container :global(.skills-radar-grid) {
+  opacity: 0.6;
+}
+
+/* Axes des catégories - audacieux et lisibles */
+.skills-radar-container :global(.skills-radar-angle-axis .recharts-polar-angle-axis-tick text) {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+}
+
+.skills-radar-container :global(.skills-radar-angle-axis .recharts-polar-angle-axis-tick:hover text) {
+  fill: #8b5cf6;
+  transform: scale(1.15);
+  text-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);
+}
+
+/* Axes des valeurs numériques */
+.skills-radar-container :global(.skills-radar-radius-axis .recharts-polar-radius-axis-tick text) {
+  transition: all 0.2s ease;
+  /* Éviter le chevauchement avec les labels d'angle en haut */
+  transform: translateY(-5px);
+}
+
+/* Masquer spécifiquement le tick "100" en haut s'il existe encore */
+.skills-radar-container :global(.skills-radar-radius-axis .recharts-polar-radius-axis-tick:last-child text) {
+  /* Le tickFormatter devrait déjà le masquer, mais au cas où */
+  opacity: 0;
+  pointer-events: none;
+}
+
+.skills-radar-container :global(.skills-radar-radius-axis .recharts-polar-radius-axis-tick:hover text) {
+  fill: #8b5cf6;
+  font-weight: 700;
+}
+
+/* Points marqueurs - cercles blancs lumineux aux sommets */
+.skills-radar-container :global(.skills-radar-dot) {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  filter: drop-shadow(0 2px 6px rgba(139, 92, 246, 0.5)) drop-shadow(0 0 8px rgba(255, 255, 255, 0.8));
+}
+
+.skills-radar-container :global(.skills-radar-dot:hover) {
+  transform: scale(1.4);
+  filter: drop-shadow(0 4px 12px rgba(139, 92, 246, 0.7)) drop-shadow(0 0 12px rgba(255, 255, 255, 1));
+  stroke-width: 5;
+}
+
+/* Point actif au survol */
+.skills-radar-container :global(.skills-radar-active-dot) {
+  animation: pulseDot 2s ease-in-out infinite;
+}
+
+@keyframes pulseDot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.1);
+  }
+}
+
+/* Amélioration de la forme radar - plus de profondeur */
+.skills-radar-container :global(.recharts-radar-polygon) {
+  filter: url(#radarGlow);
+  transition: all 0.3s ease;
+}
+
+.skills-radar-container:hover :global(.recharts-radar-polygon) {
+  filter: url(#radarGlow) brightness(1.05);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .skills-radar-container :global(.skills-radar-angle-axis .recharts-polar-angle-axis-tick text) {
+    font-size: 12px;
+  }
+  
+  .skills-radar-container :global(.skills-radar-dot) {
+    r: 5;
+  }
+}

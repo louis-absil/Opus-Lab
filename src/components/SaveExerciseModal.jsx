@@ -98,8 +98,8 @@ function SaveExerciseModal({
   const handleSubmit = (e) => {
     e.preventDefault()
     if (exerciseTitle.trim()) {
-      // Générer les tags automatiques
-      const autoTags = generateAutoTags(markers, chordData)
+      // Générer les tags automatiques (passer le compositeur pour les tags stylistiques)
+      const autoTags = generateAutoTags(markers, chordData, composer.trim() || null)
       
       onSave({
         composer: composer.trim() || null,
@@ -258,7 +258,7 @@ function SaveExerciseModal({
                 onClick={(e) => {
                   e.preventDefault()
                   // Créer une copie
-                  const autoTags = generateAutoTags(markers, chordData)
+                  const autoTags = generateAutoTags(markers, chordData, composer.trim() || null)
                   onSave({
                     composer: composer.trim() || null,
                     workTitle: workTitle.trim() || null,

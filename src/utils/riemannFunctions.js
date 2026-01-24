@@ -22,6 +22,20 @@ export const DEGREE_TO_FUNCTIONS = {
   'VII': ['D']
 }
 
+// Degrés principaux pour chaque fonction
+export const PRIMARY_DEGREES = {
+  'T': ['I'],
+  'SD': ['IV'],
+  'D': ['V']
+}
+
+// Degrés parallèles pour chaque fonction
+export const PARALLEL_DEGREES = {
+  'T': ['III', 'VI'],
+  'SD': ['II', 'VI'],
+  'D': ['VII', 'III']  // III est aussi Dp, mais VI n'est que Tp et SDp
+}
+
 // Couleurs pour chaque fonction
 export const FUNCTION_COLORS = {
   T: {
@@ -98,18 +112,57 @@ function normalizeDegree(chord) {
 }
 
 /**
+ * Normalise un chiffrage pour la comparaison
+ * Le chiffrage "5" (état fondamental) est équivalent à l'absence de chiffrage
+ * @param {string} figure - Le chiffrage à normaliser
+ * @returns {string} - Chiffrage normalisé (chaîne vide si "5" ou vide)
+ */
+function normalizeFigure(figure) {
+  const normalized = (figure || '').toString().trim()
+  // "5" représente l'état fondamental, équivalent à l'absence de chiffrage
+  return normalized === '5' ? '' : normalized
+}
+
+/**
+ * Normalise une cadence pour la comparaison
+ * Gère les variations de nommage (ex: 'deceptive' vs 'rompue', 'half' vs 'demi-cadence')
+ * @param {string} cadence - La cadence à normaliser
+ * @returns {string|null} - Cadence normalisée ou null
+ */
+function normalizeCadence(cadence) {
+  if (!cadence) return null
+  const normalized = cadence.toString().trim().toLowerCase()
+  
+  // Mapping des variations
+  const cadenceMap = {
+    'perfect': 'perfect',
+    'imperfect': 'imperfect',
+    'plagal': 'plagal',
+    'rompue': 'rompue',
+    'deceptive': 'rompue', // 'deceptive' = 'rompue'
+    'évitée': 'évitée',
+    'demi-cadence': 'demi-cadence',
+    'half': 'demi-cadence', // 'half' = 'demi-cadence'
+    'demie-cadence': 'demi-cadence'
+  }
+  
+  return cadenceMap[normalized] || normalized
+}
+
+/**
  * Compare une réponse utilisateur avec la solution correcte
  * Retourne un objet avec le niveau de précision et le score
- * @param {Object} userAnswer - Réponse de l'utilisateur { degree, root, displayLabel, figure, ... }
- * @param {Object} correctAnswer - Solution correcte { degree, root, displayLabel, figure, ... }
+ * @param {Object} userAnswer - Réponse de l'utilisateur { degree, root, displayLabel, figure, cadence, ... }
+ * @param {Object} correctAnswer - Solution correcte { degree, root, displayLabel, figure, cadence, ... }
  * @param {string} selectedFunction - Fonction sélectionnée par l'utilisateur (optionnel)
- * @returns {Object} - { level: 1|2|3, score: 0-100, feedback: string }
+ * @returns {Object} - { level: 1|2|3, score: 0-100, cadenceBonus: 0-10, feedback: string }
  */
 export function validateAnswerWithFunctions(userAnswer, correctAnswer, selectedFunction = null) {
   if (!userAnswer || !correctAnswer) {
     return {
       level: 0,
       score: 0,
+      cadenceBonus: 0,
       feedback: 'Réponse manquante'
     }
   }
@@ -118,19 +171,31 @@ export function validateAnswerWithFunctions(userAnswer, correctAnswer, selectedF
   const userRoot = normalizeDegree(userAnswer)
   const correctRoot = normalizeDegree(correctAnswer)
 
+  // Vérifier la cadence (bonus si correcte, pas de pénalité si absente)
+  let cadenceBonus = 0
+  const userCadence = normalizeCadence(userAnswer.cadence)
+  const correctCadence = normalizeCadence(correctAnswer.cadence)
+  
+  // Bonus de 10 points si la cadence est correcte (seulement si une cadence est attendue)
+  if (correctCadence && userCadence && userCadence === correctCadence) {
+    cadenceBonus = 10
+  }
+  // Pas de pénalité si l'utilisateur n'a pas mis de cadence ou si aucune cadence n'est attendue
+
   // Si on a les degrés normalisés, comparer directement
   if (userRoot && correctRoot) {
     // Vérifier aussi le chiffrage (figure) pour une validation complète
-    // Normaliser les figures (enlever les espaces, convertir en string)
-    const userFigure = (userAnswer.figure || '').toString().trim()
-    const correctFigure = (correctAnswer.figure || '').toString().trim()
+    // Normaliser les figures : "5" (état fondamental) = absence de chiffrage
+    const userFigure = normalizeFigure(userAnswer.figure)
+    const correctFigure = normalizeFigure(correctAnswer.figure)
     
     // Niveau 1 : Réponse parfaite (même degré + même chiffrage)
     if (userRoot === correctRoot && userFigure === correctFigure) {
       return {
         level: 1,
         score: 100,
-        feedback: 'Parfait !'
+        cadenceBonus: cadenceBonus,
+        feedback: cadenceBonus > 0 ? 'Parfait ! + Bonus cadence' : 'Parfait !'
       }
     }
   }
@@ -144,6 +209,7 @@ export function validateAnswerWithFunctions(userAnswer, correctAnswer, selectedF
         return {
           level: 3,
           score: 30,
+          cadenceBonus: cadenceBonus,
           feedback: `Bonne fonction (${selectedFunction === 'T' ? 'Tonique' : selectedFunction === 'SD' ? 'Sous-Dominante' : 'Dominante'}) ! Mais essayez de trouver le degré exact.`
         }
       }
@@ -156,6 +222,7 @@ export function validateAnswerWithFunctions(userAnswer, correctAnswer, selectedF
         return {
           level: 3,
           score: 30,
+          cadenceBonus: cadenceBonus,
           feedback: `Bonne fonction (${selectedFunction === 'T' ? 'Tonique' : selectedFunction === 'SD' ? 'Sous-Dominante' : 'Dominante'}) ! Mais essayez de trouver le degré exact.`
         }
       }
@@ -174,7 +241,8 @@ export function validateAnswerWithFunctions(userAnswer, correctAnswer, selectedF
         return {
           level: 1,
           score: 100,
-          feedback: 'Parfait !'
+          cadenceBonus: cadenceBonus,
+          feedback: cadenceBonus > 0 ? 'Parfait ! + Bonus cadence' : 'Parfait !'
         }
       }
       // Si la fonction est correcte mais pas le degré
@@ -182,18 +250,61 @@ export function validateAnswerWithFunctions(userAnswer, correctAnswer, selectedF
         return {
           level: 2,
           score: 65,
+          cadenceBonus: cadenceBonus,
           feedback: `Presque ! C'est la bonne fonction (${selectedFunction === 'T' ? 'Tonique' : selectedFunction === 'SD' ? 'Sous-Dominante' : 'Dominante'}), mais pas le bon degré.`
         }
       }
     }
   }
 
+  // Niveau 2 : Même degré mais chiffrage différent (crédit partiel)
+  if (userRoot && correctRoot && userRoot === correctRoot) {
+    const userFigure = normalizeFigure(userAnswer.figure)
+    const correctFigure = normalizeFigure(correctAnswer.figure)
+    if (userFigure !== correctFigure) {
+      return {
+        level: 2,
+        score: 80,
+        cadenceBonus: cadenceBonus,
+        feedback: 'Bon degré ! Mais le chiffrage est différent.'
+      }
+    }
+  }
+
   // Niveau 2 : Substitution fonctionnelle (même fonction, degré différent)
+  // Mais seulement si l'un est le principal et l'autre le parallèle de la même fonction
   if (userRoot && correctRoot && areDegreesInSameFunction(userRoot, correctRoot)) {
-    return {
-      level: 2,
-      score: 65,
-      feedback: 'Bonne fonction, mais essayez de trouver le degré exact.'
+    // Vérifier si les degrés sont dans une relation principal/parallèle
+    let isPrincipalParallel = false
+    
+    // Pour chaque fonction partagée, vérifier si l'un est principal et l'autre parallèle
+    const userFunctions = getFunctionFromDegree(userRoot)
+    const correctFunctions = getFunctionFromDegree(correctRoot)
+    
+    for (const func of userFunctions) {
+      if (correctFunctions.includes(func)) {
+        const userIsPrimary = PRIMARY_DEGREES[func]?.includes(userRoot)
+        const userIsParallel = PARALLEL_DEGREES[func]?.includes(userRoot)
+        const correctIsPrimary = PRIMARY_DEGREES[func]?.includes(correctRoot)
+        const correctIsParallel = PARALLEL_DEGREES[func]?.includes(correctRoot)
+        
+        // Si l'un est principal et l'autre parallèle de la même fonction
+        if ((userIsPrimary && correctIsParallel) || (userIsParallel && correctIsPrimary)) {
+          isPrincipalParallel = true
+          break
+        }
+      }
+    }
+    
+    // Ne considérer comme partiellement juste que si c'est une relation principal/parallèle
+    // Sinon, c'est faux (ex: V vs III où III peut être Tp ou Dp mais pas spécifiquement Dp)
+    if (isPrincipalParallel) {
+      return {
+        level: 2,
+        score: 65,
+        cadenceBonus: cadenceBonus,
+        feedback: 'Bonne fonction, mais essayez de trouver le degré exact.'
+      }
     }
   }
 
@@ -201,6 +312,7 @@ export function validateAnswerWithFunctions(userAnswer, correctAnswer, selectedF
   return {
     level: 0,
     score: 0,
+    cadenceBonus: cadenceBonus,
     feedback: 'Incorrect. Essayez encore !'
   }
 }

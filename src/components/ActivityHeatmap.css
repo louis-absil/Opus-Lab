@@ -1,0 +1,88 @@
+.activity-heatmap {
+  width: 100%;
+}
+
+.heatmap-container {
+  overflow: hidden;
+  padding: 1rem 0;
+  width: 100%;
+}
+
+.heatmap-grid {
+  display: flex;
+  gap: 3px;
+  width: 100%;
+}
+
+.heatmap-week {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.heatmap-square {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid #9ca3af;
+  box-sizing: border-box;
+  background-color: #ffffff;
+}
+
+.heatmap-square:hover {
+  border-color: #9ca3af;
+  transform: scale(1.2);
+  z-index: 1;
+  position: relative;
+}
+
+.heatmap-today {
+  border: 2px solid #667eea !important;
+}
+
+.heatmap-selected {
+  border: 2px solid #fbbf24 !important;
+  transform: scale(1.3);
+}
+
+.heatmap-legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.heatmap-legend-squares {
+  display: flex;
+  gap: 3px;
+}
+
+.heatmap-legend-square {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  border: 1px solid #d1d5db;
+  box-sizing: border-box;
+}
+
+.heatmap-legend-label {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+@media (max-width: 480px) {
+  .heatmap-square {
+    width: 10px;
+    height: 10px;
+  }
+
+  .heatmap-legend-square {
+    width: 10px;
+    height: 10px;
+  }
+}

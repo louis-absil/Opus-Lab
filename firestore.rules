@@ -82,6 +82,26 @@ service cloud.firestore {
       allow delete: if false;
     }
     
+    // Collection modules
+    match /modules/{moduleId} {
+      // Lecture : autorisée pour tous les utilisateurs authentifiés (étudiants et professeurs)
+      // Cela permet get (lecture d'un document) et list (lecture de la collection)
+      allow read: if isAuthenticated();
+      
+      // Écriture : uniquement pour les professeurs
+      allow create, update, delete: if isTeacher();
+    }
+    
+    // Collection hints
+    match /hints/{hintId} {
+      // Lecture : autorisée pour tous les utilisateurs authentifiés (étudiants et professeurs)
+      // Cela permet get (lecture d'un document) et list (lecture de la collection)
+      allow read: if isAuthenticated();
+      
+      // Écriture : uniquement pour les professeurs
+      allow create, update, delete: if isTeacher();
+    }
+    
     // Collection authorizedTeachers
     match /authorizedTeachers/{docId} {
       // Lecture : publique (pour vérifier si un email est autorisé)

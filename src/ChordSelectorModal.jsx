@@ -380,14 +380,22 @@ function ChordSelectorModal({
       setSpecialRoot(initialChord.specialRoot || null)
       setSelectedFunction(initialChord.selectedFunction || null)
       setCadence(initialChord.cadence || null)
-      // En mode élève : NE JAMAIS charger le mode depuis initialChord (pour ne pas donner la réponse)
-      // Toujours utiliser le mode depuis localStorage (ou 'generic' par défaut)
+      // En mode élève : 
+      // - Si l'accord est déjà rempli (a un degreeMode), utiliser ce mode pour ne pas le modifier
+      // - Sinon (accord non rempli), utiliser le mode depuis localStorage pour les accords suivants
       // En mode prof : garder le comportement actuel
       let modeToUse
       if (studentMode) {
-        // Mode élève : ignorer initialChord.degreeMode et utiliser le localStorage élève
-        const savedMode = localStorage.getItem('chordSelectorDegreeModeStudent')
-        modeToUse = savedMode || 'generic'
+        // Mode élève : si l'accord a déjà un degreeMode (déjà rempli), l'utiliser
+        // Sinon, utiliser le localStorage pour les accords non remplis et suivants
+        if (initialChord.degreeMode) {
+          // Accord déjà rempli : conserver son mode
+          modeToUse = initialChord.degreeMode
+        } else {
+          // Accord non rempli : utiliser le mode depuis localStorage pour les accords suivants
+          const savedMode = localStorage.getItem('chordSelectorDegreeModeStudent')
+          modeToUse = savedMode || 'generic'
+        }
       } else {
         // Mode prof : comportement normal
         if (initialChord.degreeMode) {
@@ -413,6 +421,275 @@ function ChordSelectorModal({
       setInitialDegreeMode(null) // Réinitialiser
     }
   }, [isOpen, initialDegreeMode, degreeMode])
+
+  // Calculer isValid avant le useEffect des raccourcis clavier
+  const isValid = !!degree || !!specialRoot || !!selectedFunction
+
+  // --- RACCOURCIS CLAVIER ---
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleKeyDown = (e) => {
+      // Ignorer si dans un input/textarea ou élément éditable
+      if (e.target.tagName === 'INPUT' || 
+          e.target.tagName === 'TEXTAREA' || 
+          e.target.isContentEditable) {
+        return
+      }
+
+      const key = e.key
+
+      // Fonctions principales : T, S, D
+      if (key === 'T' || key === 't') {
+        e.preventDefault()
+        if (selectedFunction === 'T') {
+          setSelectedFunction(null)
+        } else {
+          setSelectedFunction('T')
+          setDegree('')
+          setAccidental('')
+          setQuality('')
+          setFigure('')
+          setIsBorrowed(false)
+          setSpecialRoot(null)
+        }
+        return
+      }
+
+      if (key === 'S' || key === 's') {
+        e.preventDefault()
+        if (selectedFunction === 'SD') {
+          setSelectedFunction(null)
+        } else {
+          setSelectedFunction('SD')
+          setDegree('')
+          setAccidental('')
+          setQuality('')
+          setFigure('')
+          setIsBorrowed(false)
+          setSpecialRoot(null)
+        }
+        return
+      }
+
+      if (key === 'D' || key === 'd') {
+        e.preventDefault()
+        if (selectedFunction === 'D') {
+          setSelectedFunction(null)
+        } else {
+          setSelectedFunction('D')
+          setDegree('')
+          setAccidental('')
+          setQuality('')
+          setFigure('')
+          setIsBorrowed(false)
+          setSpecialRoot(null)
+        }
+        return
+      }
+
+      // Flèches droite/gauche : Navigation dans les degrés et accords spéciaux
+      if (!selectedFunction) {
+        if (key === 'ArrowRight') {
+          e.preventDefault()
+          // Séquence : I, II, III, IV, V, VI, VII, N, It, Fr, Gr
+          const items = [
+            { type: 'degree', value: 'I' },
+            { type: 'degree', value: 'II' },
+            { type: 'degree', value: 'III' },
+            { type: 'degree', value: 'IV' },
+            { type: 'degree', value: 'V' },
+            { type: 'degree', value: 'VI' },
+            { type: 'degree', value: 'VII' },
+            { type: 'specialRoot', value: 'N' },
+            { type: 'specialRoot', value: 'It' },
+            { type: 'specialRoot', value: 'Fr' },
+            { type: 'specialRoot', value: 'Gr' }
+          ]
+          
+          // Trouver l'index actuel
+          let currentIndex = -1
+          if (degree) {
+            currentIndex = items.findIndex(item => item.type === 'degree' && item.value === degree)
+          } else if (specialRoot) {
+            currentIndex = items.findIndex(item => item.type === 'specialRoot' && item.value === specialRoot)
+          }
+          
+          const nextIndex = currentIndex < items.length - 1 ? currentIndex + 1 : 0
+          const nextItem = items[nextIndex]
+          
+          if (nextItem.type === 'degree') {
+            setDegree(nextItem.value)
+            setSpecialRoot(null)
+          } else {
+            setSpecialRoot(nextItem.value)
+            setDegree('')
+            setAccidental('')
+            setQuality('')
+            setFigure('')
+          }
+          setSelectedFunction(null)
+          return
+        }
+
+        if (key === 'ArrowLeft') {
+          e.preventDefault()
+          // Séquence : I, II, III, IV, V, VI, VII, N, It, Fr, Gr
+          const items = [
+            { type: 'degree', value: 'I' },
+            { type: 'degree', value: 'II' },
+            { type: 'degree', value: 'III' },
+            { type: 'degree', value: 'IV' },
+            { type: 'degree', value: 'V' },
+            { type: 'degree', value: 'VI' },
+            { type: 'degree', value: 'VII' },
+            { type: 'specialRoot', value: 'N' },
+            { type: 'specialRoot', value: 'It' },
+            { type: 'specialRoot', value: 'Fr' },
+            { type: 'specialRoot', value: 'Gr' }
+          ]
+          
+          // Trouver l'index actuel
+          let currentIndex = -1
+          if (degree) {
+            currentIndex = items.findIndex(item => item.type === 'degree' && item.value === degree)
+          } else if (specialRoot) {
+            currentIndex = items.findIndex(item => item.type === 'specialRoot' && item.value === specialRoot)
+          }
+          
+          const prevIndex = currentIndex > 0 ? currentIndex - 1 : items.length - 1
+          const prevItem = items[prevIndex]
+          
+          if (prevItem.type === 'degree') {
+            setDegree(prevItem.value)
+            setSpecialRoot(null)
+          } else {
+            setSpecialRoot(prevItem.value)
+            setDegree('')
+            setAccidental('')
+            setQuality('')
+            setFigure('')
+          }
+          setSelectedFunction(null)
+          return
+        }
+      }
+
+      // Flèches haut/bas : Navigation dans les chiffrages
+      if (!selectedFunction) {
+        if (key === 'ArrowUp') {
+          e.preventDefault()
+          const figures = ['5', '6', '64', '7', '65', '43', '2', '9', '11', '13', '54']
+          const currentIndex = figure ? figures.indexOf(figure) : -1
+          const nextIndex = currentIndex < figures.length - 1 ? currentIndex + 1 : 0
+          setFigure(figures[nextIndex])
+          return
+        }
+
+        if (key === 'ArrowDown') {
+          e.preventDefault()
+          const figures = ['5', '6', '64', '7', '65', '43', '2', '9', '11', '13', '54']
+          const currentIndex = figure ? figures.indexOf(figure) : -1
+          const prevIndex = currentIndex > 0 ? currentIndex - 1 : figures.length - 1
+          setFigure(figures[prevIndex])
+          return
+        }
+      }
+
+      // C : Cadence (cycle)
+      if (key === 'C' || key === 'c') {
+        e.preventDefault()
+        const cadences = [null, 'perfect', 'imperfect', 'plagal', 'rompue', 'évitée', 'demi-cadence']
+        const currentIndex = cadence ? cadences.indexOf(cadence) : 0
+        const nextIndex = currentIndex < cadences.length - 1 ? currentIndex + 1 : 0
+        setCadence(cadences[nextIndex])
+        return
+      }
+
+      // A : Altérations (cycle)
+      if (!selectedFunction && !specialRoot) {
+        if (key === 'A' || key === 'a') {
+          e.preventDefault()
+          const accidentals = [null, 'b', '#', 'natural']
+          const currentIndex = accidental ? accidentals.indexOf(accidental) : 0
+          const nextIndex = currentIndex < accidentals.length - 1 ? currentIndex + 1 : 0
+          setAccidental(accidentals[nextIndex])
+          return
+        }
+      }
+
+      // M : Mode (cycle)
+      if (key === 'M' || key === 'm') {
+        e.preventDefault()
+        const modes = ['generic', 'major', 'minor']
+        const currentIndex = modes.indexOf(degreeMode)
+        const nextIndex = currentIndex < modes.length - 1 ? currentIndex + 1 : 0
+        setDegreeMode(modes[nextIndex])
+        return
+      }
+
+      // Réinitialiser
+      if (key === 'Delete' || key === 'Backspace') {
+        e.preventDefault()
+        setDegree('')
+        setAccidental('')
+        setQuality('')
+        setFigure('')
+        setIsBorrowed(false)
+        setSpecialRoot(null)
+        setSelectedFunction(null)
+        setCadence(null)
+        return
+      }
+
+      // Valider (Enter)
+      if (key === 'Enter' && isValid) {
+        e.preventDefault()
+        // Sauvegarder le mode dans localStorage pour les accords suivants
+        if (studentMode) {
+          localStorage.setItem('chordSelectorDegreeModeStudent', degreeMode)
+        } else {
+          localStorage.setItem('chordSelectorDegreeMode', degreeMode)
+        }
+        
+        // Construire les données de l'accord
+        const chordData = {
+          degree, accidental, quality, figure, isBorrowed, specialRoot, selectedFunction, cadence
+        }
+        
+        // En mode élève : toujours sauvegarder le mode dans la réponse de l'élève
+        // En mode prof : comportement normal
+        if (studentMode) {
+          chordData.degreeMode = degreeMode
+        } else {
+          if (!initialChord || initialChord.degreeMode) {
+            chordData.degreeMode = degreeMode
+          }
+        }
+        
+        setInitialDegreeMode(null)
+        onValidate(chordData)
+        return
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [
+    isOpen, 
+    selectedFunction, 
+    degree, 
+    figure, 
+    accidental, 
+    cadence,
+    isValid,
+    degreeMode,
+    studentMode,
+    initialChord,
+    onValidate
+  ])
 
   // --- HANDLERS ---
   const handleDegreeModeChange = (mode) => {
@@ -710,8 +987,7 @@ function ChordSelectorModal({
   }, [selectedFunction])
 
   const chordData = { degree, accidental, quality, figure, isBorrowed, specialRoot, selectedFunction, degreeMode }
-  // Valide si on a un degré, une racine spéciale, OU une fonction sélectionnée
-  const isValid = !!degree || !!specialRoot || !!selectedFunction
+  // isValid est déjà défini plus haut, avant le useEffect des raccourcis clavier
 
   // --- JSX STRUCTURE ---
   const modalContent = (

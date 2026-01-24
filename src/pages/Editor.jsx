@@ -19,7 +19,8 @@ import {
   Save,
   LogIn,
   ArrowLeft,
-  Flag
+  Flag,
+  RotateCcw
 } from 'lucide-react'
 import { DEGREE_TO_FUNCTIONS } from '../utils/riemannFunctions'
 
@@ -229,6 +230,59 @@ function Editor() {
     setTimeout(initializeSelection, 500)
     setTimeout(initializeSelection, 1500)
     setTimeout(initializeSelection, 3000)
+  }
+
+  // Gestion des changements d'état du lecteur YouTube
+  const handleStateChange = (event) => {
+    if (!playerRef.current) return
+    
+    const state = event.data
+    // YouTube.PlayerState.PLAYING = 1
+    // YouTube.PlayerState.PAUSED = 2
+    // YouTube.PlayerState.ENDED = 0
+    
+    if (state === 1) { // PLAYING
+      // Si la lecture démarre depuis le bouton YouTube natif
+      if (!isPlaying) {
+        setIsPlaying(true)
+        
+        // Vérifier si on est avant le début de l'extrait ou après la fin
+        try {
+          const currentTime = playerRef.current.getCurrentTime()
+          
+          // Si on est avant le début ou après la fin, aller au début de l'extrait
+          if (currentTime < startTime || currentTime >= endTime) {
+            playerRef.current.seekTo(startTime, true)
+            setCurrentTime(startTime)
+            currentTimeRef.current = startTime
+          }
+        } catch (error) {
+          console.error('Erreur lors de la vérification du temps:', error)
+        }
+      }
+    } else if (state === 2 || state === 0) { // PAUSED ou ENDED
+      // Si la lecture s'arrête, synchroniser l'état React
+      if (isPlaying) {
+        setIsPlaying(false)
+      }
+      
+      // Si la vidéo est terminée, s'assurer qu'on est à la fin de l'extrait
+      if (state === 0) {
+        if (playerRef.current) {
+          try {
+            const currentTime = playerRef.current.getCurrentTime()
+            // Si on est après la fin de l'extrait, revenir à la fin
+            if (currentTime > endTime) {
+              playerRef.current.seekTo(endTime, true)
+              setCurrentTime(endTime)
+              currentTimeRef.current = endTime
+            }
+          } catch (error) {
+            console.error('Erreur lors de la vérification de fin:', error)
+          }
+        }
+      }
+    }
   }
 
   useEffect(() => {
@@ -1178,6 +1232,7 @@ function Editor() {
             videoId={extractedId}
             opts={opts}
             onReady={handleReady}
+            onStateChange={handleStateChange}
             className="w-full h-full"
                 />
               </div>
@@ -1557,6 +1612,18 @@ function Editor() {
 
           {/* Ligne 2 : Transport + TAP */}
           <div className="flex items-center justify-center gap-3">
+            {/* Bouton Revenir au début */}
+            <button
+              onClick={() => {
+                handleSeek(startTime)
+                setSelectedMarkerId(null)
+              }}
+              className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-zinc-800 border border-white/10 hover:border-white/20 hover:bg-zinc-700 transition-all duration-200 flex items-center justify-center shadow-lg active:scale-95"
+              title="Revenir au début de l'extrait"
+            >
+              <RotateCcw className="w-5 h-5 md:w-6 md:h-6 text-white/70" />
+            </button>
+
             {/* Bouton Prev */}
             <button
               onClick={() => {
@@ -1665,6 +1732,18 @@ function Editor() {
 
           {/* Cluster Centre - Transport Controls */}
           <div className="flex-1 flex items-center justify-center gap-4">
+            {/* Bouton Revenir au début */}
+            <button
+              onClick={() => {
+                handleSeek(startTime)
+                setSelectedMarkerId(null)
+              }}
+              className="w-14 h-14 rounded-xl bg-zinc-800 border border-white/10 hover:border-white/20 hover:bg-zinc-700 transition-all duration-200 flex items-center justify-center shadow-lg active:scale-95"
+              title="Revenir au début de l'extrait"
+            >
+              <RotateCcw className="w-6 h-6 text-white/70" />
+            </button>
+
             {/* Bouton Prev */}
             <button
               onClick={() => {
