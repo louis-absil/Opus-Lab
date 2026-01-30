@@ -27,9 +27,9 @@ function ExerciseSummary({ exercise, userAnswers, answerValidations = {}, onRepl
         )
       }
       
-      // Déterminer si la réponse est correcte (niveau 1 = parfait)
+      // Déterminer si la réponse est correcte (niveau 1 = parfait) ou partielle (0.5 = QCM bonne fonction, 2/3 = autres partielles)
       const isPerfect = validation && validation.level === 1
-      const isPartiallyCorrect = validation && (validation.level === 2 || validation.level === 3)
+      const isPartiallyCorrect = validation && (validation.level === 0.5 || validation.level === 2 || validation.level === 3)
       
       return {
         index,

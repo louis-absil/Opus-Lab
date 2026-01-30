@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { Play, Pause, RotateCcw } from 'lucide-react'
 import { formatChordDetailed, FIGURES } from '../utils/chordFormatter'
+import { ChordLabelFigure } from './ChordLabel'
+import { PRIMARY_DEGREES, DEGREE_TO_FUNCTIONS } from '../utils/riemannFunctions'
 import './ReviewDetailPanel.css'
 
 function ReviewDetailPanel({ 
@@ -8,6 +10,7 @@ function ReviewDetailPanel({
   userAnswer, 
   correctAnswer, 
   validation,
+  isSegmentLocked = false,
   segmentStartTime,
   segmentEndTime,
   playerRef,
@@ -33,6 +36,37 @@ function ReviewDetailPanel({
     }
   }, [segmentIndex])
 
+  // Appels sécurisés au lecteur YouTube (évite crash si iframe bloquée / non prête)
+  const safePause = () => {
+    try {
+      if (playerRef?.current) playerRef.current.pauseVideo()
+    } catch (e) {
+      console.warn('ReviewDetailPanel: lecteur indisponible (pause)', e?.message)
+    }
+  }
+  const safeSeekTo = (t, s) => {
+    try {
+      if (playerRef?.current) playerRef.current.seekTo(t, s)
+    } catch (e) {
+      console.warn('ReviewDetailPanel: lecteur indisponible (seekTo)', e?.message)
+    }
+  }
+  const safePlayVideo = () => {
+    try {
+      if (playerRef?.current) playerRef.current.playVideo()
+    } catch (e) {
+      console.warn('ReviewDetailPanel: lecteur indisponible (playVideo)', e?.message)
+    }
+  }
+  const safeGetCurrentTime = () => {
+    try {
+      return playerRef?.current ? playerRef.current.getCurrentTime() : 0
+    } catch (e) {
+      console.warn('ReviewDetailPanel: lecteur indisponible (getCurrentTime)', e?.message)
+      return 0
+    }
+  }
+
   // Arrêter la lecture si on change de segment
   useEffect(() => {
     if (segmentIntervalRef.current) {
@@ -44,9 +78,7 @@ function ReviewDetailPanel({
       fullExtractIntervalRef.current = null
     }
     setIsPlayingSegment(false)
-    if (playerRef?.current) {
-      playerRef.current.pauseVideo()
-    }
+    safePause()
   }, [segmentIndex, playerRef])
 
   // Fonction pour jouer uniquement le segment
@@ -56,11 +88,8 @@ function ReviewDetailPanel({
     setIsLooping(loop)
     setIsPlayingSegment(true)
 
-    // Positionner au début du segment
-    playerRef.current.seekTo(segmentStartTime, true)
-    
-    // Lancer la lecture
-    playerRef.current.playVideo()
+    safeSeekTo(segmentStartTime, true)
+    safePlayVideo()
 
     // Surveiller le temps et arrêter à la fin du segment
     segmentIntervalRef.current = setInterval(() => {
@@ -71,28 +100,17 @@ function ReviewDetailPanel({
         return
       }
 
-      try {
-        const currentTime = playerRef.current.getCurrentTime()
-        
-        if (currentTime >= segmentEndTime) {
-          playerRef.current.pauseVideo()
-          clearInterval(segmentIntervalRef.current)
-          segmentIntervalRef.current = null
-          
-          if (loop) {
-            // Relancer après un court délai
-            setTimeout(() => {
-              playSegment(true)
-            }, 500)
-          } else {
-            setIsPlayingSegment(false)
-          }
-        }
-      } catch (error) {
-        console.error('Erreur lors de la lecture du segment:', error)
+      const currentTime = safeGetCurrentTime()
+      if (currentTime >= segmentEndTime) {
+        safePause()
         clearInterval(segmentIntervalRef.current)
         segmentIntervalRef.current = null
-        setIsPlayingSegment(false)
+
+        if (loop) {
+          setTimeout(() => playSegment(true), 500)
+        } else {
+          setIsPlayingSegment(false)
+        }
       }
     }, 100)
   }
@@ -109,37 +127,25 @@ function ReviewDetailPanel({
     }
     setIsPlayingSegment(false)
     setIsLooping(false)
-    if (playerRef?.current) {
-      playerRef.current.pauseVideo()
-    }
+    safePause()
   }
 
   // Revenir au début de l'extrait et lancer la lecture
   const goToStart = () => {
     stopSegment()
     if (playerRef?.current && exerciseStartTime !== undefined && exerciseEndTime !== undefined) {
-      playerRef.current.seekTo(exerciseStartTime, true)
-      // Lancer la lecture de l'extrait complet
-      playerRef.current.playVideo()
-      
-      // Surveiller la fin de l'extrait et arrêter automatiquement
+      safeSeekTo(exerciseStartTime, true)
+      safePlayVideo()
+
       fullExtractIntervalRef.current = setInterval(() => {
         if (!playerRef?.current) {
           clearInterval(fullExtractIntervalRef.current)
           fullExtractIntervalRef.current = null
           return
         }
-
-        try {
-          const currentTime = playerRef.current.getCurrentTime()
-          
-          if (currentTime >= exerciseEndTime) {
-            playerRef.current.pauseVideo()
-            clearInterval(fullExtractIntervalRef.current)
-            fullExtractIntervalRef.current = null
-          }
-        } catch (error) {
-          console.error('Erreur lors de la lecture de l\'extrait complet:', error)
+        const currentTime = safeGetCurrentTime()
+        if (currentTime >= exerciseEndTime) {
+          safePause()
           clearInterval(fullExtractIntervalRef.current)
           fullExtractIntervalRef.current = null
         }
@@ -147,9 +153,36 @@ function ReviewDetailPanel({
     }
   }
 
+  const cadenceLabels = {
+    perfect: 'Parfaite',
+    imperfect: 'Imparfaite',
+    plagal: 'Plagale',
+    rompue: 'Rompue',
+    évitée: 'Évitée',
+    'demi-cadence': 'Demi-cadence',
+    half: 'Demi-cadence'
+  }
+
+  // Fonction correcte d'un accord (pour comparaison en mode QCM avec réponse "fonction seule")
+  const getCorrectFunction = (chord) => {
+    if (!chord) return null
+    if (chord.selectedFunction) return chord.selectedFunction
+    if (chord.specialRoot) {
+      const map = { N: 'SD', It: 'D', Fr: 'D', Gr: 'D' }
+      return map[chord.specialRoot] || null
+    }
+    if (chord.degree) {
+      const funcs = DEGREE_TO_FUNCTIONS[chord.degree] || []
+      return funcs.length > 0 ? funcs[0] : null
+    }
+    return null
+  }
+
   // Comparer les accords élément par élément pour la coloration
   const compareChords = (userChord, correctChord) => {
     if (!userChord || !correctChord) return null
+    const userFunction = userChord.selectedFunction || userChord.function
+    const correctFunction = getCorrectFunction(correctChord)
 
     return {
       degree: userChord.degree === correctChord.degree,
@@ -158,21 +191,14 @@ function ReviewDetailPanel({
       figure: userChord.figure === correctChord.figure,
       isBorrowed: userChord.isBorrowed === correctChord.isBorrowed,
       specialRoot: userChord.specialRoot === correctChord.specialRoot,
-      selectedFunction: userChord.selectedFunction === correctChord.selectedFunction
+      selectedFunction: userFunction != null && correctFunction != null && userFunction === correctFunction,
+      cadence: !!(userChord.cadence && correctChord.cadence) && (userChord.cadence === correctChord.cadence || (userChord.cadence === 'demi-cadence' && correctChord.cadence === 'half') || (userChord.cadence === 'half' && correctChord.cadence === 'demi-cadence'))
     }
   }
 
   const comparison = userAnswer && correctAnswer ? compareChords(userAnswer, correctAnswer) : null
   const panelRef = useRef(null)
   const contentRef = useRef(null)
-
-  useEffect(() => {
-    if (panelRef.current && contentRef.current) {
-      const panelRect = panelRef.current.getBoundingClientRect()
-      const contentRect = contentRef.current.getBoundingClientRect()
-      fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ReviewDetailPanel.jsx:useEffect',message:'Dimensions panneau détail',data:{panelHeight:panelRect.height,panelWidth:panelRect.width,contentHeight:contentRect.height,contentWidth:contentRect.width,viewportHeight:window.innerHeight,viewportWidth:window.innerWidth},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-    }
-  }, [segmentIndex])
 
   return (
     <div ref={panelRef} className="review-detail-panel">
@@ -224,9 +250,16 @@ function ReviewDetailPanel({
         <div className="review-comparator">
           <div className="review-comparison-item">
             <div className="review-comparison-label">Votre réponse</div>
-            <div className={`review-chord-display ${validation?.level === 1 ? 'review-chord-correct' : validation?.level === 2 || validation?.level === 3 ? 'review-chord-partial' : 'review-chord-incorrect'}`}>
+            <div className={`review-chord-display ${validation?.level === 1 ? 'review-chord-correct' : validation?.level === 0.5 || validation?.level === 2 || validation?.level === 3 ? 'review-chord-partial' : 'review-chord-incorrect'}`}>
               {userAnswer ? (
-                <ChordDisplayDetailed chord={userAnswer} comparison={comparison} isUserAnswer={true} />
+                <>
+                  <ChordDisplayDetailed chord={userAnswer} comparison={comparison} isUserAnswer={true} />
+                  {correctAnswer?.cadence && (
+                    <div className={`review-cadence ${comparison?.cadence ? 'review-cadence-correct' : 'review-cadence-incorrect'}`}>
+                      Cadence : {userAnswer.cadence ? (cadenceLabels[userAnswer.cadence] || userAnswer.cadence) : '—'}
+                    </div>
+                  )}
+                </>
               ) : (
                 <span className="review-chord-empty">Non répondu</span>
               )}
@@ -237,7 +270,14 @@ function ReviewDetailPanel({
             <div className="review-comparison-label">Solution</div>
             <div className="review-chord-display review-chord-correct">
               {correctAnswer ? (
-                <ChordDisplayDetailed chord={correctAnswer} isUserAnswer={false} />
+                <>
+                  <ChordDisplayDetailed chord={correctAnswer} isUserAnswer={false} />
+                  {correctAnswer.cadence && (
+                    <div className="review-cadence review-cadence-solution">
+                      Cadence : {cadenceLabels[correctAnswer.cadence] || correctAnswer.cadence}
+                    </div>
+                  )}
+                </>
               ) : (
                 <span className="review-chord-empty">Non défini</span>
               )}
@@ -245,20 +285,42 @@ function ReviewDetailPanel({
           </div>
         </div>
 
-        {/* Explication */}
-        {validation?.feedback && (
+        {/* Message explicite quand la cadence est attendue et fausse */}
+        {correctAnswer?.cadence && !comparison?.cadence && (
+          <div className="review-cadence-feedback-wrong">
+            <span className="review-cadence-feedback-wrong-icon">❌</span>
+            <p className="review-cadence-feedback-wrong-text">
+              Cadence incorrecte : vous avez indiqué <strong>{userAnswer?.cadence ? (cadenceLabels[userAnswer.cadence] || userAnswer.cadence) : '—'}</strong>, la solution est <strong>{cadenceLabels[correctAnswer.cadence] || correctAnswer.cadence}</strong>.
+            </p>
+          </div>
+        )}
+
+        {/* Explication : message neutre pour les accords non débloqués, sinon feedback de validation */}
+        {(isSegmentLocked && !userAnswer) ? (
+          <div className="review-explanation review-explanation-neutral">
+            <div className="review-explanation-icon">ℹ️</div>
+            <div className="review-explanation-content">
+              <p className="review-explanation-text">Cet accord n&apos;était pas à remplir dans ce niveau.</p>
+            </div>
+          </div>
+        ) : validation?.feedback ? (
           <div className="review-explanation">
             <div className="review-explanation-icon">
-              {validation.level === 1 ? '✅' : validation.level === 2 ? '⚠️' : validation.level === 3 ? 'ℹ️' : '❌'}
+              {validation.level === 1 ? '✅' : validation.level === 0.5 || validation.level === 2 ? '⚠️' : validation.level === 3 ? 'ℹ️' : '❌'}
             </div>
             <div className="review-explanation-content">
               <p className="review-explanation-text">{validation.feedback}</p>
-              {validation.score !== undefined && (
-                <span className="review-explanation-score">{validation.score}% XP</span>
+              {(validation.score !== undefined || validation.cadenceBonus !== undefined) && (
+                <span className="review-explanation-score">
+                  {validation.score ?? 0}% XP
+                  {validation.cadenceBonus > 0 && (
+                    <span className="review-explanation-cadence-bonus"> + {validation.cadenceBonus}% bonus cadence</span>
+                  )}
+                </span>
               )}
             </div>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   )
@@ -268,13 +330,25 @@ function ReviewDetailPanel({
 function ChordDisplayDetailed({ chord, comparison, isUserAnswer }) {
   if (!chord) return null
 
-  const { degree, accidental, quality, figure, isBorrowed, specialRoot, selectedFunction } = chord
+  const { degree, accidental, quality, figure, isBorrowed, specialRoot, selectedFunction, function: qcmFunction, qcmAnswer } = chord
+  const functionValue = selectedFunction || qcmFunction
 
-  // Si seule une fonction est sélectionnée
-  if (selectedFunction && !degree && !specialRoot) {
+  // Réponse QCM avec accord (chaîne type "I6", "II2", "V7") : afficher telle quelle
+  if (qcmAnswer && typeof qcmAnswer === 'string' && !degree && !specialRoot) {
     return (
-      <span className="review-chord-function">
-        {selectedFunction}
+      <span className="review-chord-degree">
+        {qcmAnswer}
+      </span>
+    )
+  }
+
+  // Si seule une fonction est sélectionnée (ou réponse QCM fonction seule) : afficher fonction + degré principal en petit (ex. T (I))
+  if (functionValue && !degree && !specialRoot) {
+    const principalDegree = PRIMARY_DEGREES[functionValue]?.[0]
+    return (
+      <span className="review-chord-function-with-hint">
+        <span className="review-chord-function">{functionValue}</span>
+        {principalDegree && <span className="review-chord-function-hint"> ({principalDegree})</span>}
       </span>
     )
   }
@@ -313,12 +387,10 @@ function ChordDisplayDetailed({ chord, comparison, isUserAnswer }) {
         </span>
       )}
       {figure && figure !== '5' && (
-        <span className={`review-chord-element review-chord-figure ${isUserAnswer && comparison && !comparison.figure ? 'review-chord-wrong' : 'review-chord-right'}`}>
-          {(() => {
-            const figObj = FIGURES.find(f => f.value === figure)
-            return figObj?.display || figure
-          })()}
-        </span>
+        <ChordLabelFigure
+          figure={figure}
+          className={`review-chord-element review-chord-figure ${isUserAnswer && comparison && !comparison.figure ? 'review-chord-wrong' : 'review-chord-right'}`}
+        />
       )}
       {isBorrowed && (
         <span className={`review-chord-element ${isUserAnswer && comparison && !comparison.isBorrowed ? 'review-chord-wrong' : 'review-chord-right'}`}>

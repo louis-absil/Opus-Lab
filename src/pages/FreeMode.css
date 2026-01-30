@@ -174,6 +174,63 @@
   background: #f3f4f6;
 }
 
+/* Blocs de filtres (hiérarchie pédagogique) */
+.free-mode-filter-block {
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.free-mode-filter-block:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.free-mode-filter-block-title {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 1rem 0;
+}
+
+.free-mode-filter-block-quick .free-mode-filter-block-title {
+  color: #667eea;
+}
+
+/* Chips notion (pastilles, accès rapide) */
+.free-mode-notion-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.free-mode-notion-chip {
+  padding: 0.5rem 0.875rem;
+  background: #f3f4f6;
+  border: 2px solid transparent;
+  border-radius: 14px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.free-mode-notion-chip:hover {
+  background: #e5e7eb;
+  border-color: #d1d5db;
+}
+
+.free-mode-notion-chip-active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #ffffff;
+  border-color: transparent;
+}
+
 /* Groupes de filtres */
 .free-mode-filter-group {
   margin-bottom: 2rem;
@@ -379,6 +436,60 @@
   min-width: 0;
   /* S'assurer qu'il n'y a pas de scrollbar horizontale */
   overflow-x: hidden;
+}
+
+/* Section Derniers exercices ajoutés (en haut des résultats) - toujours rendue pour éviter le saut du panneau filtres */
+.free-mode-latest-section {
+  margin-bottom: 2rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid #e5e7eb;
+  min-height: 180px; /* Réserve la place pour éviter que le layout saute au clic filtre */
+}
+
+.free-mode-latest-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 1rem 0;
+}
+
+.free-mode-latest-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+/* Placeholder quand des filtres masquent les exercices récents (évite le collapse de la section) */
+.free-mode-latest-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem 0;
+  min-height: 120px;
+  justify-content: center;
+}
+
+.free-mode-latest-placeholder p {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: #6b7280;
+}
+
+.free-mode-latest-placeholder-btn {
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: 2px solid #667eea;
+  color: #667eea;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.free-mode-latest-placeholder-btn:hover {
+  background: rgba(102, 126, 234, 0.08);
 }
 
 .free-mode-results-header {
@@ -587,11 +698,14 @@
 @media (max-width: 767px) {
   .free-mode-container {
     padding: 1rem;
+    /* Pas de overflow-x: hidden ici pour ne pas cropper cartes/pastilles */
+    max-width: 100%; /* Ne pas dépasser le viewport */
   }
   
   .free-mode-search-bar {
     flex-direction: column;
     gap: 0.75rem;
+    min-width: 0;
   }
   
   .free-mode-filter-btn {
@@ -604,15 +718,37 @@
     display: flex; /* Revenir à flex sur mobile */
     flex-direction: column;
     gap: 0;
+    min-width: 0;
+    max-width: 100%; /* Contraindre pour éviter overflow page sans cropper */
   }
   
   .free-mode-filters {
     display: none; /* Caché sur mobile, remplacé par drawer */
   }
   
+  .free-mode-results {
+    max-width: 100%;
+    min-width: 0;
+  }
+  
+  .free-mode-latest-grid,
+  .free-mode-grid {
+    min-width: 0; /* Permet à la grille de rétrécir et d'éviter l'overflow */
+  }
+  
   .free-mode-grid {
     grid-template-columns: 1fr;
     gap: 1rem;
+  }
+  
+  .free-mode-latest-grid {
+    grid-template-columns: minmax(0, 1fr); /* minmax(0,1fr) évite que la grille force une largeur min */
+  }
+  
+  /* Les cartes doivent pouvoir rétrécir dans la grille pour éviter overflow */
+  .free-mode-grid .exercise-card,
+  .free-mode-latest-grid .exercise-card {
+    min-width: 0;
   }
   
   .free-mode-results-header {

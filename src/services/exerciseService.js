@@ -11,6 +11,8 @@ import {
   serverTimestamp 
 } from 'firebase/firestore'
 import { db } from '../firebase'
+import { countRelevantChords, isExerciseSuitableForNode } from '../utils/nodeCriteria'
+import { getUnlockedCadenceValues } from '../data/parcoursTree'
 
 /**
  * Récupère tous les exercices d'un auteur
@@ -146,6 +148,24 @@ export async function searchPublicExercises(filters = {}) {
 }
 
 /**
+ * Récupère les derniers exercices publics ajoutés (tri par createdAt décroissant)
+ */
+export async function getLatestPublicExercises(limit = 10) {
+  try {
+    const exercises = await searchPublicExercises({})
+    const sorted = [...exercises].sort((a, b) => {
+      const dateA = a.createdAt?.toDate?.() || new Date(0)
+      const dateB = b.createdAt?.toDate?.() || new Date(0)
+      return dateB - dateA
+    })
+    return sorted.slice(0, limit)
+  } catch (error) {
+    console.error('Erreur lors de la récupération des derniers exercices:', error)
+    throw error
+  }
+}
+
+/**
  * Récupère un exercice aléatoire parmi les exercices publics
  */
 export async function getRandomPublicExercise(filters = {}) {
@@ -264,6 +284,42 @@ export async function findExercisesByVideoId(videoId) {
   } catch (error) {
     console.error('Erreur lors de la recherche d\'exercices par vidéo:', error)
     throw error
+  }
+}
+
+/**
+ * Récupère un exercice adapté pour un nœud de progression
+ * Sélectionne un exercice qui contient au moins 2-3 accords pertinents pour le nœud
+ */
+export async function getExercisesForNode(nodeId) {
+  try {
+    // Récupérer tous les exercices publics
+    const allExercises = await searchPublicExercises({})
+    
+    // Filtrer les exercices qui conviennent pour le nœud
+    // (assez d'accords pertinents ET pas de concepts avancés interdits)
+    const suitableExercises = allExercises.filter(exercise => {
+      return isExerciseSuitableForNode(exercise, nodeId, 2)
+    })
+    
+    if (suitableExercises.length === 0) {
+      console.warn(`Aucun exercice trouvé pour le nœud ${nodeId}`)
+      return null
+    }
+    
+    // Sélectionner un exercice aléatoire parmi ceux qui conviennent
+    const randomIndex = Math.floor(Math.random() * suitableExercises.length)
+    const exercise = suitableExercises[randomIndex]
+    // #region agent log
+    const unlockedCadences = getUnlockedCadenceValues(undefined, nodeId)
+    const markerCadences = (exercise.markers || []).map(m => (typeof m === 'object' && m.chord ? m.chord : null)).filter(Boolean).map(c => c.cadence).filter(Boolean)
+    const hasCadenceNotUnlocked = markerCadences.some(c => !unlockedCadences.includes(c))
+    fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'exerciseService.js:getExercisesForNode',message:'selected',data:{nodeId,exerciseId:exercise.id,unlockedCadences,markerCadences,hasCadenceNotUnlocked},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
+    // #endregion
+    return exercise
+  } catch (error) {
+    console.error('Erreur lors de la récupération d\'un exercice pour le nœud:', error)
+    return null
   }
 }
 

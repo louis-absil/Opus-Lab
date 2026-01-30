@@ -110,6 +110,64 @@ service cloud.firestore {
       // Écriture : interdite côté client (uniquement via la console Firebase)
       allow create, update, delete: if false;
     }
+    
+    // Collection userProgress
+    match /userProgress/{userId} {
+      // Lecture : uniquement son propre document
+      allow read: if isOwner(userId);
+      
+      // Création : uniquement son propre document avec les champs requis
+      allow create: if isOwner(userId)
+                   && request.resource.data.keys().hasAll(['userId', 'unlockedNodes', 'nodeStats'])
+                   && request.resource.data.userId == request.auth.uid;
+      
+      // Mise à jour : uniquement son propre document
+      allow update: if isOwner(userId)
+                   && request.resource.data.userId == resource.data.userId; // Le userId ne peut pas changer
+      
+      // Suppression : interdite
+      allow delete: if false;
+    }
+    
+    // Collection badges
+    match /badges/{badgeId} {
+      // Lecture : uniquement ses propres badges
+      allow read: if isAuthenticated() 
+                 && resource.data.userId == request.auth.uid;
+      
+      // Création : un utilisateur authentifié peut créer un badge avec son propre userId
+      allow create: if isAuthenticated() 
+                   && request.resource.data.userId == request.auth.uid
+                   && request.resource.data.keys().hasAll(['userId', 'badgeId']);
+      
+      // Mise à jour : uniquement son propre badge
+      allow update: if isAuthenticated() 
+                   && resource.data.userId == request.auth.uid
+                   && request.resource.data.userId == resource.data.userId; // Le userId ne peut pas changer
+      
+      // Suppression : interdite (les badges sont immuables)
+      allow delete: if false;
+    }
+    
+    // Collection objectives
+    match /objectives/{objectiveId} {
+      // Lecture : uniquement ses propres objectifs
+      allow read: if isAuthenticated() 
+                 && resource.data.userId == request.auth.uid;
+      
+      // Création : un utilisateur authentifié peut créer un objectif avec son propre userId
+      allow create: if isAuthenticated() 
+                   && request.resource.data.userId == request.auth.uid
+                   && request.resource.data.keys().hasAll(['userId', 'type', 'title', 'description', 'target', 'current', 'startDate', 'endDate']);
+      
+      // Mise à jour : uniquement son propre objectif
+      allow update: if isAuthenticated() 
+                   && resource.data.userId == request.auth.uid
+                   && request.resource.data.userId == resource.data.userId; // Le userId ne peut pas changer
+      
+      // Suppression : interdite
+      allow delete: if false;
+    }
   }
 }
 

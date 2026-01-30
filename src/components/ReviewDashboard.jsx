@@ -6,6 +6,8 @@ function ReviewDashboard({
   partialCount, 
   totalCount, 
   scorePercentage,
+  cadenceCorrectCount = 0,
+  cadenceTotalCount = 0,
   onReplay, 
   onNext, 
   onBack 
@@ -61,6 +63,11 @@ function ReviewDashboard({
               )}
               {' '}sur <strong>{totalCount}</strong>
             </p>
+            {cadenceTotalCount > 0 && (
+              <p className="review-stats-text review-stats-cadences">
+                <strong>{cadenceCorrectCount}</strong> / <strong>{cadenceTotalCount}</strong> cadence{cadenceTotalCount > 1 ? 's' : ''} correcte{cadenceTotalCount > 1 ? 's' : ''}
+              </p>
+            )}
           </div>
         </div>
 

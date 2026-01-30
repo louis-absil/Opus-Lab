@@ -9,16 +9,24 @@ Opus Lab est une plateforme web d'entraînement pour les musiciens qui souhaiten
 ### 🎹 Pour les professeurs
 - **Éditeur d'exercices** : Créez des exercices à partir de vidéos YouTube
 - **Marquage temporel précis** : Marquez les changements d'accords en temps réel
-- **Sélection d'accords avancée** : Utilisez la notation académique des conservatoires
-- **Gestion d'exercices** : Créez, modifiez et publiez vos exercices
+- **Sélection d'accords avancée** : Notation Riemann / académique des conservatoires (ChordSelectorModal)
+- **Gestion d'exercices** : Créez, modifiez, publiez ; édition des tags (EditTagsModal)
 - **Dashboard complet** : Visualisez et gérez tous vos exercices
+- **Prévisualisation parcours** : Scénarios simulés pour voir le point de vue élève
 
 ### 👨‍🎓 Pour les élèves
+- **Parcours guidé** : Carte de progression par étages (Intuition → Précision → Couleur SD → Chromatisme) avec nœuds d'apprentissage et points de contrôle (cadences)
+- **Mode libre** : Liste d'exercices avec filtres par difficulté, tag, compositeur ; accès par pastilles depuis l'accueil
+- **Tableau de bord** : Onglets Accueil, Parcours, Mode libre, Progression, Profil
+- **Bloc d'apprentissage du jour** : Objectif quotidien et accès rapide au parcours ou au mode libre
+- **Badges et gamification** : Premier Pas, séries (3/7/30 jours), score parfait, 10/50/100 exercices ; tableau des succès
+- **Graphique de progression** : Évolution du score sur les derniers exercices (Recharts)
+- **Objectifs hebdo et stats** : WeeklyObjectives, WeeklyStats, comparaison de périodes, indicateurs de tendance
+- **Suggestions d'exercices** : Recommandations selon le niveau et les objectifs
+- **Code exercice** : Accès par code pour rejoindre un exercice partagé par le professeur
 - **Mode invité** : Accédez aux exercices sans connexion
 - **Player interactif** : Entraînez-vous sur des extraits musicaux réels
-- **Suivi de progression** : Gagnez de l'XP et suivez vos performances
-- **Filtres avancés** : Filtrez par compositeur, difficulté ou type d'accord
-- **Historique des tentatives** : Consultez vos résultats précédents
+- **Historique et détails** : Liste des tentatives, PerformanceDetails, ReviewDashboard
 
 ### 🎯 Fonctionnalités techniques
 - **Intégration YouTube** : Lecture et contrôle de vidéos YouTube
@@ -26,7 +34,9 @@ Opus Lab est une plateforme web d'entraînement pour les musiciens qui souhaiten
 - **Fade in/out automatique** : Transitions sonores fluides
 - **Raccourcis clavier** : Contrôles rapides pour une utilisation efficace
 - **Authentification Google** : Connexion sécurisée via Firebase Auth
-- **Base de données Firestore** : Stockage cloud des exercices et tentatives
+- **Base de données Firestore** : Exercices, tentatives, progression, badges, objectifs ; index et règles à jour
+- **Recharts** : Graphiques de progression et statistiques
+- **Tailwind CSS** : Styles et composants
 
 ## 🛠️ Technologies utilisées
 
@@ -35,6 +45,9 @@ Opus Lab est une plateforme web d'entraînement pour les musiciens qui souhaiten
   - Vite 7.2.4
   - React Router DOM 7.11.0
   - React YouTube 10.1.0
+  - Recharts (graphiques)
+  - Tailwind CSS
+  - Lucide React (icônes)
 
 - **Backend & Services** :
   - Firebase Authentication (Google)
@@ -44,6 +57,7 @@ Opus Lab est une plateforme web d'entraînement pour les musiciens qui souhaiten
 - **Outils de développement** :
   - ESLint
   - Vite (build tool)
+  - PostCSS / Autoprefixer
 
 ## 📋 Prérequis
 
@@ -59,8 +73,8 @@ Opus Lab est une plateforme web d'entraînement pour les musiciens qui souhaiten
 ### 1. Cloner le dépôt
 
 ```bash
-git clone https://github.com/VOTRE_USERNAME/opus-lab.git
-cd opus-lab
+git clone https://github.com/louis-absil/Opus-Lab.git
+cd Opus-Lab
 ```
 
 ### 2. Installer les dépendances
@@ -124,14 +138,14 @@ Le projet est configuré pour être déployé automatiquement sur GitHub Pages.
 
 3. **Le déploiement se fait automatiquement** :
    - Le workflow GitHub Actions se déclenche à chaque push
-   - Votre site sera accessible à : `https://VOTRE_USERNAME.github.io/opus-lab/`
+   - Votre site sera accessible à : `https://louis-absil.github.io/Opus-Lab/`
 
 ### Configuration Firebase pour GitHub Pages
 
 ⚠️ **Important** : Assurez-vous que votre configuration Firebase autorise les requêtes depuis votre domaine GitHub Pages.
 
 1. Dans la console Firebase, allez dans **Authentication** → **Settings** → **Authorized domains**
-2. Ajoutez : `VOTRE_USERNAME.github.io`
+2. Ajoutez : `louis-absil.github.io`
 
 Pour plus de détails, consultez le guide complet : [`GITHUB_PAGES_SETUP.md`](./GITHUB_PAGES_SETUP.md)
 
@@ -140,34 +154,57 @@ Pour plus de détails, consultez le guide complet : [`GITHUB_PAGES_SETUP.md`](./
 ```
 opus-lab/
 ├── public/                 # Fichiers statiques
+├── docs/                   # Documentation design et refonte
 ├── src/
-│   ├── assets/            # Images et ressources
+│   ├── assets/             # Images et ressources
 │   ├── components/         # Composants réutilisables
-│   │   ├── ExerciseSummary.jsx
-│   │   ├── ProfileModal.jsx
-│   │   ├── PromoteToTeacherModal.jsx
-│   │   └── SaveExerciseModal.jsx
-│   ├── contexts/           # Contextes React
-│   │   └── AuthContext.jsx
-│   ├── pages/             # Pages de l'application
-│   │   ├── Dashboard.jsx      # Dashboard professeur
-│   │   ├── Editor.jsx         # Éditeur d'exercices
-│   │   ├── LandingPage.jsx    # Page d'accueil
-│   │   ├── Player.jsx         # Lecteur d'exercices
-│   │   └── StudentDashboard.jsx # Dashboard élève
-│   ├── services/          # Services de données
+│   │   ├── AchievementsDashboard.jsx  # Tableau des succès / badges
+│   │   ├── BadgeSystem.jsx
+│   │   ├── CampaignMap.jsx           # Carte du parcours guidé
+│   │   ├── ChordLabel.jsx, ChordSelectorModal (src/)
+│   │   ├── DailyLearningBlock.jsx    # Bloc d'apprentissage du jour
+│   │   ├── EditTagsModal.jsx
+│   │   ├── ExerciseCard.jsx, ExerciseSummary.jsx
+│   │   ├── ExerciseSuggestions.jsx
+│   │   ├── MilestoneCelebrations.jsx
+│   │   ├── PerformanceDetails.jsx, ProgressChart.jsx
+│   │   ├── PeriodComparison.jsx, TrendIndicators.jsx
+│   │   ├── ProfileModal.jsx, PromoteToTeacherModal.jsx
+│   │   ├── ReviewDashboard.jsx, ReviewDetailPanel.jsx
+│   │   ├── SaveExerciseModal.jsx
+│   │   ├── WeeklyObjectives.jsx, WeeklyStats.jsx
+│   │   └── ...
+│   ├── contexts/          # Contextes React
+│   │   ├── AuthContext.jsx
+│   │   └── NetworkContext.jsx
+│   ├── data/              # Données parcours et références
+│   │   ├── parcoursTree.js
+│   │   ├── parcoursIllustrations.js
+│   │   ├── knownTags.js, pedagogicalTips.js
+│   │   └── ...
+│   ├── pages/
+│   │   ├── Dashboard.jsx       # Dashboard professeur
+│   │   ├── Editor.jsx          # Éditeur d'exercices
+│   │   ├── FreeMode.jsx        # Mode libre (liste + filtres)
+│   │   ├── LandingPage.jsx     # Page d'accueil
+│   │   ├── Player.jsx          # Lecteur d'exercices
+│   │   └── StudentDashboard.jsx # Dashboard élève (parcours, progression, profil)
+│   ├── services/
 │   │   ├── attemptService.js
+│   │   ├── badgeService.js
 │   │   ├── exerciseService.js
+│   │   ├── objectiveService.js
+│   │   ├── progressionService.js
 │   │   └── userService.js
-│   ├── utils/             # Utilitaires
-│   │   └── tagGenerator.js
-│   ├── App.jsx            # Composant principal (ancien)
-│   ├── AppRouter.jsx      # Routeur de l'application
-│   ├── firebase.js        # Configuration Firebase
-│   └── main.jsx           # Point d'entrée
-├── firebase.json          # Configuration Firebase CLI
-├── firestore.rules        # Règles de sécurité Firestore
-└── package.json           # Dépendances et scripts
+│   ├── utils/             # Utilitaires (Riemann, tags, difficulté, etc.)
+│   ├── App.jsx, AppRouter.jsx
+│   ├── firebase.js
+│   └── main.jsx
+├── firebase.json
+├── firestore.rules
+├── firestore.indexes.json
+├── CHANGELOG.md           # Notes de mise à jour
+└── package.json
 ```
 
 ## 🎮 Guide d'utilisation
@@ -197,10 +234,12 @@ opus-lab/
 
 2. **Mode connecté** :
    - Connectez-vous avec votre compte Google
-   - Accédez au Dashboard Élève
-   - Filtrez les exercices par compositeur, difficulté, etc.
-   - Lancez un exercice et entraînez-vous
-   - Consultez vos tentatives et votre progression
+   - Accédez au Dashboard Élève (onglets : Accueil, Parcours, Mode libre, Progression, Profil)
+   - **Parcours** : suivez la carte des étages, débloquez les nœuds et les cadences
+   - **Mode libre** : filtrez par difficulté, tag, compositeur et lancez un exercice
+   - **Progression** : consultez le graphique, l'historique des tentatives et les détails de performance
+   - **Profil** : badges, objectifs hebdo, comparaison de périodes
+   - **Code exercice** : entrez un code partagé par le professeur pour accéder à un exercice
 
 ## ⌨️ Raccourcis clavier
 
@@ -220,8 +259,11 @@ Consultez [`FIRESTORE_SETUP.md`](./FIRESTORE_SETUP.md) pour plus de détails sur
 
 ## 📚 Documentation complémentaire
 
+- [`CHANGELOG.md`](./CHANGELOG.md) : Notes de mise à jour (versions et nouveautés)
 - [`FIRESTORE_SETUP.md`](./FIRESTORE_SETUP.md) : Configuration des règles Firestore
 - [`SETUP_TEACHERS.md`](./SETUP_TEACHERS.md) : Configuration des professeurs autorisés
+- [`GITHUB_PAGES_SETUP.md`](./GITHUB_PAGES_SETUP.md) : Déploiement sur GitHub Pages
+- Dossier [`docs/`](./docs/) : Refonte parcours, design, pastilles
 
 ## 🤝 Contribution
 

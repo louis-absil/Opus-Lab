@@ -1,0 +1,39 @@
+/* Chiffrage baroque : degré + chiffres superposés, tailles cohérentes.
+   Classe racine .baroque-chord-label pour éviter la collision avec
+   StudentDashboard.css .chord-label (font-size/couleur). */
+
+.baroque-chord-label {
+  display: inline-flex;
+  align-items: baseline;
+  font-variant-numeric: normal;
+}
+
+.chord-label-degree {
+  font-size: 1em;
+  line-height: 1;
+}
+
+.chord-label-figure {
+  font-family: inherit;
+  vertical-align: super;
+  position: relative;
+  top: -0.25em;
+  margin-left: 0.15em;
+  line-height: 1;
+}
+
+/* Taille par défaut du chiffrage uniquement dans ChordLabel (pas dans ChordDisplay) */
+.baroque-chord-label .chord-label-figure {
+  font-size: 0.65em;
+}
+
+.chord-label-figure-stacked {
+  display: flex;
+  flex-direction: column;
+  line-height: 0.85;
+  align-items: center;
+}
+
+.chord-label-figure-stacked span {
+  font-size: 1em;
+}

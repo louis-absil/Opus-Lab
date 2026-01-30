@@ -12,34 +12,54 @@ import { db } from '../firebase'
 import { incrementUserXP } from './userService'
 import { validateAnswerWithFunctions } from '../utils/riemannFunctions'
 
+/** Remplace récursivement undefined par null (Firebase n'accepte pas undefined). */
+function sanitizeForFirestore(value) {
+  if (value === undefined) return null
+  if (value === null) return null
+  if (Array.isArray(value)) return value.map(sanitizeForFirestore)
+  if (typeof value === 'object' && value !== null) {
+    const out = {}
+    for (const key of Object.keys(value)) {
+      out[key] = sanitizeForFirestore(value[key])
+    }
+    return out
+  }
+  return value
+}
+
 /**
  * Sauvegarde une tentative d'exercice
+ * @param {Object} options - Options de validation (ex. functionOnlyAvailable pour le mode intuition)
  */
-export async function saveAttempt(userId, exerciseId, userAnswers, correctAnswers, score, exerciseTitle = null) {
+export async function saveAttempt(userId, exerciseId, userAnswers, correctAnswers, score, exerciseTitle = null, options = {}) {
   try {
-    // Calculer le nombre de bonnes réponses pour l'XP
-    // Utiliser validateAnswerWithFunctions pour une comparaison robuste
-    const correctCount = correctAnswers.filter((correct, index) => {
+    // Calculer l'XP par marqueur selon le niveau de validation (réponses partielles = XP partielle)
+    const XP_BY_LEVEL = { 1: 10, 2: 6, 3: 4, 0.5: 5, 0: 0 }
+    let xpGained = 0
+    let correctCount = 0
+    correctAnswers.forEach((correct, index) => {
       const userAnswer = userAnswers[index]
-      if (!userAnswer || !correct) return false
-      // Utiliser validateAnswerWithFunctions pour une validation robuste
+      if (!correct) return
+      if (!userAnswer) return
       const validation = validateAnswerWithFunctions(
         userAnswer,
         correct,
-        userAnswer.selectedFunction || userAnswer.function || null
+        userAnswer.selectedFunction || userAnswer.function || null,
+        { functionOnlyAvailable: options.functionOnlyAvailable }
       )
-      // Niveau 1 = réponse parfaite (correcte)
-      return validation.level === 1
-    }).length
+      const level = validation?.level ?? 0
+      xpGained += XP_BY_LEVEL[level] ?? 0
+      if (level === 1) correctCount += 1
+    })
     
-    // Sauvegarder la tentative
+    // Sauvegarder la tentative (sanitiser : Firebase n'accepte pas undefined)
     const attemptData = {
       userId,
       exerciseId,
-      exerciseTitle, // Titre de l'exercice pour l'affichage
-      userAnswers,
-      correctAnswers, // Sauvegarder les bonnes réponses pour les statistiques
-      score, // Score en pourcentage (0-100)
+      exerciseTitle: exerciseTitle ?? null,
+      userAnswers: sanitizeForFirestore(userAnswers),
+      correctAnswers: sanitizeForFirestore(correctAnswers),
+      score,
       correctCount,
       totalQuestions: correctAnswers.length,
       completedAt: serverTimestamp()
@@ -47,8 +67,7 @@ export async function saveAttempt(userId, exerciseId, userAnswers, correctAnswer
     
     const docRef = await addDoc(collection(db, 'attempts'), attemptData)
     
-    // Incrémenter l'XP : +10 points par bonne réponse
-    const xpGained = correctCount * 10
+    // Incrémenter l'XP (déjà calculée selon level par marqueur)
     if (xpGained > 0) {
       await incrementUserXP(userId, xpGained)
     }

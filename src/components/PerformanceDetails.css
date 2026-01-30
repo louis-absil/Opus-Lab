@@ -50,7 +50,63 @@
   background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
-  padding: 1rem;
+  padding: 0.75rem 1rem;
+}
+
+.performance-stat-item--sub {
+  padding: 0.6rem 0.75rem;
+  margin-left: 1rem;
+  font-size: 0.9375rem;
+}
+
+.performance-stat-item--sub .performance-stat-name {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.performance-degree-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.performance-degree-card {
+  min-width: 0;
+}
+
+.performance-degree-card--clickable {
+  cursor: pointer;
+  border-radius: 8px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.performance-degree-card--clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  background: #f3f4f6;
+}
+
+.performance-degree-card--clickable .performance-stat-item {
+  border-color: transparent;
+}
+
+.performance-degree-by-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-left: 1.25rem;
+}
+
+.performance-degrees-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.performance-cadence-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .performance-stat-header {
@@ -97,6 +153,88 @@
   font-size: 0.875rem;
 }
 
+/* Styles pour les fonctions harmoniques */
+.performance-functions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.performance-function-gauge {
+  background: #ffffff;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.25rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.performance-function-gauge:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.performance-function-gauge-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.performance-function-name {
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.performance-function-percentage {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.performance-function-gauge-bar {
+  height: 12px;
+  background: #e5e7eb;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 0.75rem;
+}
+
+.performance-function-gauge-fill {
+  height: 100%;
+  transition: width 0.5s ease;
+  border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.performance-function-gauge-detail {
+  font-size: 0.8125rem;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+/* Styles améliorés pour les détails des stats */
+.performance-stat-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.performance-stat-breakdown {
+  font-size: 0.8125rem;
+  color: #6b7280;
+}
+
+.performance-stat-average {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  font-style: italic;
+}
+
+@media (max-width: 640px) {
+  .performance-degrees-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 480px) {
   .performance-category-header {
     padding: 0.875rem 1.25rem;
@@ -104,5 +242,13 @@
 
   .performance-category-content {
     padding: 0 1.25rem 1.25rem 1.25rem;
+  }
+
+  .performance-functions-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .performance-stat-item {
+    padding: 0.6rem 0.75rem;
   }
 }

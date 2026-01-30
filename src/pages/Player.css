@@ -31,6 +31,8 @@
 }
 
 .player-video-wrapper {
+  position: relative;
+  z-index: 0;
   width: 100%;
   height: 100%;
   display: flex;
@@ -46,12 +48,41 @@
 }
 
 .player-youtube iframe {
+  position: relative;
+  z-index: 0;
   width: 100%;
   height: 100%;
   aspect-ratio: 16 / 9;
+  /* L’iframe ne reçoit plus les clics : une overlay gère quit + play/pause (évite que la vidéo « vole » le bouton Quitter) */
+  pointer-events: none;
 }
 
-/* Bouton Quitter (Haut à droite) */
+/* Overlay qui reçoit tous les clics sur la zone vidéo (iframe en pointer-events: none) ; zone quit → bouton au-dessus, reste → play/pause */
+.player-video-tap-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 9998;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+/* Conteneur du bouton Quitter (haut à droite de la zone vidéo) - au-dessus de l’overlay et de la timeline */
+.player-video-zone-actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 10000;
+  pointer-events: none;
+}
+
+.player-video-zone-actions .player-quit-btn,
+.player-video-zone-actions .player-onboarding-overlay {
+  pointer-events: auto;
+}
+
+/* Bouton Quitter (Haut à droite) - visible et toujours cliquable */
 .player-quit-btn {
   position: absolute;
   top: 1.5rem;
@@ -60,16 +91,16 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.625rem 1.25rem;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.75);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.35);
   border-radius: 50px;
   color: #ffffff;
   font-size: 0.9375rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  z-index: 30;
+  z-index: 60;
   font-family: inherit;
 }
 
@@ -109,6 +140,10 @@
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 24px;
   max-width: 90%;
+  max-height: min(85vh, 85%);
+  margin: 1rem;
+  box-sizing: border-box;
+  overflow-y: auto;
   animation: fadeIn 0.5s ease-out;
 }
 
@@ -153,7 +188,7 @@
   overflow: visible;
 }
 
-/* Timeline avec cases superposée sur la vidéo */
+/* Timeline avec cases superposée sur la vidéo (au-dessus de l’overlay tap pour rester cliquable) */
 .player-timeline-overlay {
   position: absolute;
   bottom: 0;
@@ -163,10 +198,117 @@
   background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.6) 50%, transparent 100%);
   backdrop-filter: blur(8px);
   pointer-events: none;
-  z-index: 15;
+  z-index: 9999;
   display: flex;
   align-items: flex-end;
   padding: 0 1rem 1rem 1rem;
+}
+
+/* Réserver l'espace au-dessus de la timeline pour les accolades de cadences (mode exercice) */
+.player-timeline-overlay-has-cadences {
+  padding-top: 32px;
+  min-height: 152px;
+}
+
+/* Zone des accolades de cadences au-dessus de la timeline (comme en mode édition prof) */
+.player-timeline-cadence-braces {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 28px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.player-timeline-cadence-brace {
+  position: absolute;
+  top: 0;
+  height: 28px;
+  box-sizing: border-box;
+}
+
+.player-timeline-cadence-brace-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 16px;
+  border: 2px solid rgba(251, 191, 36, 0.5);
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  box-sizing: border-box;
+}
+
+.player-timeline-cadence-brace-label {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(251, 191, 36, 0.2);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #fcd34d;
+  white-space: nowrap;
+  z-index: 5;
+  max-width: 90%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Mode review : accolades dans le conteneur avec padding existant */
+.player-timeline-cadence-braces-review {
+  top: -28px;
+  left: 0;
+  right: 0;
+  height: 28px;
+}
+
+/* Statut cadence sur les accolades (review) : correct = vert, incorrect = rouge/orange */
+.player-timeline-cadence-braces-review .player-cadence-brace-correct .player-timeline-cadence-brace-bar,
+.player-timeline-cadence-braces-review .player-cadence-brace-correct .player-timeline-cadence-brace-label {
+  border-color: rgba(5, 150, 105, 0.5);
+  color: #059669;
+}
+.player-timeline-cadence-braces-review .player-cadence-brace-correct .player-timeline-cadence-brace-bar {
+  background: linear-gradient(180deg, rgba(5, 150, 105, 0.25) 0%, rgba(5, 150, 105, 0.1) 100%);
+}
+.player-timeline-cadence-braces-review .player-cadence-brace-correct .player-timeline-cadence-brace-label {
+  background: rgba(5, 150, 105, 0.2);
+}
+.player-timeline-cadence-braces-review .player-cadence-brace-incorrect .player-timeline-cadence-brace-bar,
+.player-timeline-cadence-braces-review .player-cadence-brace-incorrect .player-timeline-cadence-brace-label {
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #ef4444;
+}
+.player-timeline-cadence-braces-review .player-cadence-brace-incorrect .player-timeline-cadence-brace-bar {
+  background: linear-gradient(180deg, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0.08) 100%);
+}
+.player-timeline-cadence-braces-review .player-cadence-brace-incorrect .player-timeline-cadence-brace-label {
+  background: rgba(239, 68, 68, 0.15);
+}
+
+/* Mode mobile (bandes égales) : accolade de cadence alignée sur les cases (englobe la case cadence + précédente) */
+@media (max-width: 768px) {
+  .player-timeline-equal-width.player-review-timeline .player-timeline-cadence-braces-review {
+    /* Placer l'accolade juste au-dessus des cases (segments ont top: 8px) : barre 14px → top -6 pour que le bas de l'arc soit à 8px */
+    top: -6px;
+    left: 0;
+    right: 0;
+    height: 18px;
+  }
+  .player-timeline-equal-width.player-review-timeline .player-timeline-cadence-brace-bar {
+    height: 14px;
+    border-radius: 6px 6px 0 0;
+  }
+  .player-timeline-equal-width.player-review-timeline .player-timeline-cadence-brace-label {
+    top: 0;
+    font-size: 0.7rem;
+  }
 }
 
 .player-timeline-with-segments {
@@ -237,11 +379,29 @@
   background: rgba(255, 255, 255, 0.05);
 }
 
+/* Corps du segment (jauge + overlay + contenu accord) */
+.player-chord-segment-body {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* Mode bandes égales (mobile) : chaque segment a la même largeur, pas de min-width pour éviter débordement */
+.player-timeline-equal-width .player-chord-segment {
+  min-width: 0;
+}
+
 /* Dernière case : alignement avec la bordure droite */
 .player-chord-segment-last {
   right: 8px;
   /* Ne pas utiliser width, laisser le navigateur calculer automatiquement */
   width: auto !important;
+  /* Permettre à la case de rétrécir sous min-width pour éviter la troncature sur écran réduit */
+  min-width: 0;
   /* La largeur sera calculée automatiquement entre left et right */
   box-sizing: border-box;
 }
@@ -265,23 +425,23 @@
 }
 
 .player-chord-segment-sd {
-  border-color: rgba(245, 158, 11, 0.5);
-  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(139, 92, 246, 0.5);
+  background: rgba(139, 92, 246, 0.1);
 }
 
 .player-chord-segment-sd:hover {
-  border-color: rgba(245, 158, 11, 0.8);
-  background: rgba(245, 158, 11, 0.2);
+  border-color: rgba(139, 92, 246, 0.8);
+  background: rgba(139, 92, 246, 0.2);
 }
 
 .player-chord-segment-d {
-  border-color: rgba(225, 29, 72, 0.5);
-  background: rgba(225, 29, 72, 0.1);
+  border-color: rgba(236, 72, 153, 0.5);
+  background: rgba(236, 72, 153, 0.1);
 }
 
 .player-chord-segment-d:hover {
-  border-color: rgba(225, 29, 72, 0.8);
-  background: rgba(225, 29, 72, 0.2);
+  border-color: rgba(236, 72, 153, 0.8);
+  background: rgba(236, 72, 153, 0.2);
 }
 
 .player-chord-segment-empty {
@@ -301,40 +461,64 @@
 }
 
 .player-chord-segment-answered.player-chord-segment-sd {
-  border-color: rgba(245, 158, 11, 0.8);
-  background: rgba(245, 158, 11, 0.25);
+  border-color: rgba(139, 92, 246, 0.8);
+  background: rgba(139, 92, 246, 0.25);
 }
 
 .player-chord-segment-answered.player-chord-segment-d {
-  border-color: rgba(225, 29, 72, 0.8);
-  background: rgba(225, 29, 72, 0.25);
+  border-color: rgba(236, 72, 153, 0.8);
+  background: rgba(236, 72, 153, 0.25);
 }
 
 /* États de validation */
 .player-chord-segment-correct {
-  border-color: rgba(34, 197, 94, 0.9) !important;
-  background: rgba(34, 197, 94, 0.2) !important;
-  box-shadow: 0 0 24px rgba(34, 197, 94, 0.6), inset 0 0 20px rgba(34, 197, 94, 0.1) !important;
-  animation: chordValidationCorrect 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  border-color: rgba(5, 150, 105, 0.9) !important;
+  background: rgba(5, 150, 105, 0.2) !important;
+  box-shadow: 0 0 24px rgba(5, 150, 105, 0.6), inset 0 0 20px rgba(5, 150, 105, 0.1) !important;
+  animation: chordValidationCorrect 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), correctGlowPulse 2s ease-in-out infinite;
 }
 
+@keyframes correctGlowPulse {
+  0%, 100% {
+    box-shadow: 0 0 24px rgba(5, 150, 105, 0.6), 0 0 40px rgba(5, 150, 105, 0.4), inset 0 0 20px rgba(5, 150, 105, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 32px rgba(5, 150, 105, 0.8), 0 0 56px rgba(5, 150, 105, 0.6), inset 0 0 20px rgba(5, 150, 105, 0.1);
+  }
+}
+
+/* Faux : rouge (code couleur vert / gris / rouge) */
 .player-chord-segment-incorrect {
-  border-color: rgba(239, 68, 68, 0.9) !important;
-  background: rgba(239, 68, 68, 0.2) !important;
-  box-shadow: 0 0 24px rgba(239, 68, 68, 0.6), inset 0 0 20px rgba(239, 68, 68, 0.1) !important;
+  border-color: rgba(220, 38, 38, 0.9) !important;
+  background: rgba(220, 38, 38, 0.2) !important;
+  box-shadow: 0 0 24px rgba(220, 38, 38, 0.6), inset 0 0 20px rgba(220, 38, 38, 0.1) !important;
   animation: chordValidationIncorrect 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+/* Partiellement bon : orange (feedback universel rouge / orange / vert) */
 .player-chord-segment-partial {
-  border-color: rgba(251, 191, 36, 0.9) !important;
-  background: rgba(251, 191, 36, 0.2) !important;
-  box-shadow: 0 0 24px rgba(251, 191, 36, 0.6), inset 0 0 20px rgba(251, 191, 36, 0.1) !important;
+  border-color: rgba(234, 88, 12, 0.9) !important;
+  background: rgba(234, 88, 12, 0.2) !important;
+  box-shadow: 0 0 24px rgba(234, 88, 12, 0.6), inset 0 0 20px rgba(234, 88, 12, 0.1) !important;
   animation: chordValidationPartial 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .player-chord-segment-animated {
   pointer-events: none;
   z-index: 10;
+}
+
+/* Case verrouillée en mode parcours (accord non débloqué) : grisée, non cliquable */
+.player-chord-segment-locked {
+  opacity: 0.5;
+  filter: grayscale(0.7);
+  cursor: not-allowed;
+  pointer-events: auto; /* garder le clic pour pouvoir l'ignorer proprement */
+}
+.player-chord-segment-locked:hover {
+  border-color: inherit !important;
+  background: inherit !important;
+  transform: none;
 }
 
 /* Solution au-dessus de l'accord incorrect */
@@ -393,45 +577,45 @@
 @keyframes chordValidationCorrect {
   0% {
     transform: scale(1);
-    box-shadow: 0 0 0 rgba(34, 197, 94, 0);
+    box-shadow: 0 0 0 rgba(5, 150, 105, 0);
   }
   50% {
     transform: scale(1.08);
-    box-shadow: 0 0 32px rgba(34, 197, 94, 0.8), inset 0 0 30px rgba(34, 197, 94, 0.2);
+    box-shadow: 0 0 40px rgba(5, 150, 105, 0.9), 0 0 60px rgba(5, 150, 105, 0.7), inset 0 0 30px rgba(5, 150, 105, 0.2);
   }
   100% {
     transform: scale(1);
-    box-shadow: 0 0 24px rgba(34, 197, 94, 0.6), inset 0 0 20px rgba(34, 197, 94, 0.1);
+    box-shadow: 0 0 24px rgba(5, 150, 105, 0.6), 0 0 40px rgba(5, 150, 105, 0.4), inset 0 0 20px rgba(5, 150, 105, 0.1);
   }
 }
 
 @keyframes chordValidationIncorrect {
   0% {
     transform: scale(1);
-    box-shadow: 0 0 0 rgba(239, 68, 68, 0);
+    box-shadow: 0 0 0 rgba(220, 38, 38, 0);
   }
   50% {
     transform: scale(1.08);
-    box-shadow: 0 0 32px rgba(239, 68, 68, 0.8), inset 0 0 30px rgba(239, 68, 68, 0.2);
+    box-shadow: 0 0 32px rgba(220, 38, 38, 0.8), inset 0 0 30px rgba(220, 38, 38, 0.2);
   }
   100% {
     transform: scale(1);
-    box-shadow: 0 0 24px rgba(239, 68, 68, 0.6), inset 0 0 20px rgba(239, 68, 68, 0.1);
+    box-shadow: 0 0 24px rgba(220, 38, 38, 0.6), inset 0 0 20px rgba(220, 38, 38, 0.1);
   }
 }
 
 @keyframes chordValidationPartial {
   0% {
     transform: scale(1);
-    box-shadow: 0 0 0 rgba(251, 191, 36, 0);
+    box-shadow: 0 0 0 rgba(234, 88, 12, 0);
   }
   50% {
     transform: scale(1.08);
-    box-shadow: 0 0 32px rgba(251, 191, 36, 0.8), inset 0 0 30px rgba(251, 191, 36, 0.2);
+    box-shadow: 0 0 32px rgba(234, 88, 12, 0.8), inset 0 0 30px rgba(234, 88, 12, 0.2);
   }
   100% {
     transform: scale(1);
-    box-shadow: 0 0 24px rgba(251, 191, 36, 0.6), inset 0 0 20px rgba(251, 191, 36, 0.1);
+    box-shadow: 0 0 24px rgba(234, 88, 12, 0.6), inset 0 0 20px rgba(234, 88, 12, 0.1);
   }
 }
 
@@ -499,11 +683,29 @@
 }
 
 .player-chord-function-sd {
-  color: #fbbf24;
+  color: #a78bfa;
 }
 
 .player-chord-function-d {
-  color: #fb7185;
+  color: #f9a8d4;
+}
+
+/* Mode intuition (review) : T/SD/D en principal, accord complet à côté en petit (pas tronqué) */
+.player-chord-segment-intuition .player-chord-segment-content {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 6px;
+}
+.player-chord-segment-full-hint {
+  font-size: 0.6rem;
+  font-weight: 600;
+  opacity: 0.85;
+  line-height: 1.1;
+  flex-shrink: 0;
+  white-space: nowrap;
+  max-width: none;
 }
 
 .player-chord-label {
@@ -511,6 +713,20 @@
   align-items: baseline;
   gap: 2px;
   font-size: 1.25rem;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.player-chord-label .baroque-chord-label {
+  color: inherit;
+  font-size: inherit;
+}
+
+.player-chord-label .chord-label-degree {
+  font-size: 1.2em;
+}
+
+.player-chord-label .chord-label-figure {
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .player-chord-accidental {
@@ -531,20 +747,18 @@
 }
 
 .player-chord-figure {
-  font-size: 0.6rem;
+  font-size: 0.58em;
   font-family: sans-serif;
   color: rgba(255, 255, 255, 0.7);
-  margin-left: 2px;
   vertical-align: super;
   position: relative;
-  top: -0.3em;
+  top: -0.25em;
 }
 
 .player-chord-figure-stacked {
   display: flex;
   flex-direction: column;
   line-height: 0.85;
-  font-size: 0.9em;
 }
 
 .player-chord-borrowed {
@@ -661,6 +875,8 @@
   .player-onboarding-content {
     padding: 1.5rem;
     border-radius: 20px;
+    max-height: min(80vh, 80%);
+    margin: 0.75rem;
   }
 
   .player-onboarding-content p {
@@ -670,11 +886,14 @@
   .player-timeline-overlay {
     height: 100px;
     padding: 0 0.75rem 0.75rem 0.75rem;
+    overflow-x: auto;
+    overflow-y: hidden;
   }
 
   .player-timeline-with-segments {
     height: 70px;
     padding: 6px;
+    flex-shrink: 0;
   }
 
   .player-chord-segment {
@@ -683,6 +902,7 @@
 
   .player-chord-segment-last {
     right: 6px;
+    min-width: 0; /* priorité sur .player-chord-segment pour éviter la troncature */
   }
 
   .player-chord-label {
@@ -715,6 +935,25 @@
     padding: 0.625rem 1.25rem;
     font-size: 0.9375rem;
   }
+
+  .player-validation-feedback {
+    bottom: 11rem;
+    max-width: 95%;
+    padding: 0.625rem 1rem;
+  }
+  .player-validation-feedback-main {
+    font-size: 0.9rem;
+  }
+  .player-validation-feedback-revelation {
+    font-size: 0.75rem;
+  }
+  .player-segment-tooltip {
+    bottom: 11rem;
+    max-width: 95%;
+    padding: 0.625rem 1rem;
+  }
+  .player-segment-tooltip .player-validation-feedback-main { font-size: 0.9rem; }
+  .player-segment-tooltip .player-validation-feedback-revelation { font-size: 0.75rem; }
 }
 
 @media (max-width: 480px) {
@@ -740,6 +979,8 @@
   .player-onboarding-content {
     padding: 1.25rem;
     border-radius: 16px;
+    max-height: min(75vh, 75%);
+    margin: 0.5rem;
   }
 
   .player-onboarding-content p {
@@ -749,11 +990,14 @@
   .player-timeline-overlay {
     height: 90px;
     padding: 0 0.5rem 0.5rem 0.5rem;
+    overflow-x: auto;
+    overflow-y: hidden;
   }
 
   .player-timeline-with-segments {
     height: 60px;
     padding: 4px;
+    flex-shrink: 0;
   }
 
   .player-chord-segment {
@@ -762,6 +1006,7 @@
 
   .player-chord-segment-last {
     right: 4px;
+    min-width: 0; /* priorité sur .player-chord-segment pour éviter la troncature */
   }
 
   .player-chord-label {
@@ -794,6 +1039,25 @@
     padding: 0.5rem 1rem;
     font-size: 0.875rem;
   }
+
+  .player-validation-feedback {
+    bottom: 12rem;
+    max-width: 95%;
+    padding: 0.5rem 0.875rem;
+  }
+  .player-validation-feedback-main {
+    font-size: 0.875rem;
+  }
+  .player-validation-feedback-revelation {
+    font-size: 0.7rem;
+  }
+  .player-segment-tooltip {
+    bottom: 12rem;
+    max-width: 95%;
+    padding: 0.5rem 0.875rem;
+  }
+  .player-segment-tooltip .player-validation-feedback-main { font-size: 0.875rem; }
+  .player-segment-tooltip .player-validation-feedback-revelation { font-size: 0.7rem; }
 }
 
 /* ============================================
@@ -868,15 +1132,17 @@ body.player-active {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   z-index: 150;
+  overflow: visible;
 }
 
 .player-review-timeline-container {
   max-width: 100%;
   overflow-x: auto;
+  overflow-y: visible;
   position: relative;
-  /* Permettre l'affichage des cadences au-dessus */
-  padding-top: 30px;
-  margin-top: -30px;
+  /* Réserver l'espace pour les accolades de cadences au-dessus de la timeline (comme mode exercice) */
+  padding-top: 36px;
+  margin-top: -36px;
 }
 
 .player-review-timeline {
@@ -888,6 +1154,37 @@ body.player-active {
   border: 1px solid rgba(255, 255, 255, 0.1);
   padding: clamp(4px, 0.5vh, 7px);
   cursor: default;
+  overflow: visible;
+}
+
+/* Desktop : accent sur la timeline de correction (plus haute, segments plus lisibles) */
+@media (min-width: 769px) {
+  .player-review-upper-zone {
+    flex: 0 1 28%;
+    max-height: 280px;
+  }
+  .player-review-timeline {
+    height: clamp(100px, 14vh, 160px);
+  }
+  .player-review-timeline-container {
+    padding-top: 40px;
+    margin-top: -40px;
+  }
+  .player-review-timeline .player-chord-segment .player-chord-degree {
+    font-size: 1.75rem;
+  }
+  .player-review-timeline .player-chord-segment .player-chord-function {
+    font-size: 1.75rem;
+  }
+  .player-review-timeline .player-chord-segment .player-chord-label {
+    font-size: 1.4rem;
+  }
+  .player-review-timeline .player-chord-segment-intuition .player-chord-segment-full-hint {
+    font-size: 0.72rem;
+  }
+  .player-review-timeline .player-chord-segment {
+    min-width: 72px;
+  }
 }
 
 .player-review-segment {
@@ -905,6 +1202,26 @@ body.player-active {
   box-shadow: 0 0 24px rgba(255, 255, 255, 0.6), 0 0 48px rgba(255, 255, 255, 0.3) !important;
   z-index: 25 !important;
   animation: segmentPulse 2s ease-in-out infinite;
+}
+
+/* Accord « donné » (pas à remplir) : bonne réponse affichée en grisé dans la timeline corrigée */
+.player-chord-segment-given .player-chord-segment-content {
+  opacity: 0.7;
+}
+.player-chord-segment-given .player-chord-function,
+.player-chord-segment-given .player-chord-label,
+.player-chord-segment-given .player-chord-label .baroque-chord-label,
+.player-chord-segment-given .player-chord-degree,
+.player-chord-segment-given .player-chord-accidental,
+.player-chord-segment-given .player-chord-quality,
+.player-chord-segment-given .player-chord-figure,
+.player-chord-segment-given .chord-label-figure,
+.player-chord-segment-given .player-chord-borrowed {
+  color: rgba(161, 161, 170, 0.95) !important;
+}
+.player-chord-segment-given {
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  background: rgba(63, 63, 70, 0.4) !important;
 }
 
 @keyframes segmentPulse {
@@ -996,4 +1313,73 @@ body.player-active {
     width: 20px;
     height: 20px;
   }
+}
+
+/* Double correction : feedback + révélation accord précis */
+.player-validation-feedback {
+  position: fixed;
+  bottom: 5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 90%;
+  padding: 0.75rem 1.25rem;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(12px);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  z-index: 100;
+  text-align: center;
+  animation: player-feedback-in 0.3s ease;
+}
+@keyframes player-feedback-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+/* Code couleur feedback : vert = juste, orange = partiel, rouge = faux */
+.player-validation-feedback-main {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.player-validation-feedback--level-1 .player-validation-feedback-main { color: #86efac; }
+.player-validation-feedback--level-0\.5 .player-validation-feedback-main { color: #f97316; }
+.player-validation-feedback--level-2 .player-validation-feedback-main,
+.player-validation-feedback--level-3 .player-validation-feedback-main { color: #f97316; }
+.player-validation-feedback--level-0 .player-validation-feedback-main { color: #f87171; }
+.player-validation-feedback-revelation {
+  margin: 0.35rem 0 0 0;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Tooltip au tap sur un segment (accord + feedback, lisible sur mobile) */
+.player-segment-tooltip {
+  position: fixed;
+  bottom: 5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 90%;
+  padding: 0.75rem 1.25rem;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(12px);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  z-index: 101;
+  text-align: center;
+  animation: player-feedback-in 0.3s ease;
+}
+.player-segment-tooltip .player-validation-feedback-main {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.player-segment-tooltip.player-validation-feedback--level-1 .player-validation-feedback-main { color: #86efac; }
+.player-segment-tooltip.player-validation-feedback--level-0\.5 .player-validation-feedback-main { color: #f97316; }
+.player-segment-tooltip.player-validation-feedback--level-2 .player-validation-feedback-main,
+.player-segment-tooltip.player-validation-feedback--level-3 .player-validation-feedback-main { color: #f97316; }
+.player-segment-tooltip.player-validation-feedback--level-0 .player-validation-feedback-main { color: #f87171; }
+.player-segment-tooltip .player-validation-feedback-revelation {
+  margin: 0.35rem 0 0 0;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.7);
 }

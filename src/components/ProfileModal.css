@@ -126,8 +126,16 @@
 
 .profile-xp {
   margin: 0.25rem 0 0 0;
-  color: #fbbf24;
+  color: #6b7280;
+  font-size: 0.9375rem;
+}
+.profile-level-title {
   font-weight: 600;
+  color: #111827;
+}
+.profile-xp-value {
+  color: #6b7280;
+  font-weight: 500;
   font-size: 1rem;
 }
 
@@ -176,8 +184,8 @@
 
 .degree-stats-list,
 .cadence-stats-list {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 1rem;
 }
 
@@ -186,7 +194,7 @@
   background: #2a2a2a;
   border: 1px solid #3a3a3a;
   border-radius: 8px;
-  padding: 1rem;
+  padding: 0.75rem 1rem;
 }
 
 .degree-stat-header,
@@ -231,6 +239,55 @@
 .cadence-stat-detail {
   font-size: 0.85rem;
   color: #b0b0b0;
+}
+
+.degree-stat-item--sub {
+  padding: 0.75rem 1rem;
+  margin-left: 1.5rem;
+}
+
+.degree-stat-item--sub .degree-name {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.profile-degree-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.profile-degree-card {
+  min-width: 0;
+}
+
+.profile-degree-card--clickable {
+  cursor: pointer;
+  border-radius: 8px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.profile-degree-card--clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  background: #333;
+}
+
+.profile-degree-card--clickable .degree-stat-item {
+  border-color: transparent;
+}
+
+.profile-degree-by-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-left: 1.25rem;
+}
+
+.profile-cadence-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .composer-stats-list {
@@ -295,6 +352,11 @@
   }
 
   .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .degree-stats-list,
+  .cadence-stats-list {
     grid-template-columns: 1fr;
   }
 }

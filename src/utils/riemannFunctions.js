@@ -44,14 +44,14 @@ export const FUNCTION_COLORS = {
     glow: 'rgba(59, 130, 246, 0.4)'
   },
   SD: {
-    primary: '#f59e0b',   // Orange
-    secondary: '#fbbf24',
-    glow: 'rgba(245, 158, 11, 0.4)'
+    primary: '#8b5cf6',   // Violet
+    secondary: '#a78bfa',
+    glow: 'rgba(139, 92, 246, 0.4)'
   },
   D: {
-    primary: '#ef4444',  // Rouge
-    secondary: '#f87171',
-    glow: 'rgba(239, 68, 68, 0.4)'
+    primary: '#ec4899',   // Rose vif (pink-500, distinct du rouge)
+    secondary: '#f9a8d4',
+    glow: 'rgba(236, 72, 153, 0.4)'
   }
 }
 
@@ -62,6 +62,24 @@ export const FUNCTION_COLORS = {
  */
 export function getFunctionFromDegree(degree) {
   return DEGREE_TO_FUNCTIONS[degree] || []
+}
+
+/**
+ * Fonctions effectives pour un accord (Cad64 = D)
+ * @param {Object} chord - Accord avec degree, figure, selectedFunction
+ * @returns {string[]} - Fonctions à utiliser pour la validation
+ */
+function getEffectiveFunctionsForChord(chord) {
+  if (!chord) return []
+  if (chord.selectedFunction) return [chord.selectedFunction]
+  const degree = normalizeDegree(chord)
+  const fig = normalizeFigure(chord.figure)
+  // I64 dépendant du contexte : V64 (passage) et cad64 (cadence) → D ; I64 (avancé) → T
+  if (degree === 'I' && fig === '64') {
+    if (chord.sixFourVariant === 'passing' || chord.sixFourVariant === 'cadential') return ['D']
+    return ['T'] // I64 harmonies avancées = tonique
+  }
+  return getFunctionFromDegree(degree)
 }
 
 /**
@@ -129,7 +147,8 @@ function normalizeFigure(figure) {
  * @param {string} cadence - La cadence à normaliser
  * @returns {string|null} - Cadence normalisée ou null
  */
-function normalizeCadence(cadence) {
+/** Normalise une cadence pour la comparaison ; exporté pour usage dans Player (QCM cadence bonus). */
+export function normalizeCadence(cadence) {
   if (!cadence) return null
   const normalized = cadence.toString().trim().toLowerCase()
   
@@ -155,9 +174,12 @@ function normalizeCadence(cadence) {
  * @param {Object} userAnswer - Réponse de l'utilisateur { degree, root, displayLabel, figure, cadence, ... }
  * @param {Object} correctAnswer - Solution correcte { degree, root, displayLabel, figure, cadence, ... }
  * @param {string} selectedFunction - Fonction sélectionnée par l'utilisateur (optionnel)
+ * @param {Object} options - Options de validation (optionnel)
+ * @param {boolean} options.functionOnlyAvailable - Si true (ex. mode intuition), une bonne fonction seule compte comme entièrement correcte
  * @returns {Object} - { level: 1|2|3, score: 0-100, cadenceBonus: 0-10, feedback: string }
  */
-export function validateAnswerWithFunctions(userAnswer, correctAnswer, selectedFunction = null) {
+export function validateAnswerWithFunctions(userAnswer, correctAnswer, selectedFunction = null, options = {}) {
+  const functionOnlyAvailable = options.functionOnlyAvailable === true
   if (!userAnswer || !correctAnswer) {
     return {
       level: 0,
@@ -182,6 +204,14 @@ export function validateAnswerWithFunctions(userAnswer, correctAnswer, selectedF
   }
   // Pas de pénalité si l'utilisateur n'a pas mis de cadence ou si aucune cadence n'est attendue
 
+  // Suffixe de feedback pour la cadence quand une cadence est attendue
+  let cadenceFeedbackSuffix = ''
+  if (correctCadence) {
+    if (cadenceBonus === 10) cadenceFeedbackSuffix = ' Cadence correcte.'
+    else if (userCadence) cadenceFeedbackSuffix = ' Cadence incorrecte.'
+    else cadenceFeedbackSuffix = ' Cadence manquante.'
+  }
+
   // Si on a les degrés normalisés, comparer directement
   if (userRoot && correctRoot) {
     // Vérifier aussi le chiffrage (figure) pour une validation complète
@@ -189,41 +219,62 @@ export function validateAnswerWithFunctions(userAnswer, correctAnswer, selectedF
     const userFigure = normalizeFigure(userAnswer.figure)
     const correctFigure = normalizeFigure(correctAnswer.figure)
     
-    // Niveau 1 : Réponse parfaite (même degré + même chiffrage)
-    if (userRoot === correctRoot && userFigure === correctFigure) {
+    // Pour I64 : comparer aussi sixFourVariant (passing / cadential / null)
+    const isI64User = userRoot === 'I' && userFigure === '64'
+    const isI64Correct = correctRoot === 'I' && correctFigure === '64'
+    const userVariant = userAnswer.sixFourVariant ?? null
+    const correctVariant = correctAnswer.sixFourVariant ?? null
+    const same64Variant = !isI64User || !isI64Correct || userVariant === correctVariant
+
+    // Niveau 1 : Réponse parfaite (même degré + même chiffrage + même variante 64 si I64)
+    if (userRoot === correctRoot && userFigure === correctFigure && same64Variant) {
       return {
         level: 1,
         score: 100,
         cadenceBonus: cadenceBonus,
-        feedback: cadenceBonus > 0 ? 'Parfait ! + Bonus cadence' : 'Parfait !'
+        feedback: (cadenceBonus > 0 ? 'Parfait ! + Bonus cadence' : 'Parfait !') + cadenceFeedbackSuffix
       }
     }
   }
 
   // Si l'utilisateur a sélectionné uniquement une fonction (sans degré spécifique)
   if (selectedFunction && !userRoot) {
-    // Vérifier que correctRoot est bien défini (normalisé)
-    if (correctRoot) {
-      const correctFunctions = getFunctionFromDegree(correctRoot)
-      if (correctFunctions.includes(selectedFunction)) {
+    const correctFunctions = getEffectiveFunctionsForChord(correctAnswer)
+    if (correctFunctions.length > 0 && correctFunctions.includes(selectedFunction)) {
+      // Mode intuition / fonction seule disponible : bonne fonction = entièrement correct
+      if (functionOnlyAvailable) {
         return {
-          level: 3,
-          score: 30,
+          level: 1,
+          score: 100,
           cadenceBonus: cadenceBonus,
-          feedback: `Bonne fonction (${selectedFunction === 'T' ? 'Tonique' : selectedFunction === 'SD' ? 'Sous-Dominante' : 'Dominante'}) ! Mais essayez de trouver le degré exact.`
+          feedback: (cadenceBonus > 0 ? 'Parfait ! + Bonus cadence' : 'Parfait !') + cadenceFeedbackSuffix
         }
       }
+      return {
+        level: 3,
+        score: 30,
+        cadenceBonus: cadenceBonus,
+        feedback: `Bonne fonction (${selectedFunction === 'T' ? 'Tonique' : selectedFunction === 'SD' ? 'Sous-Dominante' : 'Dominante'}) ! Mais essayez de trouver le degré exact.` + cadenceFeedbackSuffix
+      }
     }
-    // Si correctRoot n'est pas disponible mais que correctAnswer a une fonction sélectionnée
+    // Si correctAnswer a une fonction sélectionnée
     // (cas où l'exercice a été créé avec seulement une fonction)
     if (correctAnswer.selectedFunction || correctAnswer.function) {
       const correctFunction = correctAnswer.selectedFunction || correctAnswer.function
       if (correctFunction === selectedFunction) {
+        if (functionOnlyAvailable) {
+          return {
+            level: 1,
+            score: 100,
+            cadenceBonus: cadenceBonus,
+            feedback: (cadenceBonus > 0 ? 'Parfait ! + Bonus cadence' : 'Parfait !') + cadenceFeedbackSuffix
+          }
+        }
         return {
           level: 3,
           score: 30,
           cadenceBonus: cadenceBonus,
-          feedback: `Bonne fonction (${selectedFunction === 'T' ? 'Tonique' : selectedFunction === 'SD' ? 'Sous-Dominante' : 'Dominante'}) ! Mais essayez de trouver le degré exact.`
+          feedback: `Bonne fonction (${selectedFunction === 'T' ? 'Tonique' : selectedFunction === 'SD' ? 'Sous-Dominante' : 'Dominante'}) ! Mais essayez de trouver le degré exact.` + cadenceFeedbackSuffix
         }
       }
     }
@@ -232,7 +283,7 @@ export function validateAnswerWithFunctions(userAnswer, correctAnswer, selectedF
   // Si l'utilisateur a sélectionné une fonction ET un degré
   if (selectedFunction && userRoot) {
     const userFunctions = getFunctionFromDegree(userRoot)
-    const correctFunctions = getFunctionFromDegree(correctRoot)
+    const correctFunctions = getEffectiveFunctionsForChord(correctAnswer)
     
     // Vérifier si la fonction sélectionnée correspond à la solution
     if (correctFunctions.includes(selectedFunction)) {
@@ -242,7 +293,7 @@ export function validateAnswerWithFunctions(userAnswer, correctAnswer, selectedF
           level: 1,
           score: 100,
           cadenceBonus: cadenceBonus,
-          feedback: cadenceBonus > 0 ? 'Parfait ! + Bonus cadence' : 'Parfait !'
+          feedback: (cadenceBonus > 0 ? 'Parfait ! + Bonus cadence' : 'Parfait !') + cadenceFeedbackSuffix
         }
       }
       // Si la fonction est correcte mais pas le degré
@@ -251,51 +302,51 @@ export function validateAnswerWithFunctions(userAnswer, correctAnswer, selectedF
           level: 2,
           score: 65,
           cadenceBonus: cadenceBonus,
-          feedback: `Presque ! C'est la bonne fonction (${selectedFunction === 'T' ? 'Tonique' : selectedFunction === 'SD' ? 'Sous-Dominante' : 'Dominante'}), mais pas le bon degré.`
+          feedback: `Presque ! C'est la bonne fonction (${selectedFunction === 'T' ? 'Tonique' : selectedFunction === 'SD' ? 'Sous-Dominante' : 'Dominante'}), mais pas le bon degré.` + cadenceFeedbackSuffix
         }
       }
     }
   }
 
-  // Niveau 2 : Même degré mais chiffrage différent (crédit partiel)
+  // Niveau 2 : Même degré mais chiffrage ou variante 64 différent (crédit partiel)
   if (userRoot && correctRoot && userRoot === correctRoot) {
     const userFigure = normalizeFigure(userAnswer.figure)
     const correctFigure = normalizeFigure(correctAnswer.figure)
-    if (userFigure !== correctFigure) {
+    const isI64Both = userRoot === 'I' && userFigure === '64' && correctFigure === '64'
+    const userVariant = userAnswer.sixFourVariant ?? null
+    const correctVariant = correctAnswer.sixFourVariant ?? null
+    const variantDiff = isI64Both && userVariant !== correctVariant
+    if (userFigure !== correctFigure || variantDiff) {
       return {
         level: 2,
-        score: 80,
+        score: variantDiff ? 80 : 80,
         cadenceBonus: cadenceBonus,
-        feedback: 'Bon degré ! Mais le chiffrage est différent.'
+        feedback: (variantDiff ? 'Bon degré et chiffrage 6/4, mais le contexte (passage / cadence / I64) est différent.' : 'Bon degré ! Mais le chiffrage est différent.') + cadenceFeedbackSuffix
       }
     }
   }
 
   // Niveau 2 : Substitution fonctionnelle (même fonction, degré différent)
-  // Mais seulement si l'un est le principal et l'autre le parallèle de la même fonction
-  if (userRoot && correctRoot && areDegreesInSameFunction(userRoot, correctRoot)) {
-    // Vérifier si les degrés sont dans une relation principal/parallèle
-    let isPrincipalParallel = false
-    
-    // Pour chaque fonction partagée, vérifier si l'un est principal et l'autre parallèle
+  if (userRoot && correctRoot) {
     const userFunctions = getFunctionFromDegree(userRoot)
-    const correctFunctions = getFunctionFromDegree(correctRoot)
-    
-    for (const func of userFunctions) {
-      if (correctFunctions.includes(func)) {
-        const userIsPrimary = PRIMARY_DEGREES[func]?.includes(userRoot)
-        const userIsParallel = PARALLEL_DEGREES[func]?.includes(userRoot)
-        const correctIsPrimary = PRIMARY_DEGREES[func]?.includes(correctRoot)
-        const correctIsParallel = PARALLEL_DEGREES[func]?.includes(correctRoot)
-        
-        // Si l'un est principal et l'autre parallèle de la même fonction
-        if ((userIsPrimary && correctIsParallel) || (userIsParallel && correctIsPrimary)) {
-          isPrincipalParallel = true
-          break
+    const correctFunctions = getEffectiveFunctionsForChord(correctAnswer)
+    const shareFunction = userFunctions.some((f) => correctFunctions.includes(f))
+    let isPrincipalParallel = false
+    if (shareFunction) {
+      for (const func of userFunctions) {
+        if (correctFunctions.includes(func)) {
+          const userIsPrimary = PRIMARY_DEGREES[func]?.includes(userRoot)
+          const userIsParallel = PARALLEL_DEGREES[func]?.includes(userRoot)
+          const correctIsPrimary = PRIMARY_DEGREES[func]?.includes(correctRoot)
+          const correctIsParallel = PARALLEL_DEGREES[func]?.includes(correctRoot)
+          if ((userIsPrimary && correctIsParallel) || (userIsParallel && correctIsPrimary)) {
+            isPrincipalParallel = true
+            break
+          }
         }
       }
     }
-    
+
     // Ne considérer comme partiellement juste que si c'est une relation principal/parallèle
     // Sinon, c'est faux (ex: V vs III où III peut être Tp ou Dp mais pas spécifiquement Dp)
     if (isPrincipalParallel) {
@@ -303,7 +354,7 @@ export function validateAnswerWithFunctions(userAnswer, correctAnswer, selectedF
         level: 2,
         score: 65,
         cadenceBonus: cadenceBonus,
-        feedback: 'Bonne fonction, mais essayez de trouver le degré exact.'
+        feedback: 'Bonne fonction, mais essayez de trouver le degré exact.' + cadenceFeedbackSuffix
       }
     }
   }
@@ -313,7 +364,7 @@ export function validateAnswerWithFunctions(userAnswer, correctAnswer, selectedF
     level: 0,
     score: 0,
     cadenceBonus: cadenceBonus,
-    feedback: 'Incorrect. Essayez encore !'
+    feedback: 'Incorrect. Essayez encore !' + cadenceFeedbackSuffix
   }
 }
 

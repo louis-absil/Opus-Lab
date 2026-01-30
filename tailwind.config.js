@@ -10,6 +10,7 @@ export default {
     extend: {
       fontFamily: {
         serif: ['Times New Roman', 'Georgia', 'serif'],
+        chord: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
       },
       keyframes: {
         fadeIn: {

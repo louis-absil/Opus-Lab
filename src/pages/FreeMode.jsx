@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { searchPublicExercises } from '../services/exerciseService'
+import { searchPublicExercises, getLatestPublicExercises } from '../services/exerciseService'
 import { formatTagForDisplay } from '../utils/tagFormatter'
+import ExerciseCard from '../components/ExerciseCard'
 import './FreeMode.css'
 
-function FreeMode() {
+function FreeMode({ initialFilter = null, onInitialFilterConsumed }) {
   const navigate = useNavigate()
   
   // États de recherche et filtres
@@ -37,7 +38,8 @@ function FreeMode() {
   const [genres, setGenres] = useState([])
   const [loading, setLoading] = useState(true)
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false)
-  
+  const [latestExercises, setLatestExercises] = useState([])
+
   // Debounce pour la recherche textuelle
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -50,11 +52,39 @@ function FreeMode() {
   useEffect(() => {
     loadAllExercises()
   }, [])
+
+  // Charger les derniers exercices ajoutés (section en haut des résultats)
+  useEffect(() => {
+    let cancelled = false
+    getLatestPublicExercises(8)
+      .then((data) => {
+        if (!cancelled) setLatestExercises(data)
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          console.error('Erreur chargement derniers exercices (Mode Libre):', err)
+          setLatestExercises([])
+        }
+      })
+    return () => { cancelled = true }
+  }, [])
   
   // Filtrer les exercices quand les filtres changent
   useEffect(() => {
     filterExercises()
   }, [debouncedSearchText, selectedComposer, selectedDifficulty, selectedTags, selectedGenre, exercises])
+
+  // Appliquer le filtre initial (clic pastille depuis le dashboard élève)
+  useEffect(() => {
+    if (!initialFilter || !onInitialFilterConsumed) return
+    if (initialFilter.difficulty) {
+      setSelectedDifficulty(initialFilter.difficulty)
+    }
+    if (initialFilter.tag) {
+      setSelectedTags([initialFilter.tag])
+    }
+    onInitialFilterConsumed()
+  }, [initialFilter, onInitialFilterConsumed])
   
   const loadAllExercises = async () => {
     try {
@@ -252,17 +282,33 @@ function FreeMode() {
     setSelectedGenre('')
   }
   
-  const getYouTubeThumbnail = (videoId) => {
-    if (!videoId) return null
-    const id = videoId.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1] || videoId
-    return `https://img.youtube.com/vi/${id}/mqdefault.jpg`
-  }
-  
   const handleExerciseClick = (exerciseId) => {
     navigate(`/play/${exerciseId}`)
   }
   
   const difficulties = ['débutant', 'intermédiaire', 'avancé', 'expert']
+
+  // Pastilles "notion" pour accès rapide (alignées sur les cartes exercice)
+  const notionQuickFilters = useMemo(() => {
+    const items = []
+    if (tagCategories.cadences?.[0]) items.push({ label: 'Cadences', tag: tagCategories.cadences[0] })
+    if (tagCategories.renversements?.[0]) items.push({ label: 'Renversements', tag: tagCategories.renversements[0] })
+    const septieme = tagCategories.extensions?.find((t) => /septième|septieme/i.test(t))
+    if (septieme) items.push({ label: '7e', tag: septieme })
+    if (tagCategories.qualites?.[0]) items.push({ label: 'Couleurs', tag: tagCategories.qualites[0] })
+    if (tagCategories.structure?.[0]) items.push({ label: 'Structure', tag: tagCategories.structure[0] })
+    ;['Baroque', 'Classique', 'Romantique', 'Moderne'].forEach((s) => {
+      const t = tagCategories.styles?.find((st) => st.toLowerCase() === s.toLowerCase())
+      if (t) items.push({ label: s, tag: t })
+    })
+    return items
+  }, [tagCategories])
+
+  const applyNotionQuickFilter = (tag) => {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    )
+  }
   
   return (
     <div className="free-mode-container">
@@ -320,50 +366,97 @@ function FreeMode() {
               </button>
             )}
           </div>
-          
-          {/* Filtre Compositeur */}
-          <div className="free-mode-filter-group">
-            <label className="free-mode-filter-label">Compositeur</label>
-            <div className="free-mode-chips-container">
-              <button
-                className={`free-mode-chip ${selectedComposer === '' ? 'free-mode-chip-active' : ''}`}
-                onClick={() => setSelectedComposer('')}
-              >
-                Tous
-              </button>
-              {composers.slice(0, 10).map(composer => (
+
+          {/* Bloc Accès rapide : niveau + pastilles (notions) */}
+          <div className="free-mode-filter-block free-mode-filter-block-quick">
+            <h4 className="free-mode-filter-block-title">Accès rapide</h4>
+            <div className="free-mode-filter-group">
+              <label className="free-mode-filter-label">Niveau</label>
+              <div className="free-mode-difficulty-cards">
+                {difficulties.map(diff => (
+                  <button
+                    key={diff}
+                    className={`free-mode-difficulty-card ${selectedDifficulty === diff ? 'free-mode-difficulty-card-active' : ''}`}
+                    onClick={() => setSelectedDifficulty(selectedDifficulty === diff ? '' : diff)}
+                  >
+                    <span className="free-mode-difficulty-icon">
+                      {diff === 'débutant' && '🌱'}
+                      {diff === 'intermédiaire' && '⭐'}
+                      {diff === 'avancé' && '🔥'}
+                      {diff === 'expert' && '💎'}
+                    </span>
+                    <span className="free-mode-difficulty-label">{diff}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            {notionQuickFilters.length > 0 && (
+              <div className="free-mode-filter-group">
+                <label className="free-mode-filter-label">Filtrer par notion</label>
+                <div className="free-mode-notion-chips">
+                  {notionQuickFilters.map(({ label, tag }) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      className={`free-mode-notion-chip ${selectedTags.includes(tag) ? 'free-mode-notion-chip-active' : ''}`}
+                      onClick={() => applyNotionQuickFilter(tag)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Bloc Affiner : compositeur, genre */}
+          <div className="free-mode-filter-block">
+            <h4 className="free-mode-filter-block-title">Affiner</h4>
+            <div className="free-mode-filter-group">
+              <label className="free-mode-filter-label">Compositeur</label>
+              <div className="free-mode-chips-container">
                 <button
-                  key={composer}
-                  className={`free-mode-chip ${selectedComposer === composer ? 'free-mode-chip-active' : ''}`}
-                  onClick={() => setSelectedComposer(composer)}
+                  className={`free-mode-chip ${selectedComposer === '' ? 'free-mode-chip-active' : ''}`}
+                  onClick={() => setSelectedComposer('')}
                 >
-                  {composer}
+                  Tous
                 </button>
-              ))}
+                {composers.slice(0, 10).map(composer => (
+                  <button
+                    key={composer}
+                    className={`free-mode-chip ${selectedComposer === composer ? 'free-mode-chip-active' : ''}`}
+                    onClick={() => setSelectedComposer(composer)}
+                  >
+                    {composer}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="free-mode-filter-group">
+              <label className="free-mode-filter-label">Genre</label>
+              <div className="free-mode-chips-container">
+                <button
+                  className={`free-mode-chip ${selectedGenre === '' ? 'free-mode-chip-active' : ''}`}
+                  onClick={() => setSelectedGenre('')}
+                >
+                  Tous
+                </button>
+                {genres.map(genre => (
+                  <button
+                    key={genre}
+                    className={`free-mode-chip ${selectedGenre === genre ? 'free-mode-chip-active' : ''}`}
+                    onClick={() => setSelectedGenre(genre)}
+                  >
+                    {genre}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-          
-          {/* Filtre Difficulté */}
-          <div className="free-mode-filter-group">
-            <label className="free-mode-filter-label">Difficulté</label>
-            <div className="free-mode-difficulty-cards">
-              {difficulties.map(diff => (
-                <button
-                  key={diff}
-                  className={`free-mode-difficulty-card ${selectedDifficulty === diff ? 'free-mode-difficulty-card-active' : ''}`}
-                  onClick={() => setSelectedDifficulty(selectedDifficulty === diff ? '' : diff)}
-                >
-                  <span className="free-mode-difficulty-icon">
-                    {diff === 'débutant' && '🌱'}
-                    {diff === 'intermédiaire' && '⭐'}
-                    {diff === 'avancé' && '🔥'}
-                    {diff === 'expert' && '💎'}
-                  </span>
-                  <span className="free-mode-difficulty-label">{diff}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+
+          {/* Bloc Détails techniques : tags par catégorie */}
+          <div className="free-mode-filter-block free-mode-filter-block-details">
+            <h4 className="free-mode-filter-block-title">Détails techniques</h4>
           
           {/* Section Harmonie - Structure des accords */}
           {(tagCategories.renversements.length > 0 || tagCategories.extensions.length > 0 || tagCategories.qualites.length > 0) && (
@@ -637,32 +730,36 @@ function FreeMode() {
               </div>
             </div>
           )}
-          
-          {/* Filtre Genre */}
-          <div className="free-mode-filter-group">
-            <label className="free-mode-filter-label">Genre</label>
-            <div className="free-mode-chips-container">
-              <button
-                className={`free-mode-chip ${selectedGenre === '' ? 'free-mode-chip-active' : ''}`}
-                onClick={() => setSelectedGenre('')}
-              >
-                Tous
-              </button>
-              {genres.map(genre => (
-                <button
-                  key={genre}
-                  className={`free-mode-chip ${selectedGenre === genre ? 'free-mode-chip-active' : ''}`}
-                  onClick={() => setSelectedGenre(genre)}
-                >
-                  {genre}
-                </button>
-              ))}
-            </div>
           </div>
         </aside>
         
         {/* Zone de résultats */}
         <div className="free-mode-results">
+          {/* Section Derniers exercices : toujours affichée pour éviter que le layout ne saute au clic sur un filtre */}
+          {latestExercises.length > 0 && (
+            <div className="free-mode-latest-section">
+              <h3 className="free-mode-latest-title">Derniers exercices ajoutés</h3>
+              {!selectedComposer && !selectedDifficulty && selectedTags.length === 0 && !selectedGenre && !debouncedSearchText ? (
+                <div className="free-mode-latest-grid">
+                  {latestExercises.map((exercise) => (
+                    <ExerciseCard
+                      key={exercise.id}
+                      exercise={exercise}
+                      onClick={(id) => handleExerciseClick(id)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="free-mode-latest-placeholder">
+                  <p>Les filtres masquent les exercices récents.</p>
+                  <button type="button" className="free-mode-latest-placeholder-btn" onClick={clearAllFilters}>
+                    Réinitialiser pour les afficher
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {loading ? (
             <div className="free-mode-loading">
               <div className="spinner"></div>
@@ -689,90 +786,13 @@ function FreeMode() {
                 </p>
               </div>
               <div className="free-mode-grid">
-                {filteredExercises.map((exercise) => {
-                  const videoId = exercise.video?.id
-                  const thumbnailUrl = getYouTubeThumbnail(videoId)
-                  
-                  return (
-                    <div
-                      key={exercise.id}
-                      className="dashboard-card"
-                      onClick={() => handleExerciseClick(exercise.id)}
-                    >
-                      {/* Miniature vidéo */}
-                      <div className="dashboard-card-thumbnail">
-                        {thumbnailUrl ? (
-                          <img
-                            src={thumbnailUrl}
-                            alt={exercise.metadata?.workTitle || exercise.video?.title || 'Vidéo'}
-                            className="dashboard-card-thumbnail-img"
-                            onError={(e) => {
-                              e.target.style.display = 'none'
-                              if (e.target.nextElementSibling) {
-                                e.target.nextElementSibling.style.display = 'flex'
-                              }
-                            }}
-                          />
-                        ) : null}
-                        <div
-                          className="dashboard-card-thumbnail-placeholder"
-                          style={{ display: thumbnailUrl ? 'none' : 'flex' }}
-                        >
-                          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                            <path d="M9 18V5l12-2v13"></path>
-                            <circle cx="6" cy="18" r="3"></circle>
-                            <circle cx="18" cy="16" r="3"></circle>
-                          </svg>
-                        </div>
-                      </div>
-                      
-                      {/* Contenu de la carte */}
-                      <div className="dashboard-card-body">
-                        <h3 className="dashboard-card-title">
-                          {exercise.metadata?.workTitle || exercise.metadata?.exerciseTitle || exercise.metadata?.title || 'Sans titre'}
-                        </h3>
-                        
-                        {exercise.metadata?.composer && (
-                          <p className="dashboard-card-composer">
-                            {exercise.metadata.composer}
-                          </p>
-                        )}
-                        
-                        {/* Tags */}
-                        {exercise.autoTags && exercise.autoTags.length > 0 && (
-                          <div className="dashboard-card-tags">
-                            <div className="dashboard-card-tags-scroll">
-                              {exercise.autoTags.slice(0, 2).map((tag, index) => (
-                                <span key={index} className="dashboard-tag">
-                                  {formatTagForDisplay(tag)}
-                                </span>
-                              ))}
-                              {exercise.autoTags.length > 2 && (
-                                <span className="dashboard-tag-more">
-                                  +{exercise.autoTags.length - 2}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* Footer */}
-                        <div className="dashboard-card-footer">
-                          <div className="dashboard-card-meta">
-                            <span className="dashboard-card-meta-item">
-                              {exercise.markers?.length || 0} marqueur{exercise.markers?.length !== 1 ? 's' : ''}
-                            </span>
-                            {exercise.metadata?.difficulty && (
-                              <span className={`dashboard-card-difficulty ${exercise.metadata.difficulty}`}>
-                                {exercise.metadata.difficulty}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
+                {filteredExercises.map((exercise) => (
+                  <ExerciseCard
+                    key={exercise.id}
+                    exercise={exercise}
+                    onClick={(id) => handleExerciseClick(id)}
+                  />
+                ))}
               </div>
             </>
           )}
@@ -802,48 +822,96 @@ function FreeMode() {
             </div>
             
             <div className="free-mode-filter-drawer-content">
-              {/* Même contenu que le panneau desktop */}
-              <div className="free-mode-filter-group">
-                <label className="free-mode-filter-label">Compositeur</label>
-                <div className="free-mode-chips-container">
-                  <button
-                    className={`free-mode-chip ${selectedComposer === '' ? 'free-mode-chip-active' : ''}`}
-                    onClick={() => setSelectedComposer('')}
-                  >
-                    Tous
-                  </button>
-                  {composers.slice(0, 10).map(composer => (
+              {/* Accès rapide */}
+              <div className="free-mode-filter-block free-mode-filter-block-quick">
+                <h4 className="free-mode-filter-block-title">Accès rapide</h4>
+                <div className="free-mode-filter-group">
+                  <label className="free-mode-filter-label">Niveau</label>
+                  <div className="free-mode-difficulty-cards">
+                    {difficulties.map(diff => (
+                      <button
+                        key={diff}
+                        className={`free-mode-difficulty-card ${selectedDifficulty === diff ? 'free-mode-difficulty-card-active' : ''}`}
+                        onClick={() => setSelectedDifficulty(selectedDifficulty === diff ? '' : diff)}
+                      >
+                        <span className="free-mode-difficulty-icon">
+                          {diff === 'débutant' && '🌱'}
+                          {diff === 'intermédiaire' && '⭐'}
+                          {diff === 'avancé' && '🔥'}
+                          {diff === 'expert' && '💎'}
+                        </span>
+                        <span className="free-mode-difficulty-label">{diff}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {notionQuickFilters.length > 0 && (
+                  <div className="free-mode-filter-group">
+                    <label className="free-mode-filter-label">Filtrer par notion</label>
+                    <div className="free-mode-notion-chips">
+                      {notionQuickFilters.map(({ label, tag }) => (
+                        <button
+                          key={tag}
+                          type="button"
+                          className={`free-mode-notion-chip ${selectedTags.includes(tag) ? 'free-mode-notion-chip-active' : ''}`}
+                          onClick={() => applyNotionQuickFilter(tag)}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Affiner */}
+              <div className="free-mode-filter-block">
+                <h4 className="free-mode-filter-block-title">Affiner</h4>
+                <div className="free-mode-filter-group">
+                  <label className="free-mode-filter-label">Compositeur</label>
+                  <div className="free-mode-chips-container">
                     <button
-                      key={composer}
-                      className={`free-mode-chip ${selectedComposer === composer ? 'free-mode-chip-active' : ''}`}
-                      onClick={() => setSelectedComposer(composer)}
+                      className={`free-mode-chip ${selectedComposer === '' ? 'free-mode-chip-active' : ''}`}
+                      onClick={() => setSelectedComposer('')}
                     >
-                      {composer}
+                      Tous
                     </button>
-                  ))}
+                    {composers.slice(0, 10).map(composer => (
+                      <button
+                        key={composer}
+                        className={`free-mode-chip ${selectedComposer === composer ? 'free-mode-chip-active' : ''}`}
+                        onClick={() => setSelectedComposer(composer)}
+                      >
+                        {composer}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="free-mode-filter-group">
+                  <label className="free-mode-filter-label">Genre</label>
+                  <div className="free-mode-chips-container">
+                    <button
+                      className={`free-mode-chip ${selectedGenre === '' ? 'free-mode-chip-active' : ''}`}
+                      onClick={() => setSelectedGenre('')}
+                    >
+                      Tous
+                    </button>
+                    {genres.map(genre => (
+                      <button
+                        key={genre}
+                        className={`free-mode-chip ${selectedGenre === genre ? 'free-mode-chip-active' : ''}`}
+                        onClick={() => setSelectedGenre(genre)}
+                      >
+                        {genre}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
-              
-              <div className="free-mode-filter-group">
-                <label className="free-mode-filter-label">Difficulté</label>
-                <div className="free-mode-difficulty-cards">
-                  {difficulties.map(diff => (
-                    <button
-                      key={diff}
-                      className={`free-mode-difficulty-card ${selectedDifficulty === diff ? 'free-mode-difficulty-card-active' : ''}`}
-                      onClick={() => setSelectedDifficulty(selectedDifficulty === diff ? '' : diff)}
-                    >
-                      <span className="free-mode-difficulty-icon">
-                        {diff === 'débutant' && '🌱'}
-                        {diff === 'intermédiaire' && '⭐'}
-                        {diff === 'avancé' && '🔥'}
-                        {diff === 'expert' && '💎'}
-                      </span>
-                      <span className="free-mode-difficulty-label">{diff}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+
+              {/* Détails techniques */}
+              <div className="free-mode-filter-block free-mode-filter-block-details">
+                <h4 className="free-mode-filter-block-title">Détails techniques</h4>
               
               {/* Section Harmonie - Structure des accords */}
               {(tagCategories.renversements.length > 0 || tagCategories.extensions.length > 0 || tagCategories.qualites.length > 0) && (
@@ -1117,26 +1185,6 @@ function FreeMode() {
                   </div>
                 </div>
               )}
-              
-              <div className="free-mode-filter-group">
-                <label className="free-mode-filter-label">Genre</label>
-                <div className="free-mode-chips-container">
-                  <button
-                    className={`free-mode-chip ${selectedGenre === '' ? 'free-mode-chip-active' : ''}`}
-                    onClick={() => setSelectedGenre('')}
-                  >
-                    Tous
-                  </button>
-                  {genres.map(genre => (
-                    <button
-                      key={genre}
-                      className={`free-mode-chip ${selectedGenre === genre ? 'free-mode-chip-active' : ''}`}
-                      onClick={() => setSelectedGenre(genre)}
-                    >
-                      {genre}
-                    </button>
-                  ))}
-                </div>
               </div>
             </div>
             

@@ -1,39 +1,60 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useState, useRef, useEffect, useCallback, useMemo, Component } from 'react'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import YouTube from 'react-youtube'
-import ChordSelectorModal from '../ChordSelectorModal'
+import ChordSelectorModal, { CADENCES } from '../ChordSelectorModal'
 import VideoCockpit from '../VideoCockpit'
 import ReviewDashboard from '../components/ReviewDashboard'
 import ReviewDetailPanel from '../components/ReviewDetailPanel'
 import { getExerciseById } from '../services/exerciseService'
 import { saveAttempt } from '../services/attemptService'
 import { useAuth } from '../contexts/AuthContext'
-import { validateAnswerWithFunctions, DEGREE_TO_FUNCTIONS } from '../utils/riemannFunctions'
+import { validateAnswerWithFunctions, DEGREE_TO_FUNCTIONS, normalizeCadence, PRIMARY_DEGREES } from '../utils/riemannFunctions'
+import { getUserProgress, updateNodeProgress, calculateNodeScore } from '../services/progressionService'
+import { getRelevantChordIndices, getChordFunction as getChordFunctionForLock } from '../utils/nodeCriteria'
+import { formatChordDetailed } from '../utils/chordFormatter'
+import { formatChordString as formatChordStringQcm } from '../utils/qcmOptions'
+import ChordLabel from '../components/ChordLabel'
+import { getNodePhase, getEnabledFunctions, getUnlockedChordKeys, getPrecisionFunctions, isCadenceAvailableForNode, getUnlockedCadenceValues, PHASE_INTUITION, PHASE_PRECISION, PHASE_MAITRISE } from '../data/parcoursTree'
 import { Play, Pause, SkipBack, SkipForward, Pencil, RotateCcw } from 'lucide-react'
 import './Player.css'
 
-// Constantes pour les chiffrages (identique à ChordSelectorModal et Editor)
-const FIGURES = [
-  { value: '5', label: 'Quinte', display: '5' },
-  { value: '6', label: 'Sixte', display: '6' },
-  { value: '64', label: 'Quarte-sixte', display: '6/4', isStacked: true, displayArray: ['6', '4'] },
-  { value: '7', label: 'Septième', display: '7' },
-  { value: '65', label: 'Sixte-quinte', display: '6/5', isStacked: true, displayArray: ['6', '5'] },
-  { value: '43', label: 'Quarte-tierce', display: '4/3', isStacked: true, displayArray: ['4', '3'] },
-  { value: '2', label: 'Seconde', display: '2' },
-  { value: '9', label: 'Neuvième', display: '9' },
-  { value: '11', label: 'Onzième', display: '11' },
-  { value: '13', label: 'Treizième', display: '13' },
-  { value: '54', label: 'Quinte-quarte', display: '5/4', isStacked: true, displayArray: ['5', '4'] }
-]
+// Error boundary pour le panneau de feedback (évite page noire si le lecteur YouTube plante)
+class ReviewDetailErrorBoundary extends Component {
+  state = { hasError: false }
+
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error, info) {
+    console.warn('ReviewDetailPanel error boundary:', error?.message, info?.componentStack)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="review-detail-panel review-detail-panel-fallback" style={{ padding: '1rem', color: 'var(--text-secondary, #94a3b8)', textAlign: 'center' }}>
+          <p>Le détail de correction n&apos;a pas pu s&apos;afficher (lecteur vidéo indisponible ou bloqué).</p>
+          <p style={{ fontSize: '0.9rem', marginTop: '0.5rem' }}>Vous pouvez consulter vos réponses dans la timeline ci-dessus.</p>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 function Player() {
   const { exerciseId } = useParams()
+  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { user, isGuest } = useAuth()
   const [exercise, setExercise] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  
+  // Détecter le mode depuis l'URL
+  const exerciseMode = searchParams.get('mode') || 'libre' // 'parcours' | 'libre'
+  const nodeId = searchParams.get('node') || null
   
   // États de l'exercice
   const [mode, setMode] = useState('exercise') // 'exercise' | 'review'
@@ -48,16 +69,125 @@ function Player() {
   const [isValidating, setIsValidating] = useState(false) // État pour l'animation de validation
   const [animatedChords, setAnimatedChords] = useState(new Set()) // Accords déjà animés
   const [selectedSegmentIndex, setSelectedSegmentIndex] = useState(null) // Segment sélectionné en mode review
+  const [segmentTooltipIndex, setSegmentTooltipIndex] = useState(null) // Index du segment dont on affiche le tooltip (accord + feedback)
+  
+  // États pour le mode parcours
+  const [progressionMode, setProgressionMode] = useState('full') // 'functions' | 'qcm' | 'full'
+  const [parcoursContext, setParcoursContext] = useState(null)
+  const [nodeStatsForQCM, setNodeStatsForQCM] = useState(null) // nodeStats[nodeId] pour QCM adaptatif
+  const [relevantChordIndices, setRelevantChordIndices] = useState([])
   
   const playerRef = useRef(null)
   const intervalRef = useRef(null)
   const currentTimeRef = useRef(0)
   const timelineRef = useRef(null)
+  const videoZoneOverlayRef = useRef(null)
+
+  // Détection mobile pour timeline en bandes égales (breakpoint aligné avec le CSS)
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)')
+    const handler = () => setIsMobile(mq.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+
+  /** Convertit un accord attendu en clé parcours (ex. I, I6, V7, N6, V64, cad64) pour comparer à unlockedChordKeys */
+  const chordToParcoursKey = useCallback((chord) => {
+    if (!chord) return null
+    if (chord.specialRoot === 'N') return 'N6'
+    if (chord.specialRoot === 'It' || chord.specialRoot === 'Fr' || chord.specialRoot === 'Gr') return chord.specialRoot
+    const degree = (chord.degree || '').toUpperCase()
+    if (!degree) return null
+    const fig = chord.figure && chord.figure !== '5' ? chord.figure : ''
+    // I64 dépendant du contexte : passage → V64, cadence → cad64, avancé → I64
+    if (degree === 'I' && fig === '64') {
+      if (chord.sixFourVariant === 'passing') return 'V64'
+      if (chord.sixFourVariant === 'cadential') return 'cad64'
+      return 'I64'
+    }
+    return degree + fig
+  }, [])
+
+  /** En mode parcours, true si la case à l'index donnée a un accord attendu non débloqué (à griser / non remplissable) */
+  const isSegmentLockedByParcours = useCallback((markerIndex) => {
+    if (exerciseMode !== 'parcours' || !parcoursContext || !exercise?.markers?.[markerIndex]) {
+      return false
+    }
+    const marker = exercise.markers[markerIndex]
+    const expectedChord = typeof marker === 'object' && marker.chord ? marker.chord : null
+    if (!expectedChord) {
+      return false
+    }
+
+    // Phase Intuition (niveau 1, cadence parfaite, etc.) : on verrouille uniquement si la *fonction* (T/SD/D) n'est pas autorisée
+    if (parcoursContext.phase === PHASE_INTUITION && parcoursContext.enabledFunctions?.length) {
+      const chordFunction = getChordFunctionForLock(expectedChord)
+      const locked = chordFunction != null && !parcoursContext.enabledFunctions.includes(chordFunction)
+      return locked
+    }
+
+    // Phase Précision / Maîtrise : pour les fonctions en "validation simple", on verrouille seulement si la fonction n'est pas autorisée ; pour les autres, on verrouille si la clé précise n'est pas débloquée
+    const chordFunction = getChordFunctionForLock(expectedChord)
+    const precisionFunctions = parcoursContext.precisionFunctions ?? ['T', 'SD', 'D']
+    if (chordFunction != null && !precisionFunctions.includes(chordFunction)) {
+      const locked = !parcoursContext.enabledFunctions?.includes(chordFunction)
+      return locked
+    }
+    if (!parcoursContext.unlockedChordKeys?.length) {
+      return false
+    }
+    const key = chordToParcoursKey(expectedChord)
+    if (!key) {
+      return false
+    }
+    const locked = !parcoursContext.unlockedChordKeys.includes(key)
+    return locked
+  }, [exerciseMode, parcoursContext, exercise, chordToParcoursKey])
 
   // Charger l'exercice
   useEffect(() => {
     loadExercise()
   }, [exerciseId])
+
+  // Charger la progression et déterminer le mode si on est en mode parcours
+  useEffect(() => {
+    if (exercise && exerciseMode === 'parcours' && nodeId && user && !isGuest) {
+      loadProgressionMode()
+    } else if (exerciseMode === 'libre') {
+      setProgressionMode('full')
+      setParcoursContext(null)
+      setNodeStatsForQCM(null)
+      setRelevantChordIndices([])
+    }
+  }, [exercise, exerciseMode, nodeId, user, isGuest])
+
+  const loadProgressionMode = async () => {
+    try {
+      const relevantIndices = getRelevantChordIndices(nodeId, exercise)
+      setRelevantChordIndices(relevantIndices)
+
+      const progress = await getUserProgress(user.uid)
+      const nodeStats = progress?.nodeStats || {}
+      const unlockedNodes = progress?.unlockedNodes || []
+      setNodeStatsForQCM(nodeStats[nodeId] || null)
+      const phase = getNodePhase(nodeId, nodeStats)
+      const enabledFunctions = getEnabledFunctions(nodeId)
+      const unlockedChordKeys = getUnlockedChordKeys(nodeId)
+      const precisionFunctions = getPrecisionFunctions(nodeId)
+      const unlockedCadenceValues = getUnlockedCadenceValues(unlockedNodes, nodeId)
+      const cadenceAvailable = isCadenceAvailableForNode(nodeId, unlockedNodes)
+      setParcoursContext({ nodeId, phase, enabledFunctions, unlockedChordKeys, precisionFunctions, cadenceAvailable, unlockedCadenceValues })
+
+      // En parcours : seul l'intuition utilise le mode "functions" ; précision et maîtrise = QCM. Le mode "full" (sélecteur complet) est réservé au mode libre.
+      if (phase === PHASE_INTUITION) setProgressionMode('functions')
+      else setProgressionMode('qcm')
+    } catch (error) {
+      console.error('Erreur lors du chargement de la progression:', error)
+      setProgressionMode('functions')
+      setParcoursContext(null)
+    }
+  }
 
   const loadExercise = async () => {
     try {
@@ -492,7 +622,9 @@ function Player() {
   // Fonction pour ouvrir la modale pour un marqueur spécifique (permet de modifier une réponse)
   const handleMarkerClick = (markerIndex) => {
     if (!playerRef.current || !exercise) return
-    
+    // En mode parcours, ne pas ouvrir la modale pour une case dont l'accord n'est pas encore débloqué
+    if (isSegmentLockedByParcours(markerIndex)) return
+
     const markers = exercise.markers.map(m => typeof m === 'number' ? m : m.time || m.absoluteTime)
     const markerTime = markers[markerIndex]
     
@@ -562,32 +694,99 @@ function Player() {
   }
 
   const handleChordValidate = (chordData) => {
+    // En mode QCM, chordData peut être une chaîne (legacy) ou un objet { chord, cadence }
+    let finalChordData = chordData
+    const isQcmPayload = progressionMode === 'qcm' && typeof chordData === 'object' && chordData !== null && 'chord' in chordData
+    const isQcmString = progressionMode === 'qcm' && typeof chordData === 'string'
+
+    if (isQcmPayload) {
+      finalChordData = { qcmAnswer: chordData.chord, cadence: chordData.cadence ?? undefined, function: chordData.function ?? undefined }
+    } else if (isQcmString) {
+      finalChordData = { qcmAnswer: chordData }
+    }
+
     // Enregistrer la réponse de l'élève
     setUserAnswers(prev => ({
       ...prev,
-      [currentMarkerIndex]: chordData
+      [currentMarkerIndex]: finalChordData
     }))
-    
+
     // Valider avec le système de fonctions de Riemann
     if (exercise && exercise.markers && exercise.markers[currentMarkerIndex]) {
       const marker = exercise.markers[currentMarkerIndex]
       const correctAnswer = typeof marker === 'object' && marker.chord ? marker.chord : null
-      
+
       if (correctAnswer) {
-        const validation = validateAnswerWithFunctions(
-          chordData,
-          correctAnswer,
-          chordData.selectedFunction || chordData.function || null
-        )
-        
-        setAnswerValidations(prev => ({
-          ...prev,
-          [currentMarkerIndex]: validation
-        }))
-        
-        // Afficher un feedback temporaire (optionnel)
-        if (validation.feedback && validation.level > 0) {
-          // Le feedback sera affiché dans l'interface si nécessaire
+        // En mode QCM, comparer accord (et bonus cadence si fourni)
+        if (progressionMode === 'qcm' && (isQcmString || isQcmPayload)) {
+          const chordStr = isQcmPayload ? chordData.chord : chordData
+          const correctStr = formatChordStringQcm(correctAnswer)
+          const isCorrectChord = chordStr === correctStr
+          const correctFunction = (() => {
+            if (!correctAnswer) return null
+            if (correctAnswer.selectedFunction) return correctAnswer.selectedFunction
+            if (correctAnswer.specialRoot) {
+              const map = { 'N': 'SD', 'It': 'D', 'Fr': 'D', 'Gr': 'D' }
+              return map[correctAnswer.specialRoot] || null
+            }
+            if (correctAnswer.degree) {
+              const funcs = DEGREE_TO_FUNCTIONS[correctAnswer.degree] || []
+              return funcs.length > 0 ? funcs[0] : null
+            }
+            return null
+          })()
+          const userFunction = finalChordData.function ?? null
+          const isCorrectFunction = Boolean(userFunction && correctFunction && userFunction === correctFunction)
+          const userFunctionFromChord = chordStr ? getFunctionFromQcmAnswer(chordStr) : null
+          const isCorrectFunctionFromChord = Boolean(userFunctionFromChord && correctFunction && userFunctionFromChord === correctFunction)
+          let cadenceBonus = 0
+          const correctCadence = correctAnswer.cadence ? normalizeCadence(correctAnswer.cadence) : null
+          const unlocked = parcoursContext?.unlockedCadenceValues
+          const effectiveCorrectCadence = (exerciseMode === 'parcours' && Array.isArray(unlocked) && unlocked.length > 0)
+            ? (correctCadence && unlocked.includes(correctCadence) ? correctCadence : null)
+            : correctCadence
+          const userCadence = finalChordData.cadence ? normalizeCadence(finalChordData.cadence) : null
+          if (effectiveCorrectCadence && userCadence && userCadence === effectiveCorrectCadence) cadenceBonus = 10
+          let cadenceFeedbackSuffix = ''
+          if (effectiveCorrectCadence) {
+            if (cadenceBonus === 10) cadenceFeedbackSuffix = ' Cadence correcte.'
+            else if (userCadence) cadenceFeedbackSuffix = ' Cadence incorrecte.'
+            else cadenceFeedbackSuffix = ' Cadence manquante.'
+          }
+          const score = isCorrectChord ? 100 + cadenceBonus : (isCorrectFunctionFromChord || isCorrectFunction ? 50 : 0)
+          let feedback = (isCorrectChord
+            ? (cadenceBonus > 0 ? 'Parfait ! + Bonus cadence' : 'Correct !')
+            : (isCorrectFunctionFromChord || isCorrectFunction)
+              ? 'Partiel : bonne fonction.'
+              : 'Incorrect') + cadenceFeedbackSuffix
+
+          if (exerciseMode !== 'parcours') {
+            setAnswerValidations(prev => ({
+              ...prev,
+              [currentMarkerIndex]: {
+                level: isCorrectChord ? 1 : (isCorrectFunctionFromChord || isCorrectFunction ? 0.5 : 0),
+                score,
+                cadenceBonus,
+                feedback
+              }
+            }))
+          }
+          setIsModalOpen(false)
+        } else {
+          // Mode normal avec validation fonctionnelle
+          const validation = validateAnswerWithFunctions(
+            finalChordData,
+            correctAnswer,
+            finalChordData.selectedFunction || finalChordData.function || null,
+            { functionOnlyAvailable: progressionMode === 'functions' }
+          )
+          // En mode parcours : pas de feedback par accord, uniquement à la fin de la séquence
+          if (exerciseMode !== 'parcours') {
+            setAnswerValidations(prev => ({
+              ...prev,
+              [currentMarkerIndex]: validation
+            }))
+          }
         }
       }
     }
@@ -610,30 +809,66 @@ function Player() {
     exercise.markers.forEach((marker, index) => {
       const userAnswer = userAnswers[index]
       const correctAnswer = typeof marker === 'object' && marker.chord ? marker.chord : null
+      const isLocked = isSegmentLockedByParcours(index)
+      let setMissing = false
       
       if (userAnswer && correctAnswer) {
-        // Utiliser la validation existante ou en créer une nouvelle
         if (answerValidations[index]) {
           validations[index] = answerValidations[index]
+        } else if (progressionMode === 'qcm' && 'qcmAnswer' in userAnswer) {
+          const correctStr = formatChordStringQcm(correctAnswer)
+          const isCorrectChord = userAnswer.qcmAnswer === correctStr
+          const correctFunction = (() => {
+            if (!correctAnswer) return null
+            if (correctAnswer.selectedFunction) return correctAnswer.selectedFunction
+            if (correctAnswer.specialRoot) {
+              const map = { 'N': 'SD', 'It': 'D', 'Fr': 'D', 'Gr': 'D' }
+              return map[correctAnswer.specialRoot] || null
+            }
+            if (correctAnswer.degree) {
+              const funcs = DEGREE_TO_FUNCTIONS[correctAnswer.degree] || []
+              return funcs.length > 0 ? funcs[0] : null
+            }
+            return null
+          })()
+          const userFunction = userAnswer.function ?? null
+          const isCorrectFunction = Boolean(userFunction && correctFunction && userFunction === correctFunction)
+          const userFunctionFromChord = userAnswer.qcmAnswer ? getFunctionFromQcmAnswer(userAnswer.qcmAnswer) : null
+          const isCorrectFunctionFromChord = Boolean(userFunctionFromChord && correctFunction && userFunctionFromChord === correctFunction)
+          let cadenceBonus = 0
+          const correctCadence = correctAnswer.cadence ? normalizeCadence(correctAnswer.cadence) : null
+          const unlockedBatch = parcoursContext?.unlockedCadenceValues
+          const effectiveCorrectCadenceBatch = (exerciseMode === 'parcours' && Array.isArray(unlockedBatch) && unlockedBatch.length > 0)
+            ? (correctCadence && unlockedBatch.includes(correctCadence) ? correctCadence : null)
+            : correctCadence
+          const userCadence = userAnswer.cadence ? normalizeCadence(userAnswer.cadence) : null
+          if (effectiveCorrectCadenceBatch && userCadence && userCadence === effectiveCorrectCadenceBatch) cadenceBonus = 10
+          const score = isCorrectChord ? 100 + cadenceBonus : (isCorrectFunctionFromChord || isCorrectFunction ? 50 : 0)
+          const feedback = (isCorrectChord ? 'Correct !' : (isCorrectFunctionFromChord || isCorrectFunction) ? 'Partiel : bonne fonction.' : 'Incorrect') + (effectiveCorrectCadenceBatch ? (cadenceBonus === 10 ? ' Cadence correcte.' : userCadence ? ' Cadence incorrecte.' : ' Cadence manquante.') : '')
+          const level = isCorrectChord ? 1 : (isCorrectFunctionFromChord || isCorrectFunction ? 0.5 : 0)
+          validations[index] = { level, score, cadenceBonus, feedback }
         } else {
           validations[index] = validateAnswerWithFunctions(
             userAnswer,
             correctAnswer,
-            userAnswer.selectedFunction || userAnswer.function || null
+            userAnswer.selectedFunction || userAnswer.function || null,
+            { functionOnlyAvailable: progressionMode === 'functions' }
           )
         }
-      } else if (correctAnswer) {
-        // Réponse manquante
+      } else if (correctAnswer && !isLocked) {
+        // Réponse manquante uniquement pour les cases remplissables (non grisées)
+        setMissing = true
         validations[index] = {
           level: 0,
           score: 0,
+          cadenceBonus: 0,
           feedback: 'Réponse manquante'
         }
       }
     })
-    
+
     return validations
-  }, [exercise, userAnswers, answerValidations])
+  }, [exercise, userAnswers, answerValidations, progressionMode, isSegmentLockedByParcours, exerciseMode, parcoursContext?.unlockedCadenceValues])
 
   // Fonction pour animer les accords séquentiellement
   const animateChordValidation = useCallback(async (validations) => {
@@ -697,41 +932,70 @@ function Player() {
           typeof marker === 'object' && marker.chord ? marker.chord : null
         )
         
-        // Calculer le score avec le système pondéré de fonctions de Riemann + bonus cadences
         let totalScore = 0
         let maxScore = 0
         let totalCadenceBonus = 0
         
-        correctAnswersArray.forEach((correct, index) => {
-          const userAnswer = answersArray[index]
-          if (userAnswer && correct) {
-            const validation = allValidations[index] || answerValidations[index]
-            if (validation) {
-              totalScore += validation.score
-              // Ajouter le bonus de cadence si présent
-              if (validation.cadenceBonus) {
-                totalCadenceBonus += validation.cadenceBonus
+        // En mode parcours, calculer le score uniquement sur les accords remplissables (non grisés)
+        if (exerciseMode === 'parcours' && nodeId && relevantChordIndices.length > 0) {
+          const fillableIndices = relevantChordIndices.filter((i) => !isSegmentLockedByParcours(i))
+          const nodeScore = calculateNodeScore(nodeId, answersArray, correctAnswersArray, exercise, {
+            functionOnlyAvailable: progressionMode === 'functions',
+            fillableIndices
+          })
+          const relevantCount = fillableIndices.length
+          
+          // Mettre à jour la progression du nœud (sur le nombre de cases à remplir)
+          await updateNodeProgress(user.uid, nodeId, nodeScore, relevantCount)
+          
+          // Utiliser le score du nœud pour l'affichage
+          totalScore = nodeScore * relevantCount
+          maxScore = relevantCount * 100
+        } else {
+          // Mode libre : calculer le score sur tous les accords (accord + cadence si attendue)
+          correctAnswersArray.forEach((correct, index) => {
+            const userAnswer = answersArray[index]
+            if (userAnswer && correct) {
+              const validation = allValidations[index] || answerValidations[index]
+              if (validation) {
+                totalScore += validation.score
+                // Ajouter le bonus de cadence si présent
+                if (validation.cadenceBonus) {
+                  totalCadenceBonus += validation.cadenceBonus
+                }
+              } else {
+                // Fallback : validation binaire si pas de validation fonctionnelle
+                const validation = validateAnswerWithFunctions(
+                  userAnswer,
+                  correct,
+                  userAnswer.selectedFunction || userAnswer.function || null,
+                  { functionOnlyAvailable: progressionMode === 'functions' }
+                )
+                totalScore += validation.score
+                // Ajouter le bonus de cadence si présent
+                if (validation.cadenceBonus) {
+                  totalCadenceBonus += validation.cadenceBonus
+                }
               }
-            } else {
-              // Fallback : validation binaire si pas de validation fonctionnelle
-              const validation = validateAnswerWithFunctions(
-                userAnswer,
-                correct,
-                userAnswer.selectedFunction || userAnswer.function || null
-              )
-              totalScore += validation.score
-              // Ajouter le bonus de cadence si présent
-              if (validation.cadenceBonus) {
-                totalCadenceBonus += validation.cadenceBonus
+              maxScore += 100
+              // La cadence compte pour le score : +10 points possibles si une cadence est attendue (et débloquée en parcours)
+              if (correct.cadence) {
+                const norm = normalizeCadence(correct.cadence)
+                const unlc = parcoursContext?.unlockedCadenceValues
+                if (exerciseMode !== 'parcours' || !Array.isArray(unlc) || unlc.length === 0 || (norm && unlc.includes(norm))) maxScore += 10
+              }
+            } else if (correct) {
+              maxScore += 100
+              if (correct.cadence) {
+                const norm = normalizeCadence(correct.cadence)
+                const unlc = parcoursContext?.unlockedCadenceValues
+                if (exerciseMode !== 'parcours' || !Array.isArray(unlc) || unlc.length === 0 || (norm && unlc.includes(norm))) maxScore += 10
               }
             }
-            maxScore += 100
-          } else if (correct) {
-            maxScore += 100
-          }
-        })
-        
-        // Le score final peut dépasser 100% grâce aux bonus de cadence
+          })
+        }
+
+        // Score final : accord (100) + bonus cadence (10 si attendue et correcte) par marqueur
         const score = maxScore > 0 ? Math.round(((totalScore + totalCadenceBonus) / maxScore) * 100) : 0
         
         // Sauvegarder la tentative
@@ -741,7 +1005,8 @@ function Player() {
           answersArray, 
           correctAnswersArray, 
           score,
-          exercise.metadata?.exerciseTitle || exercise.metadata?.workTitle || 'Exercice'
+          exercise.metadata?.exerciseTitle || exercise.metadata?.workTitle || 'Exercice',
+          { functionOnlyAvailable: progressionMode === 'functions' }
         )
       } catch (error) {
         console.error('Erreur lors de la sauvegarde de la tentative:', error)
@@ -790,6 +1055,26 @@ function Player() {
     }
   }
 
+  /** Clic/tap sur la zone vidéo (overlay) : zone quit → handleQuitExercise, sinon play/pause (l’iframe a pointer-events: none) */
+  const handleVideoZoneTap = useCallback((e) => {
+    const el = videoZoneOverlayRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const quitZoneW = 140
+    const quitZoneH = 80
+    const inQuitZone = e.clientX >= rect.right - quitZoneW && e.clientY < rect.top + quitZoneH
+    if (inQuitZone) {
+      handleQuitExercise()
+    } else if (playerRef.current) {
+      if (isPlaying) {
+        playerRef.current.pauseVideo()
+        setIsPlaying(false)
+      } else {
+        playerRef.current.playVideo()
+        setIsPlaying(true)
+      }
+    }
+  }, [isPlaying])
 
   // Calculer les valeurs nécessaires AVANT les returns conditionnels
   // Utiliser des valeurs par défaut si exercise n'existe pas encore
@@ -803,6 +1088,61 @@ function Player() {
     : []
   const totalMarkers = markers.length
   const answeredCount = Object.values(userAnswers).filter(a => a !== null).length
+  
+  // En mode parcours : indices remplissables = pertinents et non grisés (débloqués)
+  const fillableIndices = useMemo(() => {
+    if (exerciseMode !== 'parcours' || relevantChordIndices.length === 0) return []
+    return relevantChordIndices.filter(i => !isSegmentLockedByParcours(i))
+  }, [exerciseMode, relevantChordIndices, isSegmentLockedByParcours])
+
+  const answeredFillableCount = useMemo(() => {
+    if (exerciseMode === 'parcours' && fillableIndices.length > 0) {
+      return fillableIndices.filter(index => userAnswers[index] !== null).length
+    }
+    return Object.values(userAnswers).filter(a => a !== null).length
+  }, [exerciseMode, fillableIndices, userAnswers])
+
+  // En mode parcours, calculer le nombre d'accords pertinents remplis (legacy, pour validateAllAnswers etc.)
+  const answeredRelevantCount = useMemo(() => {
+    if (exerciseMode === 'parcours' && relevantChordIndices.length > 0) {
+      return relevantChordIndices.filter(index => userAnswers[index] !== null).length
+    }
+    return Object.values(userAnswers).filter(a => a !== null).length
+  }, [exerciseMode, relevantChordIndices, userAnswers])
+
+  const relevantChordsCount = relevantChordIndices.length
+
+  // Cadence attendue sur le marqueur courant (obligatoire si présente)
+  // En parcours : n'exiger la cadence que si la bonne réponse est dans les cadences débloquées
+  const expectedCadence = useMemo(() => {
+    if (!exercise?.markers?.[currentMarkerIndex]) return false
+    const marker = exercise.markers[currentMarkerIndex]
+    const chord = typeof marker === 'object' && marker.chord ? marker.chord : null
+    const correctCadence = chord?.cadence || null
+    if (!correctCadence) return false
+    const unlocked = parcoursContext?.unlockedCadenceValues
+    const inUnlocked = Array.isArray(unlocked) && unlocked.includes(correctCadence)
+    return exerciseMode === 'parcours' ? !!inUnlocked : !!correctCadence
+  }, [exercise, currentMarkerIndex, exerciseMode, parcoursContext?.unlockedCadenceValues])
+
+  // Liste des cadences à afficher en QCM (filtrée en Parcours par unlockedCadenceValues)
+  const qcmCadencesToShow = useMemo(() => {
+    const unlocked = parcoursContext?.unlockedCadenceValues
+    if (Array.isArray(unlocked) && unlocked.length > 0) return CADENCES.filter(c => unlocked.includes(c.value))
+    return CADENCES
+  }, [parcoursContext?.unlockedCadenceValues])
+
+  // Liste d'accords pour le QCM : mémoïsée pour éviter de recréer une nouvelle référence à chaque rendu (ex. pendant la lecture vidéo), ce qui ferait re-mélanger les options en permanence
+  const qcmAllChords = useMemo(() => {
+    if (!exercise?.markers) return []
+    return exercise.markers.map(m => typeof m === 'object' && m.chord ? m.chord : null).filter(Boolean)
+  }, [exercise?.markers])
+
+  // En mode parcours : afficher Terminer quand toutes les cases *remplissables* (non grisées) sont remplies.
+  // En mode libre : afficher quand tous les marqueurs sont remplis.
+  const canShowFinishButton = exerciseMode === 'parcours'
+    ? totalMarkers > 0 && (fillableIndices.length === 0 || answeredFillableCount === fillableIndices.length)
+    : answeredCount === totalMarkers && totalMarkers > 0
 
   // Calculer le temps relatif pour l'affichage
   const relativeCurrentTime = currentTime - startTime
@@ -839,40 +1179,114 @@ function Player() {
     })
   }, [markers, startTime, endTime, relativeEndTime, answeredMarkers, userAnswers, exercise])
 
-  // Trouver les cadences pour l'affichage en mode review
+  // Position du curseur : en mobile (bandes égales) vitesse variable, sinon proportionnelle au temps
+  const playheadPositionPercent = useMemo(() => {
+    if (currentTime < startTime || currentTime > endTime) return null
+    if (!isMobile || !chordSegments.length) {
+      return relativeEndTime > 0 ? (relativeCurrentTime / relativeEndTime) * 100 : 0
+    }
+    const X = chordSegments.length
+    for (let i = 0; i < chordSegments.length; i++) {
+      const seg = chordSegments[i]
+      const segDuration = seg.endTime - seg.startTime
+      if (segDuration <= 0) continue
+      if (currentTime >= seg.startTime && currentTime <= seg.endTime) {
+        const p = (currentTime - seg.startTime) / segDuration
+        return ((i + p) / X) * 100
+      }
+    }
+    if (currentTime < chordSegments[0].startTime) return 0
+    if (currentTime > chordSegments[chordSegments.length - 1].endTime) return 100
+    return (relativeEndTime > 0 ? (relativeCurrentTime / relativeEndTime) * 100 : 0)
+  }, [currentTime, startTime, endTime, relativeCurrentTime, relativeEndTime, isMobile, chordSegments])
+
+  // Trouver les cadences pour l'affichage en mode review (avec statut correct/incorrect)
   const getCadences = useMemo(() => {
     if (mode !== 'review' || !exercise || !exercise.markers) return []
-    
+    const unlockedScores = parcoursContext?.unlockedCadenceValues
+    const onlyUnlockedCadenceForMax = exerciseMode === 'parcours' && Array.isArray(unlockedScores) && unlockedScores.length > 0
+
     const cadences = []
     exercise.markers.forEach((marker, index) => {
       // En mode review, afficher la cadence de la solution correcte
       const correctAnswer = typeof marker === 'object' && marker.chord ? marker.chord : null
       const userAnswer = userAnswers[index]
       const validation = answerValidations[index]
-      
+
+      // Cadence attendue (même règle que maxScore +10)
+      const normCad = correctAnswer?.cadence ? normalizeCadence(correctAnswer.cadence) : null
+      const cadenceExpected = !!(correctAnswer?.cadence && (
+        !onlyUnlockedCadenceForMax || (normCad && unlockedScores.includes(normCad))
+      ))
+      const cadenceCorrect = cadenceExpected
+        ? !!(validation?.cadenceBonus > 0)
+        : undefined
+
       // Déterminer quelle cadence afficher :
       // - Si l'élève a mis une cadence correcte, afficher celle de l'élève
       // - Sinon, afficher la cadence de la solution
       let cadenceToDisplay = null
       if (validation && validation.cadenceBonus > 0 && userAnswer?.cadence) {
-        // L'élève a mis une cadence correcte
         cadenceToDisplay = userAnswer.cadence
       } else if (correctAnswer?.cadence) {
-        // Afficher la cadence de la solution
         cadenceToDisplay = correctAnswer.cadence
       }
-      
+
       if (cadenceToDisplay) {
         cadences.push({
           index,
           cadence: cadenceToDisplay,
           startMarker: index > 0 ? index - 1 : null,
-          endMarker: index
+          endMarker: index,
+          cadenceExpected,
+          cadenceCorrect
         })
       }
     })
     return cadences
-  }, [mode, exercise, userAnswers, answerValidations])
+  }, [mode, exercise, userAnswers, answerValidations, exerciseMode, parcoursContext?.unlockedCadenceValues])
+
+  // Labels des cadences (partagé pour accolade au-dessus de la timeline)
+  const cadenceLabelsMap = useMemo(() => ({
+    perfect: 'Parfaite',
+    imperfect: 'Imparfaite',
+    plagal: 'Plagale',
+    rompue: 'Rompue',
+    évitée: 'Évitée',
+    'demi-cadence': 'Demi-cadence',
+    half: 'Demi-cadence'
+  }), [])
+
+  // Liste des cadences pour l'accolade au-dessus de la timeline (exercice + review)
+  // En parcours : n'afficher l'accolade que pour les cadences débloquées
+  const getCadencesForBrace = useMemo(() => {
+    if (mode === 'review') {
+      return getCadences.map(c => ({
+        ...c,
+        cadenceLabel: cadenceLabelsMap[c.cadence] || c.cadence
+      }))
+    }
+    // Mode exercice : marqueurs qui attendent une cadence (débloquée en parcours)
+    const unlocked = parcoursContext?.unlockedCadenceValues
+    const onlyUnlocked = exerciseMode === 'parcours' && Array.isArray(unlocked) && unlocked.length > 0
+    const list = []
+    ;(exercise?.markers ?? []).forEach((marker, index) => {
+      const chord = typeof marker === 'object' && marker.chord ? marker.chord : null
+      if (!chord?.cadence) return
+      if (onlyUnlocked) {
+        const normalized = normalizeCadence(chord.cadence)
+        if (!normalized || !unlocked.includes(normalized)) return
+      }
+      const val = userAnswers[index]?.cadence
+      list.push({
+        startMarker: index > 0 ? index - 1 : null,
+        endMarker: index,
+        cadence: val,
+        cadenceLabel: val ? (cadenceLabelsMap[val] || val) : 'Cadence'
+      })
+    })
+    return list
+  }, [mode, getCadences, exercise?.markers, userAnswers, cadenceLabelsMap, exerciseMode, parcoursContext?.unlockedCadenceValues])
 
   // Trouver l'accord actuel (celui au-dessus du curseur de lecture)
   const findCurrentChordSegment = useMemo(() => {
@@ -884,16 +1298,14 @@ function Player() {
     }
     
     // Sinon, trouver le segment qui contient le currentTime
-    // Important : si on est exactement au début d'un segment (currentTime === segment.startTime),
-    // on doit retourner ce segment, pas le précédent
+    // À la frontière entre deux segments (t = endTime du précédent = startTime du suivant),
+    // on préfère le segment qui commence à cet instant (accord « suivant »)
     for (let i = 0; i < chordSegments.length; i++) {
       const segment = chordSegments[i]
-      // Si on est exactement au début de ce segment, le retourner
-      if (currentTime === segment.startTime) {
-        return segment
-      }
-      // Si on est dans le segment (mais pas au début), le retourner
+      if (currentTime === segment.startTime) return segment
       if (currentTime > segment.startTime && currentTime <= segment.endTime) {
+        const next = chordSegments[i + 1]
+        if (currentTime === segment.endTime && next && next.startTime === currentTime) return next
         return segment
       }
     }
@@ -911,11 +1323,30 @@ function Player() {
     return null
   }, [chordSegments, currentTime, selectedMarkerId])
 
-  // Fonction pour ouvrir la modale pour l'accord actuel
+  // Fonction pour ouvrir la modale pour l'accord actuel (utilise getCurrentTime() au clic pour éviter state stale sur mobile)
   const handleOpenCurrentChordModal = useCallback(() => {
-    if (!findCurrentChordSegment) return
-    handleMarkerClick(findCurrentChordSegment.index)
-  }, [findCurrentChordSegment, handleMarkerClick])
+    if (!chordSegments?.length || !playerRef.current) return
+    const t = playerRef.current.getCurrentTime()
+    if (typeof t !== 'number') return
+    let segment = null
+    for (let i = 0; i < chordSegments.length; i++) {
+      const seg = chordSegments[i]
+      if (t === seg.startTime) { segment = seg; break }
+      if (t > seg.startTime && t <= seg.endTime) {
+        const next = chordSegments[i + 1]
+        if (t === seg.endTime && next && next.startTime === t) { segment = next; break }
+        segment = seg
+        break
+      }
+    }
+    if (!segment && chordSegments.length > 0) {
+      if (t < chordSegments[0].startTime) segment = chordSegments[0]
+      else if (t > chordSegments[chordSegments.length - 1].endTime) segment = chordSegments[chordSegments.length - 1]
+    }
+    if (!segment) return
+    if (isSegmentLockedByParcours(segment.index)) return
+    handleMarkerClick(segment.index)
+  }, [chordSegments, handleMarkerClick, isSegmentLockedByParcours])
 
   // Gestion des raccourcis clavier
   useEffect(() => {
@@ -933,8 +1364,10 @@ function Player() {
 
       // Entrée : Ouvrir la modale pour l'accord actuel
       if (e.key === 'Enter' && !isModalOpen && findCurrentChordSegment) {
-        e.preventDefault()
-        handleOpenCurrentChordModal()
+        if (!isSegmentLockedByParcours(findCurrentChordSegment.index)) {
+          e.preventDefault()
+          handleOpenCurrentChordModal()
+        }
       }
 
       // Échap : Fermer la modale
@@ -971,23 +1404,20 @@ function Player() {
       window.removeEventListener('keydown', handleKeyDown)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isModalOpen, findCurrentChordSegment, currentTime, markers.length])
+  }, [isModalOpen, findCurrentChordSegment, currentTime, markers.length, isSegmentLockedByParcours])
 
   // Calculer les scores pour le dashboard (en mode review)
   // IMPORTANT: Ce hook doit être AVANT tous les returns conditionnels
   const calculateScores = useMemo(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Player.jsx:930',message:'calculateScores useMemo called',data:{mode,hasExercise:!!exercise,markersCount:exercise?.markers?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'fix-attempt-1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     if (!exercise || !exercise.markers) {
-      return { score: 0, perfectCount: 0, partialCount: 0, totalCount: 0, scorePercentage: 0 }
+      return { score: 0, perfectCount: 0, partialCount: 0, totalCount: 0, scorePercentage: 0, cadenceCorrectCount: 0, cadenceTotalCount: 0 }
     }
 
     const results = exercise.markers.map((marker, index) => {
       const userAnswer = userAnswers[index]
       const validation = answerValidations[index]
       const isPerfect = validation && validation.level === 1
-      const isPartiallyCorrect = validation && (validation.level === 2 || validation.level === 3)
+      const isPartiallyCorrect = validation && (validation.level === 0.5 || validation.level === 2 || validation.level === 3)
       return { isPerfect, isPartiallyCorrect }
     })
 
@@ -995,27 +1425,40 @@ function Player() {
     const partialCount = results.filter(r => r.isPartiallyCorrect && !r.isPerfect).length
     const totalCount = results.length
 
-    const totalScore = results.reduce((sum, r, index) => {
-      const validation = answerValidations[index]
-      if (validation) {
-        return sum + validation.score
+    let totalScore = 0
+    let maxScore = 0
+    let cadenceCorrectCount = 0
+    let cadenceTotalCount = 0
+    const unlockedScores = parcoursContext?.unlockedCadenceValues
+    const onlyUnlockedCadenceForMax = exerciseMode === 'parcours' && Array.isArray(unlockedScores) && unlockedScores.length > 0
+    exercise.markers.forEach((marker, index) => {
+      const correctAnswer = typeof marker === 'object' && marker.chord ? marker.chord : null
+      maxScore += 100
+      if (correctAnswer?.cadence) {
+        const normCad = normalizeCadence(correctAnswer.cadence)
+        if (!onlyUnlockedCadenceForMax || (normCad && unlockedScores.includes(normCad))) {
+          maxScore += 10
+          cadenceTotalCount += 1
+        }
       }
-      return sum + (r.isPerfect ? 100 : 0)
-    }, 0)
-
-    const maxScore = totalCount * 100
+      const validation = answerValidations[index]
+      if (validation?.cadenceBonus > 0) cadenceCorrectCount += 1
+      if (validation) {
+        totalScore += validation.score + (validation.cadenceBonus || 0)
+      } else {
+        const r = results[index]
+        totalScore += r?.isPerfect ? 100 : 0
+      }
+    })
     const scorePercentage = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0
     const score = Math.round(scorePercentage / 10)
 
-    return { score, perfectCount, partialCount, totalCount, scorePercentage }
-  }, [exercise, userAnswers, answerValidations])
+    return { score, perfectCount, partialCount, totalCount, scorePercentage, cadenceCorrectCount, cadenceTotalCount }
+  }, [exercise, userAnswers, answerValidations, exerciseMode, parcoursContext?.unlockedCadenceValues])
 
   // Sélectionner automatiquement le premier segment en mode review
   // IMPORTANT: Ce hook doit être AVANT tous les returns conditionnels
   useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Player.jsx:970',message:'useEffect for segment selection called',data:{mode,selectedSegmentIndex,chordSegmentsLength:chordSegments.length},timestamp:Date.now(),sessionId:'debug-session',runId:'fix-attempt-1',hypothesisId:'B'})}).catch(()=>{});
-    // #endregion
     if (mode === 'review' && selectedSegmentIndex === null && chordSegments.length > 0) {
       setSelectedSegmentIndex(0)
     }
@@ -1092,25 +1535,50 @@ function Player() {
     'Gr': 'D'    // Sixte allemande → Dominante
   }
 
+  /** Extrait la fonction T/SD/D depuis une chaîne qcmAnswer (ex. "I5", "II♭6", "cad6/4") */
+  const getFunctionFromQcmAnswer = (qcmAnswer) => {
+    if (!qcmAnswer || typeof qcmAnswer !== 'string') return null
+    const s = qcmAnswer.trim()
+    if (s.startsWith('It+6') || s.startsWith('Fr+6') || s.startsWith('Gr+6')) return 'D'
+    if (s.startsWith('II♭') || s.startsWith('IIb')) return 'SD'
+    if (s.startsWith('cad')) return 'T'
+    const degreeMatch = s.match(/^(III|VII|II|IV|VI|I|V)(♭|♯|b|#)?/)
+    const degree = degreeMatch ? degreeMatch[1] : null
+    if (degree) {
+      const functions = DEGREE_TO_FUNCTIONS[degree] || []
+      return functions.length > 0 ? functions[0] : null
+    }
+    return null
+  }
+
   const getChordFunction = (chord) => {
     if (!chord) return null
     
-    const { degree, specialRoot, selectedFunction } = chord
+    const { degree, specialRoot, selectedFunction, function: qcmFunction, qcmAnswer } = chord
     
-    // 1. Si une fonction est explicitement sélectionnée, l'utiliser
+    // 1. Réponse QCM avec fonction seule (T/SD/D)
+    if (qcmFunction && ['T', 'SD', 'D'].includes(qcmFunction)) {
+      return qcmFunction
+    }
+    // 2. Si une fonction est explicitement sélectionnée, l'utiliser
     if (selectedFunction) {
       return selectedFunction
     }
     
-    // 2. Si c'est une racine spéciale, utiliser le mapping
+    // 3. Si c'est une racine spéciale, utiliser le mapping
     if (specialRoot) {
       return SPECIAL_ROOT_TO_FUNCTION[specialRoot] || null
     }
     
-    // 3. Si c'est un degré, utiliser le mapping (prendre la première fonction si plusieurs)
+    // 4. Si c'est un degré, utiliser le mapping (prendre la première fonction si plusieurs)
     if (degree) {
       const functions = DEGREE_TO_FUNCTIONS[degree] || []
       return functions.length > 0 ? functions[0] : null
+    }
+    
+    // 5. Réponse QCM avec accord (qcmAnswer) : dériver la fonction depuis la chaîne (ex. "I5" → T)
+    if (qcmAnswer) {
+      return getFunctionFromQcmAnswer(qcmAnswer)
     }
     
     return null
@@ -1166,7 +1634,7 @@ function Player() {
       const savedMode = localStorage.getItem('chordSelectorDegreeModeStudent')
       degreeMode = savedMode || 'generic'
     }
-    const { degree, accidental, quality, figure, isBorrowed, specialRoot, selectedFunction } = chord
+    const { degree, accidental, quality, figure, isBorrowed, specialRoot, selectedFunction, sixFourVariant } = chord
     
     // Si seule une fonction est sélectionnée (sans degré)
     if (selectedFunction && !degree && !specialRoot) {
@@ -1195,12 +1663,15 @@ function Player() {
     
     if (!degree) return null
     
-    const displayDegree = getDegreeLabel(degree, degreeMode)
+    // I64 dépendant du contexte : V64 (passage), cad64 (cadence), I64 (avancé)
+    const isI64 = degree === 'I' && figure === '64'
+    const displayDegreeRaw = isI64 && sixFourVariant === 'passing' ? 'V' : isI64 && sixFourVariant === 'cadential' ? 'cad' : degree
+    const displayDegree = displayDegreeRaw === 'cad' ? 'cad' : getDegreeLabel(displayDegreeRaw, degreeMode)
     const hasDiminished = displayDegree.includes('°')
     const degreeWithoutSymbol = displayDegree.replace('°', '').trim()
     
     let finalQuality = quality
-    if (hasDiminished) {
+    if (hasDiminished && displayDegreeRaw !== 'cad') {
       if (!quality || quality === '°') {
         finalQuality = '°'
       }
@@ -1210,7 +1681,7 @@ function Player() {
     
     return {
       degree: degreeWithoutSymbol,
-      accidental: accidental === 'b' ? '♭' : accidental === '#' ? '♯' : accidental === 'natural' ? '♮' : '',
+      accidental: displayDegreeRaw !== 'cad' ? (accidental === 'b' ? '♭' : accidental === '#' ? '♯' : accidental === 'natural' ? '♮' : '') : '',
       quality: finalQuality,
       figure: figure && figure !== '5' ? figure : '',
       isBorrowed
@@ -1266,12 +1737,16 @@ function Player() {
   const handleSegmentClick = (segmentIndex) => {
     if (mode === 'review') {
       setSelectedSegmentIndex(segmentIndex)
-      // Positionner la vidéo au début du segment
+      // Positionner la vidéo au début du segment (sécurisé : lecteur peut être indisponible)
       if (playerRef.current && chordSegments[segmentIndex]) {
         const segment = chordSegments[segmentIndex]
-        playerRef.current.seekTo(segment.startTime, true)
-        setCurrentTime(segment.startTime)
-        currentTimeRef.current = segment.startTime
+        try {
+          playerRef.current.seekTo(segment.startTime, true)
+          setCurrentTime(segment.startTime)
+          currentTimeRef.current = segment.startTime
+        } catch (e) {
+          console.warn('Player: seekTo indisponible', e?.message)
+        }
       }
     }
   }
@@ -1301,6 +1776,8 @@ function Player() {
             partialCount={calculateScores.partialCount}
             totalCount={calculateScores.totalCount}
             scorePercentage={calculateScores.scorePercentage}
+            cadenceCorrectCount={calculateScores.cadenceCorrectCount}
+            cadenceTotalCount={calculateScores.cadenceTotalCount}
             onReplay={handleReplay}
             onNext={handleNextLevel}
             onBack={handleBackToDashboard}
@@ -1317,45 +1794,34 @@ function Player() {
           <div className="player-review-timeline-container">
             <div 
               ref={timelineRef}
-              className="player-timeline-with-segments player-review-timeline"
+              className={`player-timeline-with-segments player-review-timeline${isMobile ? ' player-timeline-equal-width' : ''}`}
+              style={chordSegments.length && !isMobile ? { minWidth: `max(100%, ${chordSegments.length * 72}px)` } : undefined}
             >
-              {/* Affichage des cadences au-dessus de la timeline */}
-              {getCadences.length > 0 && (
-                <div className="absolute -top-6 left-0 w-full h-6 pointer-events-none z-10">
-                  {getCadences.map((cadence, idx) => {
+              {/* Accolades de cadences au-dessus de la timeline (correction / feedback) */}
+              {getCadencesForBrace.length > 0 && (
+                <div className="player-timeline-cadence-braces player-timeline-cadence-braces-review">
+                  {getCadencesForBrace.map((cadence, idx) => {
                     if (cadence.startMarker === null || cadence.endMarker === null) return null
-                    
                     const startSegment = chordSegments[cadence.startMarker]
                     const endSegment = chordSegments[cadence.endMarker]
                     if (!startSegment || !endSegment) return null
-                    
-                    const leftPos = startSegment.startPos
-                    const width = endSegment.endPos - startSegment.startPos
-                    
-                    const cadenceLabels = {
-                      perfect: 'Parfaite',
-                      imperfect: 'Imparfaite',
-                      plagal: 'Plagale',
-                      rompue: 'Rompue',
-                      évitée: 'Évitée',
-                      'demi-cadence': 'Demi-cadence'
-                    }
-                    
+                    const X = chordSegments.length
+                    const leftPos = isMobile ? (cadence.startMarker / X) * 100 : startSegment.startPos
+                    const width = isMobile ? ((cadence.endMarker - cadence.startMarker + 1) / X) * 100 : (endSegment.endPos - startSegment.startPos)
+                    const braceClass = cadence.cadenceExpected && cadence.cadenceCorrect === true
+                      ? 'player-timeline-cadence-brace player-cadence-brace-correct'
+                      : cadence.cadenceExpected && cadence.cadenceCorrect === false
+                        ? 'player-timeline-cadence-brace player-cadence-brace-incorrect'
+                        : 'player-timeline-cadence-brace'
                     return (
                       <div
                         key={idx}
-                        className="absolute"
-                        style={{
-                          left: `${leftPos}%`,
-                          width: `${width}%`
-                        }}
+                        className={braceClass}
+                        style={{ left: `${leftPos}%`, width: `${width}%` }}
                       >
-                        {/* Crochet supérieur */}
-                        <div className="absolute top-0 left-0 w-full h-4 border-t-2 border-l-2 border-r-2 border-amber-500/50 rounded-t-lg"></div>
-                        
-                        {/* Label cadence */}
-                        <div className="absolute top-0.5 left-1/2 transform -translate-x-1/2 px-2 py-0.5 rounded bg-amber-500/20 backdrop-blur-sm border border-amber-500/30 text-xs font-semibold text-amber-300 whitespace-nowrap z-10">
-                          {cadenceLabels[cadence.cadence] || cadence.cadence}
+                        <div className="player-timeline-cadence-brace-bar" />
+                        <div className="player-timeline-cadence-brace-label">
+                          {cadence.cadenceLabel}
                         </div>
                       </div>
                     )
@@ -1364,11 +1830,11 @@ function Player() {
               )}
 
               {/* Curseur de lecture */}
-              {currentTime >= startTime && currentTime <= endTime && (
+              {currentTime >= startTime && currentTime <= endTime && playheadPositionPercent != null && (
                 <div
                   className="player-timeline-playhead"
                   style={{ 
-                    left: `${relativeEndTime > 0 ? (relativeCurrentTime / relativeEndTime) * 100 : 0}%`,
+                    left: `${playheadPositionPercent}%`,
                     willChange: 'left'
                   }}
                 >
@@ -1380,20 +1846,38 @@ function Player() {
                 const validation = answerValidations[segment.index]
                 const isCorrect = validation && validation.level === 1
                 const isIncorrect = validation && validation.level === 0
-                const isPartial = validation && (validation.level === 2 || validation.level === 3)
+                const isPartial = validation && (validation.level === 0.5 || validation.level === 2 || validation.level === 3)
                 const isSelected = selectedSegmentIndex === segment.index
-                
+                const segLocked = isSegmentLockedByParcours(segment.index)
                 // En mode review, afficher la correction (solution) au lieu de la mauvaise réponse
                 let chordToDisplay = segment.chord
+                const marker = exercise.markers[segment.index]
+                const correctAnswer = typeof marker === 'object' && marker.chord ? marker.chord : null
                 if (isIncorrect || isPartial) {
-                  const marker = exercise.markers[segment.index]
-                  const correctAnswer = typeof marker === 'object' && marker.chord ? marker.chord : null
                   if (correctAnswer) {
                     chordToDisplay = correctAnswer
                   }
+                } else if (segLocked && correctAnswer) {
+                  // Accord qui n'était pas à remplir : afficher la bonne réponse en grisé
+                  chordToDisplay = correctAnswer
                 }
                 const chordLabel = formatChordLabel(chordToDisplay)
-                
+                // En mode QCM, afficher la réponse : accord (qcmAnswer) ou fonction (T/SD/D) si seule
+                const qcmAnswerText = (progressionMode === 'qcm' && chordToDisplay && ('qcmAnswer' in chordToDisplay || 'function' in chordToDisplay))
+                  ? (chordToDisplay.qcmAnswer ?? chordToDisplay.function ?? null)
+                  : null
+                // En mode intuition : timeline avec lettre (T/SD/D) en principal + accord complet en petit
+                const showIntuitionInTimeline = progressionMode === 'functions'
+                const timelineFunction = showIntuitionInTimeline && chordToDisplay ? getChordFunction(chordToDisplay) : null
+                const _detailed = chordToDisplay ? formatChordDetailed(chordToDisplay) : ''
+                const fullChordText = chordToDisplay
+                  ? (chordToDisplay.degree || chordToDisplay.specialRoot
+                      ? _detailed
+                      : (chordToDisplay.selectedFunction && PRIMARY_DEGREES[chordToDisplay.selectedFunction]
+                          ? (PRIMARY_DEGREES[chordToDisplay.selectedFunction][0] || _detailed)
+                          : _detailed))
+                  : ''
+
                 // Classes de validation
                 let validationClass = ''
                 if (isCorrect) {
@@ -1405,25 +1889,52 @@ function Player() {
                 }
 
                 const isLastSegment = segment.index === markers.length - 1
-                
+                const isGivenNotToFill = segLocked && (chordLabel || qcmAnswerText)
+                const reviewSegmentWidthPercent = isMobile && chordSegments.length > 0 ? (100 / chordSegments.length) : segment.width
+                const reviewSegmentLeftPercent = isMobile && chordSegments.length > 0 ? (segment.index / chordSegments.length) * 100 : segment.startPos
                 return (
                   <div
                     key={segment.index}
-                    className={`player-chord-segment player-review-segment ${validationClass} ${isSelected ? 'player-segment-selected' : ''} ${isLastSegment ? 'player-chord-segment-last' : ''}`}
+                    className={`player-chord-segment player-review-segment ${validationClass} ${isSelected ? 'player-segment-selected' : ''} ${isLastSegment && !isMobile ? 'player-chord-segment-last' : ''} ${isGivenNotToFill ? 'player-chord-segment-given' : ''} ${showIntuitionInTimeline ? 'player-chord-segment-intuition' : ''}`}
                     style={{
-                      left: `${segment.startPos}%`,
-                      ...(isLastSegment 
-                        ? {} 
-                        : { width: `${segment.width}%` }
-                      )
+                      left: `${reviewSegmentLeftPercent}%`,
+                      ...(isLastSegment && !isMobile ? {} : { width: `${reviewSegmentWidthPercent}%` })
                     }}
                     onClick={(e) => {
                       e.stopPropagation()
                       handleSegmentClick(segment.index)
+                      setSegmentTooltipIndex((prev) => (prev === segment.index ? null : segment.index))
                     }}
                   >
                     <div className="player-chord-segment-content">
-                      {chordLabel ? (
+                      {showIntuitionInTimeline && timelineFunction ? (
+                        <>
+                          <span className={`player-chord-function ${
+                            timelineFunction === 'T' ? 'player-chord-function-t' :
+                            timelineFunction === 'SD' ? 'player-chord-function-sd' :
+                            'player-chord-function-d'
+                          }`}>
+                            {timelineFunction}
+                          </span>
+                          {fullChordText && (
+                            <span className="player-chord-segment-full-hint">{fullChordText}</span>
+                          )}
+                        </>
+                      ) : qcmAnswerText ? (
+                        ['T', 'SD', 'D'].includes(qcmAnswerText) ? (
+                          <span className={`player-chord-function ${
+                            qcmAnswerText === 'T' ? 'player-chord-function-t' :
+                            qcmAnswerText === 'SD' ? 'player-chord-function-sd' :
+                            'player-chord-function-d'
+                          }`}>
+                            {qcmAnswerText}
+                          </span>
+                        ) : (
+                          <div className="player-chord-label">
+                            <span className="player-chord-degree">{qcmAnswerText}</span>
+                          </div>
+                        )
+                      ) : chordLabel ? (
                         <>
                           {chordLabel.isFunctionOnly ? (
                             <span className={`player-chord-function ${
@@ -1435,42 +1946,19 @@ function Player() {
                             </span>
                           ) : (
                             <div className="player-chord-label">
-                              {chordLabel.isBorrowed && <span className="player-chord-borrowed">(</span>}
-                              {chordLabel.accidental && <span className="player-chord-accidental">{chordLabel.accidental}</span>}
-                              <span className="player-chord-degree">
-                                {chordLabel.degree}
-                                {chordLabel.quality && <span className="player-chord-quality">{chordLabel.quality}</span>}
-                                {chordLabel.figure && (() => {
-                                  const figObj = FIGURES.find(f => f.value === chordLabel.figure)
-                                  const isStacked = figObj?.isStacked || false
-                                  return (
-                                    <span className="player-chord-figure">
-                                      {isStacked && figObj?.displayArray ? (
-                                        <span className="player-chord-figure-stacked">
-                                          {figObj.displayArray.map((f, i) => (
-                                            <span key={i}>{f}</span>
-                                          ))}
-                                        </span>
-                                      ) : (
-                                        <span>{chordLabel.figure}</span>
-                                      )}
-                                    </span>
-                                  )
-                                })()}
-                              </span>
-                              {chordLabel.isBorrowed && <span className="player-chord-borrowed">)</span>}
+                              <ChordLabel chord={chordToDisplay} />
                             </div>
                           )}
                         </>
-                      ) : (
-                        <div className="player-chord-empty">
-                          <span className="player-chord-empty-icon">?</span>
-                        </div>
-                      )}
-                    </div>
+                    ) : (
+                      <div className="player-chord-empty">
+                        <span className="player-chord-empty-icon">?</span>
+                      </div>
+                    )}
                   </div>
-                )
-              })}
+                </div>
+              )
+            })}
             </div>
           </div>
         </div>
@@ -1483,20 +1971,23 @@ function Player() {
             }}
             style={{ flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}
           >
-          <ReviewDetailPanel
-            segmentIndex={selectedSegmentIndex}
-            userAnswer={userAnswers[selectedSegmentIndex]}
-            correctAnswer={(() => {
-              const marker = exercise.markers[selectedSegmentIndex]
-              return typeof marker === 'object' && marker.chord ? marker.chord : null
-            })()}
-            validation={answerValidations[selectedSegmentIndex]}
-            segmentStartTime={chordSegments[selectedSegmentIndex].startTime}
-            segmentEndTime={chordSegments[selectedSegmentIndex].endTime}
-            playerRef={playerRef}
-            exerciseStartTime={startTime}
-            exerciseEndTime={endTime}
-          />
+          <ReviewDetailErrorBoundary>
+            <ReviewDetailPanel
+              segmentIndex={selectedSegmentIndex}
+              userAnswer={userAnswers[selectedSegmentIndex]}
+              correctAnswer={(() => {
+                const marker = exercise.markers[selectedSegmentIndex]
+                return typeof marker === 'object' && marker.chord ? marker.chord : null
+              })()}
+              validation={answerValidations[selectedSegmentIndex]}
+              isSegmentLocked={exerciseMode === 'parcours' && isSegmentLockedByParcours(selectedSegmentIndex)}
+              segmentStartTime={chordSegments[selectedSegmentIndex].startTime}
+              segmentEndTime={chordSegments[selectedSegmentIndex].endTime}
+              playerRef={playerRef}
+              exerciseStartTime={startTime}
+              exerciseEndTime={endTime}
+            />
+          </ReviewDetailErrorBoundary>
           </div>
         )}
       </div>
@@ -1508,6 +1999,29 @@ function Player() {
     <div className="player-immersive">
       {/* Zone Vidéo (Haut - 80-85%) avec Timeline superposée */}
       <div className="player-video-zone">
+        {/* Bouton Quitter masqué quand la modale accord (QCM/intuition/complet) est ouverte pour ne pas superposer la croix de fermeture */}
+        <div className="player-video-zone-actions">
+          {!isModalOpen && (
+          <button
+            className="player-quit-btn"
+            onClick={handleQuitExercise}
+            aria-label="Quitter l'exercice"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+            <span>Quitter</span>
+          </button>
+          )}
+          {showOnboarding && (
+            <div className="player-onboarding-overlay" onClick={handleOnboardingClick}>
+              <div className="player-onboarding-content">
+                <p>Cliquez sur les cases pour identifier les accords</p>
+              </div>
+            </div>
+          )}
+        </div>
         <div className="player-video-wrapper">
             <YouTube
               videoId={videoId}
@@ -1517,29 +2031,76 @@ function Player() {
               className="player-youtube"
             />
           </div>
+        {/* Overlay qui reçoit tous les clics (iframe en pointer-events: none) : zone quit → quit, reste → play/pause */}
+        <div
+          ref={videoZoneOverlayRef}
+          className="player-video-tap-overlay"
+          onClick={handleVideoZoneTap}
+          aria-hidden
+        />
 
         {/* Timeline avec cases superposée sur la vidéo */}
-        <div className="player-timeline-overlay">
+        <div className={`player-timeline-overlay ${getCadencesForBrace.length > 0 ? 'player-timeline-overlay-has-cadences' : ''}`}>
+          {/* Accolades de cadences au-dessus de la timeline (comme en mode édition prof) */}
+          {getCadencesForBrace.length > 0 && (
+            <div className="player-timeline-cadence-braces">
+              {getCadencesForBrace.map((cadence, idx) => {
+                if (cadence.startMarker === null || cadence.endMarker === null) return null
+                const startSegment = chordSegments[cadence.startMarker]
+                const endSegment = chordSegments[cadence.endMarker]
+                if (!startSegment || !endSegment) return null
+                const X = chordSegments.length
+                const leftPos = isMobile ? (cadence.startMarker / X) * 100 : startSegment.startPos
+                const width = isMobile ? ((cadence.endMarker - cadence.startMarker + 1) / X) * 100 : (endSegment.endPos - startSegment.startPos)
+                return (
+                  <div
+                    key={idx}
+                    className="player-timeline-cadence-brace"
+                    style={{ left: `${leftPos}%`, width: `${width}%` }}
+                  >
+                    <div className="player-timeline-cadence-brace-bar" />
+                    <div className="player-timeline-cadence-brace-label">
+                      {cadence.cadenceLabel}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
           <div 
             ref={timelineRef}
-            className="player-timeline-with-segments"
+            className={`player-timeline-with-segments${isMobile ? ' player-timeline-equal-width' : ''}`}
+            style={chordSegments.length && !isMobile ? { minWidth: `max(100%, ${chordSegments.length * 72}px)` } : undefined}
             onClick={(e) => {
               if (!playerRef.current || !exercise) return
-              const rect = e.currentTarget.getBoundingClientRect()
-              const x = e.clientX - rect.left
-              const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100))
-              const time = startTime + (percentage / 100) * (endTime - startTime)
+              const el = e.currentTarget
+              const rect = el.getBoundingClientRect()
+              const scrollLeft = el.scrollLeft || 0
+              const scrollWidth = el.scrollWidth || rect.width
+              const x = e.clientX - rect.left + scrollLeft
+              const percentage = Math.max(0, Math.min(100, (x / scrollWidth) * 100))
+              let time
+              if (isMobile && chordSegments.length > 0) {
+                const X = chordSegments.length
+                const i = Math.min(X - 1, Math.max(0, Math.floor((percentage / 100) * X)))
+                const q = ((percentage / 100) * X) % 1
+                const seg = chordSegments[i]
+                const segDuration = seg.endTime - seg.startTime
+                time = seg.startTime + q * segDuration
+              } else {
+                time = startTime + (percentage / 100) * (endTime - startTime)
+              }
               playerRef.current.seekTo(time, true)
               setCurrentTime(time)
               currentTimeRef.current = time
             }}
           >
             {/* Curseur de lecture */}
-            {currentTime >= startTime && currentTime <= endTime && (
+            {currentTime >= startTime && currentTime <= endTime && playheadPositionPercent != null && (
               <div
                 className="player-timeline-playhead"
                 style={{ 
-                  left: `${relativeEndTime > 0 ? (relativeCurrentTime / relativeEndTime) * 100 : 0}%`,
+                  left: `${playheadPositionPercent}%`,
                   willChange: 'left'
                 }}
               >
@@ -1550,8 +2111,12 @@ function Player() {
             {/* Cases d'accords */}
             {chordSegments.map((segment) => {
               const chordLabel = formatChordLabel(segment.chord)
+              const qcmAnswerText = (progressionMode === 'qcm' && segment.chord && ('qcmAnswer' in segment.chord || 'function' in segment.chord))
+                ? (segment.chord.qcmAnswer ?? segment.chord.function ?? null)
+                : null
               const chordFunction = getChordFunction(segment.chord)
               const isNext = nextMarkerIndex === segment.index
+              const isLocked = isSegmentLockedByParcours(segment.index)
               
               // Obtenir la validation et la solution correcte si on est en mode validation
               const validation = isValidating || animatedChords.has(segment.index) ? answerValidations[segment.index] : null
@@ -1559,11 +2124,13 @@ function Player() {
               const isIncorrect = validation && validation.level === 0
               const isAnimated = animatedChords.has(segment.index)
               
-              // Obtenir la solution correcte
+              // Obtenir la solution correcte (scope visible pour tout le segment, dont ChordLabel plus bas)
               let correctAnswerLabel = null
+              let correctAnswerForDisplay = null
               if (isValidating || isAnimated) {
                 const marker = exercise.markers[segment.index]
                 const correctAnswer = typeof marker === 'object' && marker.chord ? marker.chord : null
+                correctAnswerForDisplay = correctAnswer
                 if (correctAnswer) {
                   correctAnswerLabel = formatChordLabel(correctAnswer)
                 }
@@ -1578,11 +2145,10 @@ function Player() {
                   validationClass = 'player-chord-segment-correct'
                 } else if (isIncorrect) {
                   validationClass = 'player-chord-segment-incorrect'
-                } else if (validation && (validation.level === 2 || validation.level === 3)) {
+                } else if (validation && (validation.level === 0.5 || validation.level === 2 || validation.level === 3)) {
                   validationClass = 'player-chord-segment-partial'
                 }
               }
-              
               if (chordFunction === 'T') {
                 functionColorClasses = segment.isAnswered 
                   ? 'player-chord-segment-answered player-chord-segment-t' 
@@ -1596,8 +2162,8 @@ function Player() {
                   ? 'player-chord-segment-answered player-chord-segment-d' 
                   : 'player-chord-segment-d'
               } else {
-                functionColorClasses = segment.isAnswered 
-                  ? 'player-chord-segment-answered' 
+                functionColorClasses = (segment.isAnswered || qcmAnswerText)
+                  ? 'player-chord-segment-answered'
                   : 'player-chord-segment-empty'
               }
 
@@ -1614,28 +2180,34 @@ function Player() {
               // Pour la dernière case, utiliser une classe CSS pour l'alignement
               const isLastSegment = segment.index === markers.length - 1
               
+              const segmentWidthPercent = isMobile && chordSegments.length > 0 ? (100 / chordSegments.length) : segment.width
+              const segmentLeftPercent = isMobile && chordSegments.length > 0 ? (segment.index / chordSegments.length) * 100 : segment.startPos
+              const segmentStyle = isMobile || !isLastSegment
+                ? { left: `${segmentLeftPercent}%`, width: `${segmentWidthPercent}%` }
+                : { left: `${segmentLeftPercent}%` }
               return (
                 <div
                   key={segment.index}
-                  className={`player-chord-segment ${functionColorClasses} ${validationClass} ${isNext && !segment.isAnswered && !isValidating ? 'player-chord-segment-next' : ''} ${isLastSegment ? 'player-chord-segment-last' : ''} ${isAnimated ? 'player-chord-segment-animated' : ''}`}
-                  style={{
-                    left: `${segment.startPos}%`,
-                    ...(isLastSegment 
-                      ? { 
-                          // Pour la dernière case, utiliser right au lieu de width
-                          // La largeur sera calculée automatiquement par le navigateur
-                          // Le CSS gérera les valeurs de right selon la taille d'écran
-                        } 
-                      : { width: `${segment.width}%` }
-                    )
-                  }}
+                  className={`player-chord-segment ${functionColorClasses} ${validationClass} ${isNext && !segment.isAnswered && !isValidating ? 'player-chord-segment-next' : ''} ${isLastSegment && !isMobile ? 'player-chord-segment-last' : ''} ${isAnimated ? 'player-chord-segment-animated' : ''} ${isLocked ? 'player-chord-segment-locked' : ''}`}
+                  style={segmentStyle}
                   onClick={(e) => {
-                    if (!isValidating) {
+                    if (!isValidating && !isLocked) {
                       e.stopPropagation()
-                      handleMarkerClick(segment.index)
+                      const hasValidation = answerValidations[segment.index]
+                      // En mode QCM : toujours ouvrir la modale au clic pour pouvoir remplir ou modifier l'accord (comme en mode intuition)
+                      if (progressionMode === 'qcm') {
+                        setSegmentTooltipIndex(null)
+                        handleMarkerClick(segment.index)
+                      } else if (hasValidation) {
+                        setSegmentTooltipIndex((prev) => (prev === segment.index ? null : segment.index))
+                      } else {
+                        setSegmentTooltipIndex(null)
+                        handleMarkerClick(segment.index)
+                      }
                     }
                   }}
                 >
+                  <div className="player-chord-segment-body">
                   {/* Jauge de progression à l'intérieur de la case */}
                   {isPlaying && progressInSegment > 0 && !isValidating && (
                     <div 
@@ -1649,39 +2221,24 @@ function Player() {
                     <div className="player-chord-solution-overlay">
                       <div className="player-chord-solution-label">
                         {correctAnswerLabel.isFunctionOnly ? (
-                          <span className={`player-chord-function ${
-                            correctAnswerLabel.function === 'T' ? 'player-chord-function-t' :
-                            correctAnswerLabel.function === 'SD' ? 'player-chord-function-sd' :
-                            'player-chord-function-d'
-                          }`}>
-                            {correctAnswerLabel.function}
-                          </span>
+                          <>
+                            <span className={`player-chord-function ${
+                              correctAnswerLabel.function === 'T' ? 'player-chord-function-t' :
+                              correctAnswerLabel.function === 'SD' ? 'player-chord-function-sd' :
+                              'player-chord-function-d'
+                            }`}>
+                              {correctAnswerLabel.function}
+                            </span>
+                            {(() => {
+                              const marker = exercise.markers[segment.index]
+                              const correctAnswer = typeof marker === 'object' && marker.chord ? marker.chord : null
+                              const principalDegree = correctAnswer?.selectedFunction && PRIMARY_DEGREES[correctAnswer.selectedFunction] ? PRIMARY_DEGREES[correctAnswer.selectedFunction][0] : null
+                              return principalDegree ? <span className="player-chord-segment-full-hint"> ({principalDegree})</span> : null
+                            })()}
+                          </>
                         ) : (
                           <div className="player-chord-label">
-                            {correctAnswerLabel.isBorrowed && <span className="player-chord-borrowed">(</span>}
-                            {correctAnswerLabel.accidental && <span className="player-chord-accidental">{correctAnswerLabel.accidental}</span>}
-                            <span className="player-chord-degree">
-                              {correctAnswerLabel.degree}
-                              {correctAnswerLabel.quality && <span className="player-chord-quality">{correctAnswerLabel.quality}</span>}
-                              {correctAnswerLabel.figure && (() => {
-                                const figObj = FIGURES.find(f => f.value === correctAnswerLabel.figure)
-                                const isStacked = figObj?.isStacked || false
-                                return (
-                                  <span className="player-chord-figure">
-                                    {isStacked && figObj?.displayArray ? (
-                                      <span className="player-chord-figure-stacked">
-                                        {figObj.displayArray.map((f, i) => (
-                                          <span key={i}>{f}</span>
-                                        ))}
-                                      </span>
-                                    ) : (
-                                      <span>{correctAnswerLabel.figure}</span>
-                                    )}
-                                  </span>
-                                )
-                              })()}
-                            </span>
-                            {correctAnswerLabel.isBorrowed && <span className="player-chord-borrowed">)</span>}
+                            <ChordLabel chord={correctAnswerForDisplay} />
                           </div>
                         )}
                       </div>
@@ -1690,7 +2247,21 @@ function Player() {
 
                   {/* Contenu de l'accord */}
                   <div className="player-chord-segment-content">
-                    {chordLabel ? (
+                    {qcmAnswerText ? (
+                      ['T', 'SD', 'D'].includes(qcmAnswerText) ? (
+                        <span className={`player-chord-function ${
+                          qcmAnswerText === 'T' ? 'player-chord-function-t' :
+                          qcmAnswerText === 'SD' ? 'player-chord-function-sd' :
+                          'player-chord-function-d'
+                        }`}>
+                          {qcmAnswerText}
+                        </span>
+                      ) : (
+                        <div className="player-chord-label">
+                          <span className="player-chord-degree">{qcmAnswerText}</span>
+                        </div>
+                      )
+                    ) : chordLabel ? (
                       <>
                         {chordLabel.isFunctionOnly ? (
                           <span className={`player-chord-function ${
@@ -1702,30 +2273,7 @@ function Player() {
                           </span>
                         ) : (
                           <div className="player-chord-label">
-                            {chordLabel.isBorrowed && <span className="player-chord-borrowed">(</span>}
-                            {chordLabel.accidental && <span className="player-chord-accidental">{chordLabel.accidental}</span>}
-                            <span className="player-chord-degree">
-                              {chordLabel.degree}
-                              {chordLabel.quality && <span className="player-chord-quality">{chordLabel.quality}</span>}
-                              {chordLabel.figure && (() => {
-                                const figObj = FIGURES.find(f => f.value === chordLabel.figure)
-                                const isStacked = figObj?.isStacked || false
-                                return (
-                                  <span className="player-chord-figure">
-                                    {isStacked && figObj?.displayArray ? (
-                                      <span className="player-chord-figure-stacked">
-                                        {figObj.displayArray.map((f, i) => (
-                                          <span key={i}>{f}</span>
-                                        ))}
-                                      </span>
-                                    ) : (
-                                      <span>{chordLabel.figure}</span>
-                                    )}
-                                  </span>
-                                )
-                              })()}
-                            </span>
-                            {chordLabel.isBorrowed && <span className="player-chord-borrowed">)</span>}
+                            <ChordLabel chord={segment.chord} />
                           </div>
                         )}
                       </>
@@ -1736,32 +2284,11 @@ function Player() {
                     )}
                   </div>
                 </div>
+                </div>
               )
             })}
           </div>
         </div>
-
-        {/* Bouton Quitter (Haut à droite) */}
-        <button
-          className="player-quit-btn"
-          onClick={handleQuitExercise}
-          aria-label="Quitter l'exercice"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-          <span>Quitter</span>
-        </button>
-
-        {/* Overlay d'onboarding temporaire */}
-        {showOnboarding && (
-          <div className="player-onboarding-overlay" onClick={handleOnboardingClick}>
-            <div className="player-onboarding-content">
-              <p>Cliquez sur les cases pour identifier les accords</p>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Zone de Contrôle (Bas - 15-20%) */}
@@ -1860,20 +2387,21 @@ function Player() {
             <SkipForward className="w-5 h-5 md:w-6 md:h-6 text-white/70" />
           </button>
 
-          {/* Bouton pour ouvrir la modale de l'accord actuel */}
+          {/* Bouton pour ouvrir la modale de l'accord actuel (désactivé si accord non débloqué en mode parcours) */}
           {findCurrentChordSegment && (
             <button
               onClick={handleOpenCurrentChordModal}
-              className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 border border-white/10 hover:border-white/20 transition-all duration-200 flex items-center justify-center shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 active:scale-95"
-              title="Remplir l'accord actuel (Entrée)"
-              aria-label="Ouvrir le sélecteur d'accord pour l'accord actuel"
+              disabled={isSegmentLockedByParcours(findCurrentChordSegment.index)}
+              className={`w-12 h-12 md:w-14 md:h-14 rounded-xl border border-white/10 transition-all duration-200 flex items-center justify-center active:scale-95 ${isSegmentLockedByParcours(findCurrentChordSegment.index) ? 'bg-zinc-700 cursor-not-allowed opacity-60' : 'bg-gradient-to-br from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 hover:border-white/20 shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50'}`}
+              title={isSegmentLockedByParcours(findCurrentChordSegment.index) ? "Accord non débloqué dans ce parcours" : "Remplir l'accord actuel (Entrée)"}
+              aria-label={isSegmentLockedByParcours(findCurrentChordSegment.index) ? "Accord non débloqué" : "Ouvrir le sélecteur d'accord pour l'accord actuel"}
             >
-              <Pencil className="w-5 h-5 md:w-6 md:h-6 text-white" />
+              <Pencil className={`w-5 h-5 md:w-6 md:h-6 ${isSegmentLockedByParcours(findCurrentChordSegment.index) ? 'text-zinc-400' : 'text-white'}`} />
             </button>
           )}
 
-          {/* Bouton Terminer (si toutes les questions sont répondues) */}
-          {answeredCount === totalMarkers && totalMarkers > 0 && (
+          {/* Bouton Terminer (toutes les questions débloquées remplies en parcours, ou tous les accords en libre) */}
+          {canShowFinishButton && (
             <button
               className="px-4 py-2 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold shadow-lg shadow-indigo-500/40 hover:shadow-indigo-500/60 transition-all duration-200 active:scale-95"
               onClick={handleFinishExercise}
@@ -1885,23 +2413,66 @@ function Player() {
         </div>
       </div>
 
-      {/* Modale Flottante de Saisie d'Accord (HUD Glassmorphism) */}
-        <ChordSelectorModal
-          isOpen={isModalOpen}
-          onClose={handleModalClose}
-          onValidate={handleChordValidate}
-          initialChord={userAnswers[currentMarkerIndex] || null}
-          studentMode={true}
-          currentQuestion={currentMarkerIndex + 1}
-          totalQuestions={totalMarkers}
+      {/* Modale Flottante de Saisie d'Accord (ChordSelectorModal : intuition, QCM ou maîtrise) */}
+      <ChordSelectorModal
+        isOpen={isModalOpen}
+        onClose={handleModalClose}
+        onValidate={handleChordValidate}
+        initialChord={userAnswers[currentMarkerIndex] || null}
+        studentMode={true}
+        progressionMode={progressionMode}
+        parcoursContext={parcoursContext}
+        expectedCadence={expectedCadence}
+        currentQuestion={currentMarkerIndex + 1}
+        totalQuestions={totalMarkers}
         embedded={true}
-        />
+        qcmCorrectChord={progressionMode === 'qcm' && exercise?.markers?.[currentMarkerIndex] && typeof exercise.markers[currentMarkerIndex] === 'object' && exercise.markers[currentMarkerIndex].chord ? exercise.markers[currentMarkerIndex].chord : null}
+        qcmAllChords={progressionMode === 'qcm' ? qcmAllChords : null}
+        qcmQuestionId={progressionMode === 'qcm' ? currentMarkerIndex : null}
+        nodeProgress={progressionMode === 'qcm' ? nodeStatsForQCM : null}
+      />
       
-      {/* Affichage du feedback de validation (optionnel, peut être intégré dans l'UI) */}
-      {answerValidations[currentMarkerIndex] && (
-        <div className="player-validation-feedback" style={{ display: 'none' }}>
-          {answerValidations[currentMarkerIndex].feedback}
-      </div>
+      {/* Tooltip au tap sur un segment : accord complet + feedback (lisible sur mobile quand les cases sont étroites) */}
+      {segmentTooltipIndex !== null && chordSegments[segmentTooltipIndex] && exercise?.markers?.[segmentTooltipIndex] && (() => {
+        const validation = answerValidations[segmentTooltipIndex]
+        const marker = exercise.markers[segmentTooltipIndex]
+        const correctChord = typeof marker === 'object' && marker.chord ? marker.chord : null
+        if (!validation) return null
+        const revelation = correctChord
+          ? (!correctChord.degree && !correctChord.specialRoot && correctChord.selectedFunction && PRIMARY_DEGREES[correctChord.selectedFunction])
+            ? `${correctChord.selectedFunction} (${PRIMARY_DEGREES[correctChord.selectedFunction][0]})`
+            : formatChordDetailed(correctChord)
+          : null
+        return (
+          <div
+            className={`player-segment-tooltip player-validation-feedback--level-${validation.level ?? 0}`}
+            role="tooltip"
+            aria-live="polite"
+          >
+            <p className="player-validation-feedback-main">{validation.feedback}</p>
+            {revelation && (
+              <p className="player-validation-feedback-revelation">En réalité, c&apos;était précisément un {revelation}.</p>
+            )}
+          </div>
+        )
+      })()}
+      
+      {/* Double correction : validation fonctionnelle + révélation accord précis (en parcours : feedback uniquement en fin de séquence, dans le panneau de relecture) */}
+      {answerValidations[currentMarkerIndex] && exercise?.markers?.[currentMarkerIndex] && exerciseMode !== 'parcours' && (
+        <div className={`player-validation-feedback player-validation-feedback--level-${answerValidations[currentMarkerIndex].level ?? 0}`}>
+          <p className="player-validation-feedback-main">{answerValidations[currentMarkerIndex].feedback}</p>
+          {(() => {
+            const marker = exercise.markers[currentMarkerIndex]
+            const correctChord = typeof marker === 'object' && marker.chord ? marker.chord : null
+            if (correctChord) {
+              const revelation = (!correctChord.degree && !correctChord.specialRoot && correctChord.selectedFunction && PRIMARY_DEGREES[correctChord.selectedFunction])
+                ? `${correctChord.selectedFunction} (${PRIMARY_DEGREES[correctChord.selectedFunction][0]})`
+                : formatChordDetailed(correctChord)
+              return <p className="player-validation-feedback-revelation">En réalité, c&apos;était précisément un {revelation}.</p>
+            }
+            return null
+          })()}
+        </div>
       )}
     </div>
   )

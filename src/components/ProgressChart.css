@@ -1,0 +1,82 @@
+.progress-chart-container {
+  width: 100%;
+  position: relative;
+  padding: 1.5rem 0;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.03) 0%, rgba(102, 126, 234, 0.02) 100%);
+  border-radius: 16px;
+  transition: all 0.3s ease;
+  overflow: visible;
+}
+
+.progress-chart-container:hover {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(102, 126, 234, 0.04) 100%);
+}
+
+.progress-chart-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #6b7280;
+  font-size: 0.875rem;
+  background: #f9fafb;
+  border-radius: 12px;
+  border: 1px dashed #e5e7eb;
+}
+
+/* Tooltip personnalisé */
+.progress-chart-tooltip {
+  background: rgba(17, 24, 39, 0.95);
+  backdrop-filter: blur(8px);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15), 0 4px 10px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  min-width: 150px;
+}
+
+.progress-chart-tooltip-title {
+  color: #ffffff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0 0 0.25rem 0;
+  letter-spacing: 0.3px;
+}
+
+.progress-chart-tooltip-date {
+  color: #9ca3af;
+  font-size: 0.75rem;
+  margin: 0 0 0.5rem 0;
+}
+
+.progress-chart-tooltip-value {
+  color: #a78bfa;
+  font-size: 1.125rem;
+  font-weight: 700;
+  margin: 0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Animations */
+.progress-chart-container :global(.recharts-area) {
+  animation: fadeInChart 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes fadeInChart {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .progress-chart-container {
+    padding: 1rem 0;
+  }
+}

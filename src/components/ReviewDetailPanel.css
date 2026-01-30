@@ -143,21 +143,34 @@
 }
 
 .review-chord-correct {
-  background: rgba(16, 185, 129, 0.15);
-  border: 2px solid rgba(16, 185, 129, 0.4);
-  color: #10b981;
+  background: rgba(5, 150, 105, 0.15);
+  border: 2px solid rgba(5, 150, 105, 0.4);
+  color: #059669;
+  box-shadow: 0 0 20px rgba(5, 150, 105, 0.5), 0 0 35px rgba(5, 150, 105, 0.3);
+  animation: reviewCorrectGlow 2s ease-in-out infinite;
 }
 
+@keyframes reviewCorrectGlow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(5, 150, 105, 0.5), 0 0 35px rgba(5, 150, 105, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 28px rgba(5, 150, 105, 0.7), 0 0 48px rgba(5, 150, 105, 0.5);
+  }
+}
+
+/* Partiellement bon : orange (feedback universel rouge / orange / vert) */
 .review-chord-partial {
-  background: rgba(245, 158, 11, 0.15);
-  border: 2px solid rgba(245, 158, 11, 0.4);
-  color: #f59e0b;
+  background: rgba(234, 88, 12, 0.15);
+  border: 2px solid rgba(234, 88, 12, 0.4);
+  color: #ea580c;
 }
 
+/* Faux : rouge */
 .review-chord-incorrect {
-  background: rgba(239, 68, 68, 0.15);
-  border: 2px solid rgba(239, 68, 68, 0.4);
-  color: #ef4444;
+  background: rgba(220, 38, 38, 0.15);
+  border: 2px solid rgba(220, 38, 38, 0.4);
+  color: #dc2626;
 }
 
 .review-chord-empty {
@@ -192,7 +205,13 @@
   font-family: sans-serif;
   vertical-align: super;
   position: relative;
-  top: -0.3em;
+  top: -0.25em;
+}
+
+.review-chord-figure .chord-label-figure-stacked {
+  display: flex;
+  flex-direction: column;
+  line-height: 0.85;
 }
 
 .review-chord-function {
@@ -200,14 +219,26 @@
   font-weight: 900;
 }
 
+.review-chord-function-with-hint {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.15em;
+}
+
+.review-chord-function-hint {
+  font-size: 0.75em;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
 .review-chord-right {
   color: inherit;
 }
 
 .review-chord-wrong {
-  color: #ef4444;
+  color: #dc2626;
   text-decoration: line-through;
-  opacity: 0.6;
+  opacity: 0.9;
 }
 
 /* Explication */
@@ -246,6 +277,64 @@
   color: #f59e0b;
   font-weight: 700;
   font-family: 'Courier New', monospace;
+}
+
+.review-explanation-cadence-bonus {
+  color: #fcd34d;
+  margin-left: 0.35em;
+}
+
+/* Cadence dans le comparateur (votre réponse / solution) */
+.review-cadence {
+  margin-top: 0.5rem;
+  font-size: clamp(0.7rem, 2%, 0.9rem);
+  font-weight: 600;
+}
+.review-cadence-correct {
+  color: #86efac;
+}
+.review-cadence-incorrect {
+  color: #fca5a5;
+}
+.review-cadence-solution {
+  color: #fcd34d;
+}
+
+/* Message explicite « Cadence incorrecte » */
+.review-cadence-feedback-wrong {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: clamp(0.5rem, 1.5%, 0.75rem);
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: clamp(6px, 0.6%, 10px);
+  flex-shrink: 0;
+}
+.review-cadence-feedback-wrong-icon {
+  flex-shrink: 0;
+  font-size: 1.1rem;
+}
+.review-cadence-feedback-wrong-text {
+  margin: 0;
+  font-size: clamp(0.75rem, 2%, 0.95rem);
+  color: #fca5a5;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.review-cadence-feedback-wrong-text strong {
+  color: #fecaca;
+}
+
+/* Message neutre (accord non débloqué, pas d'erreur) */
+.review-explanation-neutral {
+  background: rgba(99, 102, 241, 0.1);
+  border-left-color: rgba(99, 102, 241, 0.5);
+}
+
+.review-explanation-neutral .review-explanation-text {
+  color: rgba(165, 180, 252, 0.95);
+  font-style: normal;
 }
 
 @keyframes panelSlideUp {

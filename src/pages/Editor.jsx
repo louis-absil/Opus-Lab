@@ -23,21 +23,7 @@ import {
   RotateCcw
 } from 'lucide-react'
 import { DEGREE_TO_FUNCTIONS } from '../utils/riemannFunctions'
-
-// Constantes pour les chiffrages (identique à ChordSelectorModal)
-const FIGURES = [
-  { value: '5', label: 'Quinte', display: '5' },
-  { value: '6', label: 'Sixte', display: '6' },
-  { value: '64', label: 'Quarte-sixte', display: '6/4', isStacked: true, displayArray: ['6', '4'] },
-  { value: '7', label: 'Septième', display: '7' },
-  { value: '65', label: 'Sixte-quinte', display: '6/5', isStacked: true, displayArray: ['6', '5'] },
-  { value: '43', label: 'Quarte-tierce', display: '4/3', isStacked: true, displayArray: ['4', '3'] },
-  { value: '2', label: 'Seconde', display: '2' },
-  { value: '9', label: 'Neuvième', display: '9' },
-  { value: '11', label: 'Onzième', display: '11' },
-  { value: '13', label: 'Treizième', display: '13' },
-  { value: '54', label: 'Quinte-quarte', display: '5/4', isStacked: true, displayArray: ['5', '4'] }
-]
+import ChordLabel from '../components/ChordLabel'
 
 function Editor() {
   const { id } = useParams()
@@ -69,6 +55,7 @@ function Editor() {
   const [dragStartX, setDragStartX] = useState(0)
   const [dragStartTime, setDragStartTime] = useState(0)
   const [draggingMarkerIndex, setDraggingMarkerIndex] = useState(null)
+  const [loadedAutoTags, setLoadedAutoTags] = useState([])
   
   const playerRef = useRef(null)
   const intervalRef = useRef(null)
@@ -163,6 +150,7 @@ function Editor() {
       }
 
       setExerciseId(exerciseId)
+      setLoadedAutoTags(exercise.autoTags && Array.isArray(exercise.autoTags) ? [...exercise.autoTags] : [])
       setIsEditingUrl(false)
       setShowVideoSearch(false)
       
@@ -1096,7 +1084,7 @@ function Editor() {
       const savedMode = localStorage.getItem('chordSelectorDegreeMode')
       degreeMode = savedMode || 'generic'
     }
-    const { degree, accidental, quality, figure, isBorrowed, specialRoot, selectedFunction } = chord
+    const { degree, accidental, quality, figure, isBorrowed, specialRoot, selectedFunction, sixFourVariant } = chord
     
     // Si seule une fonction est sélectionnée (sans degré)
     if (selectedFunction && !degree && !specialRoot) {
@@ -1127,30 +1115,25 @@ function Editor() {
     
     if (!degree) return null
     
-    // Utiliser getDegreeLabel pour adapter l'affichage selon le mode
-    const displayDegree = getDegreeLabel(degree, degreeMode)
-    // Extraire le symbole ° si présent dans le label adapté
+    // I64 dépendant du contexte : V64 (passage), cad64 (cadence), I64 (avancé)
+    const isI64 = degree === 'I' && figure === '64'
+    const displayDegreeRaw = isI64 && sixFourVariant === 'passing' ? 'V' : isI64 && sixFourVariant === 'cadential' ? 'cad' : degree
+    const displayDegree = displayDegreeRaw === 'cad' ? 'cad' : getDegreeLabel(displayDegreeRaw, degreeMode)
     const hasDiminished = displayDegree.includes('°')
     const degreeWithoutSymbol = displayDegree.replace('°', '').trim()
     
-    // Si le label adapté contient déjà °, l'utiliser comme quality
-    // (sauf si quality contient déjà autre chose que °, auquel cas on garde la quality originale)
     let finalQuality = quality
-    if (hasDiminished) {
-      // Le symbole est dans le label adapté, l'utiliser comme quality
-      // Sauf si quality contient déjà autre chose (comme '+'), auquel cas on garde la quality originale
+    if (hasDiminished && displayDegreeRaw !== 'cad') {
       if (!quality || quality === '°') {
         finalQuality = '°'
       }
-      // Si quality contient autre chose (comme '+'), on garde la quality originale
     } else if (!quality) {
-      // Si le label adapté ne contient pas ° et qu'il n'y a pas de quality, on ne met rien
       finalQuality = ''
     }
     
     return {
       degree: degreeWithoutSymbol,
-      accidental: accidental === 'b' ? '♭' : accidental === '#' ? '♯' : accidental === 'natural' ? '♮' : '',
+      accidental: displayDegreeRaw !== 'cad' ? (accidental === 'b' ? '♭' : accidental === '#' ? '♯' : accidental === 'natural' ? '♮' : '') : '',
       quality: finalQuality,
       figure: figure && figure !== '5' ? figure : '',
       isBorrowed
@@ -1237,32 +1220,32 @@ function Editor() {
                 />
               </div>
             
-        {/* Overlay avec contrôles et infos */}
+        {/* Overlay avec contrôles et infos — en colonne sur mobile pour que Sauvegarder reste visible */}
         <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/60 to-transparent p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-shrink">
               <button
                 onClick={handleBackClick}
-                className="p-2 rounded-lg bg-white/5 hover:bg-white/10 backdrop-blur-md transition-colors"
+                className="p-2 rounded-lg bg-white/5 hover:bg-white/10 backdrop-blur-md transition-colors flex-shrink-0"
                 title="Retour au Dashboard"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
-              <div className="px-4 py-2 rounded-lg bg-black/40 backdrop-blur-md border border-white/10">
-                <p className="text-sm font-medium text-white/90 truncate max-w-md">{videoTitle || 'Vidéo YouTube'}</p>
+              <div className="px-3 py-2 sm:px-4 rounded-lg bg-black/40 backdrop-blur-md border border-white/10 min-w-0 flex-1 sm:flex-initial">
+                <p className="text-sm font-medium text-white/90 truncate max-w-[140px] sm:max-w-md">{videoTitle || 'Vidéo YouTube'}</p>
               </div>
               <button
                 onClick={() => setShowVideoSearch(true)}
-                className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 backdrop-blur-md border border-white/10 text-sm transition-colors"
+                className="px-3 py-2 sm:px-4 rounded-lg bg-white/5 hover:bg-white/10 backdrop-blur-md border border-white/10 text-sm transition-colors flex-shrink-0"
               >
                 Changer
               </button>
             </div>
-            
-            <div className="flex items-center gap-2">
+
+            <div className="flex items-center justify-end gap-2 flex-shrink-0">
               {user ? (
                 <>
-                  <span className="px-3 py-1.5 rounded-lg bg-white/5 backdrop-blur-md text-sm text-white/70">
+                  <span className="hidden sm:inline px-3 py-1.5 rounded-lg bg-white/5 backdrop-blur-md text-sm text-white/70 truncate max-w-[120px] md:max-w-none">
                     {user.displayName || user.email}
                   </span>
                   <button
@@ -1373,6 +1356,9 @@ function Editor() {
               {markers.map((marker, index) => {
                 const chord = chordData[index]
                 const chordLabel = formatChordLabel(chord)
+                // #region agent log
+                fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Editor.jsx:ruban-accords',message:'ruban marker/chord',data:{index,markerType:typeof marker,markerChord:typeof marker?.chord,chordDefined:!!chord,chordLabelExists:!!chordLabel,isFunctionOnly:!!chordLabel?.isFunctionOnly},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'H1'})}).catch(()=>{});
+                // #endregion
                 const isSelected = selectedMarkerId === index
                 const chordFunction = getChordFunction(chord)
                 
@@ -1384,12 +1370,12 @@ function Editor() {
                     : 'border-blue-500/40 bg-blue-500/10 hover:bg-blue-500/15 hover:border-blue-500/60'
                 } else if (chordFunction === 'SD') {
                   functionColorClasses = isSelected 
-                    ? 'border-amber-500 bg-amber-500/20 shadow-lg shadow-amber-500/30' 
-                    : 'border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/15 hover:border-amber-500/60'
+                    ? 'border-violet-500 bg-violet-500/20 shadow-lg shadow-violet-500/30' 
+                    : 'border-violet-500/40 bg-violet-500/10 hover:bg-violet-500/15 hover:border-violet-500/60'
                 } else if (chordFunction === 'D') {
                   functionColorClasses = isSelected 
-                    ? 'border-rose-500 bg-rose-500/20 shadow-lg shadow-rose-500/30' 
-                    : 'border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/15 hover:border-rose-500/60'
+                    ? 'border-pink-500 bg-pink-500/20 shadow-lg shadow-pink-500/30' 
+                    : 'border-pink-500/40 bg-pink-500/10 hover:bg-pink-500/15 hover:border-pink-500/60'
                 } else {
                   // Pas de fonction déterminée
                   functionColorClasses = isSelected 
@@ -1415,46 +1401,22 @@ function Editor() {
                       {chordLabel ? (
                         <>
                           {chordLabel.isFunctionOnly ? (
-                            <span className={`font-serif text-4xl font-bold ${
+                            <span className={`font-chord text-4xl font-bold ${
                               chordLabel.function === 'T' ? 'text-blue-400' :
-                              chordLabel.function === 'SD' ? 'text-amber-400' :
-                              'text-rose-400'
+                              chordLabel.function === 'SD' ? 'text-violet-400' :
+                              'text-pink-400'
                             }`}>
                               {chordLabel.function}
                             </span>
                           ) : (
                             <div className={`flex items-center gap-0.5 ${chordLabel.isBorrowed ? 'px-1' : ''}`}>
-                              {chordLabel.isBorrowed && <span className="text-zinc-500 text-2xl leading-none">(</span>}
-                              <div className="flex flex-col items-center">
-                                <span className="font-serif text-3xl font-bold text-white relative inline-flex items-baseline">
-                                  {chordLabel.accidental && <span className="text-amber-400">{chordLabel.accidental}</span>}
-                                  <span className="relative inline-flex items-baseline">
-                                    {chordLabel.degree}
-                                    {chordLabel.quality && <span className="text-zinc-300">{chordLabel.quality}</span>}
-                                    {chordLabel.figure && (() => {
-                                      // Trouver la figure dans FIGURES pour savoir si elle est empilée
-                                      // La figure stockée est la valeur (ex: "64", "43"), pas le display
-                                      const figObj = FIGURES.find(f => f.value === chordLabel.figure)
-                                      const isStacked = figObj?.isStacked || false
-                                      
-                                      return (
-                                        <span className="relative inline-block align-top font-sans text-white/70 font-medium ml-0.5" style={{ fontSize: '0.45em', top: '-0.3em' }}>
-                                          {isStacked && figObj?.displayArray ? (
-                                            <span className="flex flex-col leading-none" style={{ lineHeight: '0.85' }}>
-                                              {figObj.displayArray.map((f, i) => (
-                                                <span key={i} style={{ fontSize: '0.9em' }}>{f}</span>
-                                              ))}
-                                            </span>
-                                          ) : (
-                                            <span>{chordLabel.figure}</span>
-                                          )}
-                                        </span>
-                                      )
-                                    })()}
-                                  </span>
-                                </span>
-                              </div>
-                              {chordLabel.isBorrowed && <span className="text-zinc-500 text-2xl leading-none">)</span>}
+                              {/* #region agent log */}
+                              {(()=>{fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Editor.jsx:ChordLabel-props',message:'ChordLabel reçoit chord',data:{index,passingChord:!!chord,chordPassedToLabel:!!chord},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'H2'})}).catch(()=>{});return null})()}
+                              {/* #endregion */}
+                              <ChordLabel
+                                chord={chord}
+                                className="font-chord text-3xl font-bold text-white [&_.chord-label-figure]:text-white/70"
+                              />
                             </div>
                           )}
                         </>
@@ -1471,7 +1433,7 @@ function Editor() {
                     {/* Bouton supprimer */}
                     <button
                       onClick={(e) => handleDeleteMarker(e, index)}
-                      className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center transition-colors shadow-lg z-50"
+                      className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-pink-500 hover:bg-pink-400 text-white flex items-center justify-center transition-colors shadow-lg z-50"
                       title="Supprimer"
                     >
                       <X className="w-3 h-3" />
@@ -1874,6 +1836,7 @@ function Editor() {
           markers={markers}
           chordData={chordData}
           isEditMode={!!exerciseId}
+          initialAutoTags={exerciseId ? loadedAutoTags : undefined}
         />
         
         {/* Modale de confirmation de sortie */}

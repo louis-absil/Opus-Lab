@@ -318,6 +318,14 @@ export function generateAutoTags(markers, chordData, composer = null) {
       }
     }
 
+    // Cadence 6/4 (I 6/4 cadentiel, résout sur V)
+    if (chord.degree && (chord.figure === '64' || chord.inversion === '64') && chord.sixFourVariant === 'cadential') {
+      if (!tags.includes('Cadence6/4')) tags.push('Cadence6/4')
+    }
+
+    // Dominantes secondaires (V/V, V/VI, etc.) — nécessite ofDegree ou équivalent sur l'accord ; à ajouter si le schéma est étendu
+    // if (chord.ofDegree) { if (!tags.includes('DominanteSecondaire')) tags.push('DominanteSecondaire') }
+
     // Qualités
     if (chord.quality) {
       if (chord.quality === '°') {

@@ -1,0 +1,89 @@
+.milestone-celebration {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1000;
+  pointer-events: none;
+  animation: milestoneAppear 0.5s ease-out;
+}
+
+/* Célébration renforcée pour paliers niveau (5, 10, 15…) */
+.milestone-celebration--level .milestone-celebration-content {
+  border-width: 3px;
+  border-color: rgba(251, 191, 36, 0.6);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(251, 191, 36, 0.2);
+}
+.milestone-celebration--level .milestone-emoji-large {
+  animation: milestoneBounce 0.6s ease-out, milestonePulse 1.2s ease-out 0.3s 1;
+}
+@keyframes milestonePulse {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-8px) scale(1.08); }
+}
+
+.milestone-celebration-content {
+  background: rgba(17, 24, 39, 0.95);
+  backdrop-filter: blur(12px);
+  border-radius: 24px;
+  padding: 2rem 3rem;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  border: 2px solid rgba(139, 92, 246, 0.5);
+  text-align: center;
+  min-width: 280px;
+}
+
+.milestone-emoji-large {
+  font-size: 4rem;
+  line-height: 1;
+  margin-bottom: 1rem;
+  animation: milestoneBounce 0.6s ease-out;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+}
+
+.milestone-message {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #ffffff;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0;
+}
+
+@keyframes milestoneAppear {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes milestoneBounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .milestone-celebration-content {
+    padding: 1.5rem 2rem;
+    min-width: 240px;
+  }
+
+  .milestone-emoji-large {
+    font-size: 3rem;
+  }
+
+  .milestone-message {
+    font-size: 1.125rem;
+  }
+}

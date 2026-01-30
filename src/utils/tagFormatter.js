@@ -152,3 +152,24 @@ export function formatTagForDisplay(tag) {
   
   return formatted
 }
+
+/**
+ * Libellé d'affichage pour une clé de renversement (figure) dans les stats par degré.
+ * @param {string} figureKey - Clé figure ('' ou '5' = fondamental, '6', '64', '7', '65', '43', '2', etc.)
+ * @returns {string} - Libellé pour l'affichage (ex: "5/3", "⁶", "⁶₄")
+ */
+export function getFigureKeyLabel(figureKey) {
+  if (figureKey === '' || figureKey === '5') return '5/3'
+  const map = {
+    '6': '⁶',
+    '64': '⁶₄',
+    '7': '7',
+    '65': '⁶₅',
+    '43': '⁴₃',
+    '2': '²',
+    '42': '²',
+    '9': '9',
+    '54': '⁵₄'
+  }
+  return map[figureKey] ?? figureKey
+}

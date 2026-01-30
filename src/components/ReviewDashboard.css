@@ -120,6 +120,10 @@
   font-size: clamp(0.75rem, 3%, 1.1rem);
 }
 
+.review-stats-cadences {
+  margin-top: 0.2rem;
+}
+
 .review-score-percentage {
   font-size: clamp(0.6rem, 2.2%, 0.85rem);
   color: #b0b0b0;
