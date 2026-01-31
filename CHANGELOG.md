@@ -4,6 +4,44 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ---
 
+## [1.1.0] – 2026-01-31
+
+### Nouveautés
+
+#### Nouveaux Horizons (musiques non classiques)
+- **Carte Horizons** : composant `HorizonsMap.jsx`, styles Film, Jeu vidéo, Anime, Variété, Pop.
+- **Données** : `horizonsIllustrations.js`, plan dans `docs/plan-onglet-horizons-musiques-non-classiques.md`.
+
+#### Codex
+- **CodexView** : consultation des entrées pédagogiques avec notation et exemples.
+- **Composants** : `CodexView.jsx`, `CodexNotation.jsx`, `CodexAudioPlayer.jsx`, `CodexExampleBlock.jsx`.
+- **Données** : `codexEntries.js`, `codexMusicalExamples.js`, `codexIllustrations.js`, utilitaires `codexHelpers.js`.
+
+#### Côté enseignant
+- **Catalogues** : `TeacherCatalogue.jsx`, `TeacherClasses.jsx`, `TeacherAssignments.jsx`.
+- **Modales** : `TeacherDetailModal`, `AssignToClassModal`, `RequestEstablishmentModal`, `StudentDetailModal`.
+- **Services** : `teacherClassService.js`, `assignmentService.js`, `referenceDataService.js`.
+- **Données** : `establishments.js`, `classes.js`, `teacherSubjects.js`.
+
+#### Côté élève
+- **StudentCatalogue.jsx** : catalogue élève et détail.
+- **StudentDetailModal.jsx** : détail élève.
+
+#### Authentification et divers
+- **Connexion par email** : `EmailLoginModal.jsx` en plus de Google.
+- **Avatar** : `avatarService.js`.
+- **Utilitaires** : `chordToNotes.js`, `personalizedTipSelector.js`, `profileStats.js`.
+- **Documentation** : `.gitattributes` pour fins de ligne LF ; note README sur encodage UTF-8 des messages de commit pour l’affichage correct sur GitHub Actions.
+
+### Modifié
+
+- **AchievementsDashboard** : évolution (BadgeSystem supprimé ou fusionné).
+- **ReviewDashboard**, **ReviewDetailPanel**, **SaveExerciseModal** et autres composants mis à jour.
+- **AppRouter** : routes pour catalogues, Codex, Horizons selon la structure actuelle.
+- **Firebase / Firestore** : règles et index si nécessaire pour les nouvelles fonctionnalités.
+
+---
+
 ## [1.0.0] – 2025-01-30
 
 ### 🎉 Version majeure – Parcours guidé et expérience élève
@@ -93,4 +131,5 @@ Cette version introduit un **parcours pédagogique structuré**, un **tableau de
 
 ---
 
+[1.1.0]: https://github.com/louis-absil/Opus-Lab/releases/tag/v1.1.0
 [1.0.0]: https://github.com/louis-absil/Opus-Lab/releases/tag/v1.0.0

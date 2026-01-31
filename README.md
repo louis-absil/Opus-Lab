@@ -12,11 +12,16 @@ Opus Lab est une plateforme web d'entraînement pour les musiciens qui souhaiten
 - **Sélection d'accords avancée** : Notation Riemann / académique des conservatoires (ChordSelectorModal)
 - **Gestion d'exercices** : Créez, modifiez, publiez ; édition des tags (EditTagsModal)
 - **Dashboard complet** : Visualisez et gérez tous vos exercices
+- **Catalogues** : Catalogue professeurs (TeacherCatalogue), classes (TeacherClasses), devoirs (TeacherAssignments)
+- **Modales** : Détail professeur/élève, affectation à une classe, demande d'établissement (RequestEstablishmentModal)
 - **Prévisualisation parcours** : Scénarios simulés pour voir le point de vue élève
 
 ### 👨‍🎓 Pour les élèves
 - **Parcours guidé** : Carte de progression par étages (Intuition → Précision → Couleur SD → Chromatisme) avec nœuds d'apprentissage et points de contrôle (cadences)
+- **Nouveaux Horizons** : Carte des musiques non classiques (Film, Jeu vidéo, Anime, Variété, Pop) avec styles débloqués
+- **Codex** : Consultation des entrées pédagogiques avec notation et exemples audio
 - **Mode libre** : Liste d'exercices avec filtres par difficulté, tag, compositeur ; accès par pastilles depuis l'accueil
+- **Catalogue élève** : StudentCatalogue et détail élève (StudentDetailModal)
 - **Tableau de bord** : Onglets Accueil, Parcours, Mode libre, Progression, Profil
 - **Bloc d'apprentissage du jour** : Objectif quotidien et accès rapide au parcours ou au mode libre
 - **Badges et gamification** : Premier Pas, séries (3/7/30 jours), score parfait, 10/50/100 exercices ; tableau des succès
@@ -33,7 +38,7 @@ Opus Lab est une plateforme web d'entraînement pour les musiciens qui souhaiten
 - **Timeline interactive** : Navigation précise dans les extraits musicaux
 - **Fade in/out automatique** : Transitions sonores fluides
 - **Raccourcis clavier** : Contrôles rapides pour une utilisation efficace
-- **Authentification Google** : Connexion sécurisée via Firebase Auth
+- **Authentification** : Connexion Google et par email (Firebase Auth)
 - **Base de données Firestore** : Exercices, tentatives, progression, badges, objectifs ; index et règles à jour
 - **Recharts** : Graphiques de progression et statistiques
 - **Tailwind CSS** : Styles et composants
@@ -139,6 +144,7 @@ Le projet est configuré pour être déployé automatiquement sur GitHub Pages.
 3. **Le déploiement se fait automatiquement** :
    - Le workflow GitHub Actions se déclenche à chaque push
    - Votre site sera accessible à : `https://louis-absil.github.io/Opus-Lab/`
+   - Les mises à jour sont décrites dans [CHANGELOG.md](./CHANGELOG.md).
 
 ### Configuration Firebase pour GitHub Pages
 
@@ -159,50 +165,45 @@ opus-lab/
 │   ├── assets/             # Images et ressources
 │   ├── components/         # Composants réutilisables
 │   │   ├── AchievementsDashboard.jsx  # Tableau des succès / badges
-│   │   ├── BadgeSystem.jsx
 │   │   ├── CampaignMap.jsx           # Carte du parcours guidé
+│   │   ├── CodexView.jsx, CodexNotation.jsx, CodexAudioPlayer.jsx, CodexExampleBlock.jsx
+│   │   ├── HorizonsMap.jsx           # Carte Nouveaux Horizons
 │   │   ├── ChordLabel.jsx, ChordSelectorModal (src/)
-│   │   ├── DailyLearningBlock.jsx    # Bloc d'apprentissage du jour
-│   │   ├── EditTagsModal.jsx
-│   │   ├── ExerciseCard.jsx, ExerciseSummary.jsx
-│   │   ├── ExerciseSuggestions.jsx
-│   │   ├── MilestoneCelebrations.jsx
-│   │   ├── PerformanceDetails.jsx, ProgressChart.jsx
-│   │   ├── PeriodComparison.jsx, TrendIndicators.jsx
-│   │   ├── ProfileModal.jsx, PromoteToTeacherModal.jsx
-│   │   ├── ReviewDashboard.jsx, ReviewDetailPanel.jsx
-│   │   ├── SaveExerciseModal.jsx
-│   │   ├── WeeklyObjectives.jsx, WeeklyStats.jsx
+│   │   ├── DailyLearningBlock.jsx, EditTagsModal.jsx
+│   │   ├── ExerciseCard.jsx, ExerciseSuggestions.jsx
+│   │   ├── ProfileModal.jsx, ReviewDashboard.jsx, ReviewDetailPanel.jsx
+│   │   ├── SaveExerciseModal.jsx, WeeklyObjectives.jsx, TrendIndicators.jsx
+│   │   ├── AssignToClassModal.jsx, RequestEstablishmentModal.jsx
+│   │   ├── TeacherDetailModal.jsx, StudentDetailModal.jsx
+│   │   ├── EmailLoginModal.jsx
 │   │   └── ...
 │   ├── contexts/          # Contextes React
 │   │   ├── AuthContext.jsx
 │   │   └── NetworkContext.jsx
 │   ├── data/              # Données parcours et références
-│   │   ├── parcoursTree.js
-│   │   ├── parcoursIllustrations.js
-│   │   ├── knownTags.js, pedagogicalTips.js
+│   │   ├── parcoursTree.js, parcoursIllustrations.js
+│   │   ├── codexEntries.js, codexMusicalExamples.js, codexIllustrations.js
+│   │   ├── horizonsIllustrations.js
+│   │   ├── knownTags.js, pedagogicalTips.js, classes.js, establishments.js, teacherSubjects.js
 │   │   └── ...
 │   ├── pages/
-│   │   ├── Dashboard.jsx       # Dashboard professeur
-│   │   ├── Editor.jsx          # Éditeur d'exercices
-│   │   ├── FreeMode.jsx        # Mode libre (liste + filtres)
-│   │   ├── LandingPage.jsx     # Page d'accueil
-│   │   ├── Player.jsx          # Lecteur d'exercices
-│   │   └── StudentDashboard.jsx # Dashboard élève (parcours, progression, profil)
+│   │   ├── Dashboard.jsx, Editor.jsx, LandingPage.jsx, Player.jsx
+│   │   ├── FreeMode.jsx, StudentDashboard.jsx
+│   │   ├── TeacherCatalogue.jsx, TeacherClasses.jsx, TeacherAssignments.jsx
+│   │   ├── StudentCatalogue.jsx
+│   │   └── ...
 │   ├── services/
-│   │   ├── attemptService.js
-│   │   ├── badgeService.js
-│   │   ├── exerciseService.js
-│   │   ├── objectiveService.js
-│   │   ├── progressionService.js
-│   │   └── userService.js
-│   ├── utils/             # Utilitaires (Riemann, tags, difficulté, etc.)
-│   ├── App.jsx, AppRouter.jsx
-│   ├── firebase.js
-│   └── main.jsx
-├── firebase.json
-├── firestore.rules
-├── firestore.indexes.json
+│   │   ├── attemptService.js, badgeService.js, exerciseService.js
+│   │   ├── objectiveService.js, progressionService.js, userService.js
+│   │   ├── teacherClassService.js, assignmentService.js, referenceDataService.js
+│   │   ├── avatarService.js
+│   │   └── ...
+│   ├── utils/             # Utilitaires (Riemann, tags, difficulté, codex, etc.)
+│   ├── App.jsx, AppRouter.jsx, firebase.js, main.jsx
+│   └── ...
+├── .github/workflows/deploy.yml
+├── firebase.json, firestore.rules, firestore.indexes.json
+├── .gitattributes         # Fins de ligne LF, encodage cohérent
 ├── CHANGELOG.md           # Notes de mise à jour
 └── package.json
 ```
@@ -274,6 +275,18 @@ Les contributions sont les bienvenues ! Pour contribuer :
 3. Committez vos changements (`git commit -m 'Add some AmazingFeature'`)
 4. Pushez vers la branche (`git push origin feature/AmazingFeature`)
 5. Ouvrez une Pull Request
+
+### Affichage correct des messages de commit sur GitHub (Actions, historique)
+
+Sous Windows, les messages de commit avec accents peuvent s'afficher incorrectement sur GitHub (ex. Ã© au lieu de é). Pour que les titres des runs GitHub Actions et l'historique affichent correctement les caractères accentués :
+
+- **Configurer Git en UTF-8** (une fois) :
+  ```bash
+  git config --global i18n.commitencoding utf-8
+  git config --global i18n.logoutputencoding utf-8
+  git config --global core.quotepath false
+  ```
+- **Terminal en UTF-8** : en PowerShell, exécuter `chcp 65001` avant de committer, ou rédiger le message dans l'éditeur (Cursor/VS Code) plutôt qu'en `git commit -m "..."` dans un terminal non configuré en UTF-8.
 
 ## 📝 Licence
 

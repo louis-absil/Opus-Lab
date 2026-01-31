@@ -1,0 +1,6 @@
+# Normalize line endings to LF for consistent behavior on GitHub Actions (Linux) and cross-platform
+* text=auto eol=lf
+
+# Explicit for workflow files
+*.yml text eol=lf
+*.yaml text eol=lf
