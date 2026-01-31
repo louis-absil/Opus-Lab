@@ -6,6 +6,61 @@
   padding-bottom: 80px; /* Espace pour la bottom nav */
 }
 
+/* Page Nouveaux Horizons (plein écran, sans bottom nav) */
+.student-horizons-page {
+  padding-bottom: 0;
+}
+
+.student-horizons-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  padding-top: calc(0.75rem + env(safe-area-inset-top, 0px));
+  min-height: 56px;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.student-horizons-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.5rem;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.student-horizons-back:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.student-horizons-back svg {
+  flex-shrink: 0;
+}
+
+.student-horizons-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.student-horizons-main {
+  padding: 1rem 1.25rem 1.5rem;
+  overflow-y: auto;
+}
+
 /* Bannière Preview */
 .preview-banner {
   background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
@@ -71,15 +126,84 @@
   transform: translateY(-1px);
 }
 
-/* Header enrichi : 3 zones (gauche, centre, droite) ; différenciation par onglet et niveau */
-.student-header {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border-bottom: 1px solid #e5e7eb;
+/* Panneau Nouveaux Horizons (overlay) */
+.horizons-panel-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 400;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 1rem;
+  overflow-y: auto;
+}
+
+.horizons-panel {
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.2);
+  width: 100%;
+  max-width: 640px;
+  min-height: 60vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.horizons-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 1rem 1.25rem;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.horizons-panel-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.horizons-panel-close {
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 1.75rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 10px;
+}
+
+.horizons-panel-close:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.horizons-panel-content {
+  padding: 1rem 1.25rem 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Header enrichi : 3 zones (gauche, centre, droite) ; design pro, hauteur stable, safe-area */
+.student-header {
+  position: sticky;
+  top: 0;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0.75rem 1.25rem;
+  padding-top: calc(0.75rem + env(safe-area-inset-top, 0px));
+  min-height: 56px;
+  display: flex;
+  align-items: center;
   z-index: 100;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -103,6 +227,49 @@
 .student-header--home {
   border-bottom-color: #e5e7eb;
 }
+.student-header--codex {
+  border-bottom-color: #94a3b8;
+  box-shadow: 0 2px 8px rgba(100, 116, 139, 0.1);
+}
+
+/* Header page Nouveaux Horizons : un seul bouton retour + titre (éviter superposition) */
+.student-header--horizons .student-header-left {
+  flex-shrink: 0;
+}
+.student-header-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.5rem;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 8px;
+}
+.student-header-back:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+.student-header-back svg {
+  flex-shrink: 0;
+}
+.student-header-center--title-only {
+  flex: 1;
+  min-width: 0;
+  justify-content: center;
+}
+.student-header-page-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #1e293b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* Différenciation par niveau d'usage (débutant / régulier / assidu) */
 .student-header--debutant .student-header-pill--level { background: #f1f5f9; color: #64748b; }
@@ -119,19 +286,20 @@
 }
 
 .student-header-content {
+  width: 100%;
   max-width: 1200px;
   margin: 0 auto;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem 1rem;
   flex-wrap: wrap;
 }
 
 .student-header-left {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
   min-width: 0;
 }
 
@@ -144,32 +312,22 @@
   background-clip: text;
   white-space: nowrap;
   flex-shrink: 0;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+.student-header-brand:hover {
+  opacity: 0.9;
 }
 
-.student-greeting h1 {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #111827;
-  margin: 0;
-  letter-spacing: -0.5px;
-}
-
-.student-header-subtitle {
-  font-size: 0.8125rem;
-  color: #6b7280;
-  margin: 0.125rem 0 0 0;
-  font-weight: 500;
-}
-
-.guest-badge {
-  font-size: 0.75rem;
-  color: #f59e0b;
+.student-header-guest-badge {
+  font-size: 0.6875rem;
   font-weight: 600;
-  margin: 0.25rem 0 0 0;
-  padding: 0.25rem 0.5rem;
+  color: #b45309;
+  padding: 0.2rem 0.45rem;
   background: #fef3c7;
-  border-radius: 12px;
-  display: inline-block;
+  border-radius: 6px;
+  white-space: nowrap;
 }
 
 .student-header-center {
@@ -304,7 +462,7 @@
 .student-header-right {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
   flex-shrink: 0;
 }
 
@@ -417,9 +575,17 @@
   margin-bottom: 1rem;
 }
 
+.latest-exercises-cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  width: 100%;
+}
+
 .latest-exercises-cta {
   display: block;
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 140px;
   padding: 0.75rem 1rem;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: #ffffff;
@@ -434,6 +600,112 @@
 .latest-exercises-cta:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.35);
+}
+
+.latest-exercises-cta-secondary {
+  background: transparent;
+  color: #667eea;
+  border: 2px solid #667eea;
+}
+
+.latest-exercises-cta-secondary:hover {
+  background: rgba(102, 126, 234, 0.08);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+}
+
+/* Bloc Devoirs (classe du prof) */
+.student-devoirs-section {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 6px 16px rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.student-devoirs-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 1rem 0;
+}
+
+.student-devoirs-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  color: #6b7280;
+  font-size: 0.9375rem;
+}
+
+.student-devoirs-empty {
+  color: #6b7280;
+  font-size: 0.9375rem;
+  margin: 0;
+}
+
+.student-devoirs-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.student-devoirs-item {
+  margin: 0;
+}
+
+.student-devoirs-card {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  padding: 0.75rem 1rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.9375rem;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.student-devoirs-card:hover {
+  background: #f3f4f6;
+  border-color: #667eea;
+}
+
+.student-devoirs-card-title {
+  font-weight: 600;
+  color: #111827;
+  flex: 1;
+  min-width: 0;
+}
+
+.student-devoirs-card-due {
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.student-devoirs-card-status {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+}
+
+.student-devoirs-card-status.done {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.student-devoirs-card-status.todo {
+  background: #fef3c7;
+  color: #92400e;
 }
 
 /* Onglet Parcours dédié */
@@ -808,6 +1080,32 @@
   margin: 0 0 1rem 0;
 }
 
+.progress-section-desc {
+  font-size: 0.9rem;
+  color: #6b7280;
+  margin: 0 0 0.5rem 0;
+}
+
+.progress-section-meta {
+  font-size: 0.85rem;
+  color: #9ca3af;
+  margin: 0 0 0.75rem 0;
+}
+
+.progress-section-cta {
+  padding: 0.5rem 1rem;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.progress-section-cta:hover {
+  filter: brightness(1.05);
+}
+
 .loading-state {
   text-align: center;
   padding: 3rem 1rem;
@@ -894,6 +1192,10 @@
   transform: translateY(-2px);
 }
 
+.attempt-card-clickable {
+  cursor: pointer;
+}
+
 .attempt-main {
   display: flex;
   justify-content: space-between;
@@ -960,6 +1262,108 @@
   font-size: 0.875rem;
   color: #10b981;
   font-weight: 700;
+}
+
+/* Liste Historique compacte (onglet Progression) */
+.attempts-list--compact {
+  gap: 0.5rem;
+}
+
+.attempt-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.attempt-row:hover {
+  border-color: #d1d5db;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.attempt-row-clickable {
+  cursor: pointer;
+}
+
+.attempt-row-clickable:focus-visible {
+  outline: 2px solid #667eea;
+  outline-offset: 2px;
+}
+
+.attempt-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.attempt-row-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #111827;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attempt-row-meta {
+  font-size: 0.8125rem;
+  color: #6b7280;
+}
+
+.attempt-row-xp {
+  color: #10b981;
+  font-weight: 600;
+}
+
+.attempt-row-score {
+  flex-shrink: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  padding: 0.25rem 0.5rem;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.attempt-row-score.attempt-score-high {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.attempt-row-score.attempt-score-medium {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.attempt-row-score.attempt-score-low {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.progress-history-see-more {
+  display: block;
+  width: 100%;
+  margin-top: 0.75rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #667eea;
+  background: transparent;
+  border: 1px solid rgba(102, 126, 234, 0.4);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.progress-history-see-more:hover {
+  background: rgba(102, 126, 234, 0.08);
+  border-color: #667eea;
 }
 
 /* Section Profil */
@@ -1204,11 +1608,10 @@
 @media (max-width: 768px) {
   .student-header-content {
     flex-wrap: wrap;
-    gap: 0.75rem;
+    gap: 0.5rem;
   }
 
   .student-header-left {
-    flex: 1 1 0%;
     min-width: 0;
   }
 
@@ -1217,27 +1620,21 @@
   }
 
   .student-header-center {
-    order: 3;
-    flex-basis: 100%;
-    width: 100%;
-    justify-content: flex-start;
-  }
-
-  .student-greeting h1 {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .student-header-cta {
     font-size: 0.85rem;
     padding: 0.45rem 0.85rem;
   }
+
 }
 
 @media (max-width: 480px) {
   .student-header {
-    padding: 0.875rem 1rem;
+    padding: 0.625rem 1rem;
+    padding-top: calc(0.625rem + env(safe-area-inset-top, 0px));
+    min-height: 52px;
   }
 
   .student-header-left {
@@ -1248,14 +1645,6 @@
 
   .student-header-brand {
     font-size: 1rem;
-  }
-
-  .student-greeting h1 {
-    font-size: 1.25rem;
-  }
-
-  .student-header-subtitle {
-    font-size: 0.75rem;
   }
 
   .student-header-pill {
@@ -1291,6 +1680,48 @@
 
 .profile-page {
   gap: 2rem;
+}
+
+/* Barre retour (Profil accessible via avatar uniquement) */
+.profile-top-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.profile-back-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  color: #475569;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.profile-back-btn:hover {
+  background: #f8fafc;
+  color: #1e293b;
+}
+
+.profile-back-btn:focus-visible {
+  outline: 2px solid #667eea;
+  outline-offset: 2px;
+}
+
+.profile-top-bar-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+  letter-spacing: -0.02em;
 }
 
 .profile-loading {
@@ -1450,6 +1881,143 @@
   font-weight: 500;
 }
 
+/* Édition inline avatar (onglet Profil élève) */
+.profile-inline-avatar-edit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.profile-inline-avatar-input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+.profile-inline-avatar-btn {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #6366f1;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.profile-inline-avatar-btn:hover:not(:disabled) {
+  color: #4f46e5;
+}
+
+.profile-inline-avatar-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.profile-inline-avatar-error {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #dc2626;
+  text-align: center;
+}
+
+/* Édition inline nom (onglet Profil élève) */
+.profile-inline-name-edit {
+  margin-bottom: 0.25rem;
+}
+
+.profile-inline-name-edit .profile-page-name {
+  margin: 0 0 0.25rem 0;
+}
+
+.profile-inline-name-edit-btn {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #6366f1;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.profile-inline-name-edit-btn:hover {
+  color: #4f46e5;
+}
+
+.profile-inline-name-input {
+  display: block;
+  width: 100%;
+  max-width: 260px;
+  padding: 0.5rem 0.75rem;
+  font-size: 1rem;
+  color: #111827;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+}
+
+.profile-inline-name-input:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+.profile-inline-name-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.profile-inline-name-save {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.profile-inline-name-save:hover:not(:disabled) {
+  opacity: 0.95;
+}
+
+.profile-inline-name-save:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.profile-inline-name-cancel {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #6b7280;
+  background: transparent;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.profile-inline-name-cancel:hover:not(:disabled) {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.profile-inline-name-error {
+  margin: 0.5rem 0 0 0;
+  font-size: 0.8rem;
+  color: #dc2626;
+}
+
 /* Section Card */
 .profile-section-card {
   background: #ffffff;
@@ -1465,6 +2033,162 @@
   color: #111827;
   margin: 0 0 1.5rem 0;
   letter-spacing: -0.5px;
+}
+
+/* Établissement et classe */
+.profile-establishment-section .profile-section-title {
+  margin-bottom: 0.5rem;
+}
+
+.profile-establishment-hint {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0 0 1rem 0;
+}
+
+.profile-establishment-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.profile-establishment-field label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.375rem;
+}
+
+.profile-establishment-field select {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9375rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #111827;
+  color-scheme: light;
+}
+
+.profile-establishment-field select option {
+  background: #ffffff;
+  color: #111827;
+}
+
+.profile-establishment-field select:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.profile-establishment-request-links {
+  margin: 1rem 0 0;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.profile-establishment-request-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+  color: #667eea;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.profile-establishment-request-link:hover {
+  color: #5a67d8;
+}
+
+/* Ma classe (code professeur) */
+.profile-teacher-class-section .profile-section-title {
+  margin-bottom: 0.5rem;
+}
+
+.profile-teacher-class-hint,
+.profile-teacher-class-joined {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0 0 0.75rem;
+}
+
+.profile-teacher-class-joined strong {
+  color: #111827;
+}
+
+.profile-teacher-class-join-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.profile-teacher-class-code-input {
+  flex: 1;
+  min-width: 140px;
+  padding: 0.5rem 0.75rem;
+  font-size: 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  letter-spacing: 0.05em;
+}
+
+.profile-teacher-class-code-input:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.profile-teacher-class-join-btn {
+  padding: 0.5rem 1rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  background: #667eea;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.profile-teacher-class-join-btn:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.profile-teacher-class-join-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.profile-teacher-class-leave {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.875rem;
+  background: transparent;
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.profile-teacher-class-leave:hover:not(:disabled) {
+  color: #dc2626;
+  border-color: #dc2626;
+}
+
+.profile-teacher-class-leave:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.profile-teacher-class-error {
+  font-size: 0.875rem;
+  color: #dc2626;
+  margin: 0.5rem 0 0;
+}
+
+@media (max-width: 600px) {
+  .profile-establishment-fields {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Section 2: Radar des Compétences */

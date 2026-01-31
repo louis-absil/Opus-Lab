@@ -1,0 +1,50 @@
+/* CodexExampleBlock – partition + clavier + audio */
+
+.codex-example-block {
+  margin-top: 1.25rem;
+  padding: 1rem 1.25rem;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.codex-example-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 0.75rem;
+}
+
+.codex-example-notation {
+  margin-bottom: 1rem;
+}
+
+.codex-example-keyboard {
+  margin-bottom: 1rem;
+}
+
+.codex-example-keyboard-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #64748b;
+  margin-bottom: 0.5rem;
+}
+
+.codex-example-audio {
+  margin-top: 0.75rem;
+}
+
+@media (max-width: 640px) {
+  .codex-example-block {
+    padding: 0.875rem 1rem;
+  }
+  .codex-example-title {
+    font-size: 0.9rem;
+  }
+}

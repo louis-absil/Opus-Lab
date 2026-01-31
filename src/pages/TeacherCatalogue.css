@@ -1,0 +1,153 @@
+.teacher-catalogue-page {
+  min-height: 100vh;
+  background: #f8f9fa;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+}
+
+.teacher-catalogue-header {
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 1rem 2rem;
+}
+
+.teacher-catalogue-back {
+  background: none;
+  border: none;
+  color: #667eea;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 0.5rem;
+}
+
+.teacher-catalogue-back:hover {
+  text-decoration: underline;
+}
+
+.teacher-catalogue-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.teacher-catalogue-list {
+  padding: 1.5rem 2rem;
+}
+
+.teacher-catalogue-loading {
+  text-align: center;
+  color: #6b7280;
+  padding: 2rem;
+}
+
+.teacher-catalogue-loading .spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e5e7eb;
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: teacher-catalogue-spin 0.8s linear infinite;
+  margin: 0 auto 1rem;
+}
+
+@keyframes teacher-catalogue-spin {
+  to { transform: rotate(360deg); }
+}
+
+.teacher-catalogue-empty {
+  text-align: center;
+  color: #6b7280;
+  padding: 2rem;
+}
+
+.teacher-catalogue-table-wrap {
+  overflow-x: auto;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+}
+
+.teacher-catalogue-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.teacher-catalogue-table th,
+.teacher-catalogue-table td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.teacher-catalogue-table th {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.teacher-catalogue-table td {
+  font-size: 0.9375rem;
+  color: #374151;
+}
+
+.teacher-catalogue-row {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.teacher-catalogue-row:hover {
+  background: #f9fafb;
+}
+
+.teacher-catalogue-cell-list {
+  max-width: 200px;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.teacher-catalogue-cell-contact {
+  white-space: nowrap;
+}
+
+.teacher-catalogue-contact-link {
+  display: inline-block;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.875rem;
+  background: #667eea;
+  color: #fff;
+  border-radius: 6px;
+  text-decoration: none;
+}
+
+.teacher-catalogue-contact-link:hover {
+  background: #5a67d8;
+}
+
+.teacher-catalogue-pagination {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.teacher-catalogue-pagination button {
+  padding: 0.5rem 1rem;
+  font-size: 0.9375rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  color: #374151;
+  cursor: pointer;
+}
+
+.teacher-catalogue-pagination button:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+
+.teacher-catalogue-pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

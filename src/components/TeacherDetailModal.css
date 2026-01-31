@@ -1,0 +1,134 @@
+.teacher-detail-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.teacher-detail-modal-container {
+  background: #fff;
+  border-radius: 12px;
+  max-width: 480px;
+  width: 90%;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+.teacher-detail-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.teacher-detail-modal-header h2 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.teacher-detail-modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 0 0.25rem;
+  line-height: 1;
+}
+
+.teacher-detail-modal-close:hover {
+  color: #111827;
+}
+
+.teacher-detail-modal-content {
+  padding: 1.25rem;
+}
+
+.teacher-detail-modal-content h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.teacher-detail-email {
+  font-size: 0.9375rem;
+  color: #6b7280;
+  margin: 0 0 1rem;
+}
+
+.teacher-detail-mailto {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  font-size: 0.9375rem;
+  background: #667eea;
+  color: #fff;
+  border-radius: 8px;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+}
+
+.teacher-detail-mailto:hover {
+  background: #5a67d8;
+}
+
+.teacher-detail-contact-block {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+
+.teacher-detail-contact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.teacher-detail-copy-email {
+  padding: 0.5rem 1rem;
+  font-size: 0.9375rem;
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.teacher-detail-copy-email:hover {
+  background: #e5e7eb;
+}
+
+.teacher-detail-block {
+  margin-bottom: 1rem;
+}
+
+.teacher-detail-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.teacher-detail-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.teacher-detail-badge {
+  display: inline-block;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.875rem;
+  background: #f3f4f6;
+  color: #374151;
+  border-radius: 8px;
+}

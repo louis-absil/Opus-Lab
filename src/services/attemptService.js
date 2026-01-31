@@ -4,6 +4,7 @@ import {
   query,
   where,
   getDocs,
+  getCountFromServer,
   orderBy,
   limit,
   serverTimestamp 
@@ -29,7 +30,7 @@ function sanitizeForFirestore(value) {
 
 /**
  * Sauvegarde une tentative d'exercice
- * @param {Object} options - Options de validation (ex. functionOnlyAvailable pour le mode intuition)
+ * @param {Object} options - Options (functionOnlyAvailable, exerciseMetadata: { composer, difficulty, autoTags, sourceNodeId })
  */
 export async function saveAttempt(userId, exerciseId, userAnswers, correctAnswers, score, exerciseTitle = null, options = {}) {
   try {
@@ -52,7 +53,7 @@ export async function saveAttempt(userId, exerciseId, userAnswers, correctAnswer
       if (level === 1) correctCount += 1
     })
     
-    // Sauvegarder la tentative (sanitiser : Firebase n'accepte pas undefined)
+    const meta = options.exerciseMetadata || {}
     const attemptData = {
       userId,
       exerciseId,
@@ -62,7 +63,15 @@ export async function saveAttempt(userId, exerciseId, userAnswers, correctAnswer
       score,
       correctCount,
       totalQuestions: correctAnswers.length,
-      completedAt: serverTimestamp()
+      completedAt: serverTimestamp(),
+      ...(options.authorId != null && { authorId: options.authorId }),
+      ...(options.authorName != null && { authorName: options.authorName }),
+      ...(meta.composer != null && { composer: meta.composer }),
+      ...(meta.difficulty != null && { difficulty: meta.difficulty }),
+      ...(Array.isArray(meta.autoTags) && { autoTags: sanitizeForFirestore(meta.autoTags) }),
+      ...(meta.sourceNodeId != null && { sourceNodeId: meta.sourceNodeId }),
+      ...(meta.section != null && { section: meta.section }),
+      ...(meta.musicCategory != null && { musicCategory: meta.musicCategory })
     }
     
     const docRef = await addDoc(collection(db, 'attempts'), attemptData)
@@ -142,6 +151,46 @@ export async function getAllUserAttempts(userId) {
     return attempts
   } catch (error) {
     console.error('Erreur lors de la récupération de toutes les tentatives:', error)
+    throw error
+  }
+}
+
+/**
+ * Récupère la dernière tentative d'un utilisateur (pour afficher "dernière activité")
+ * Nécessite un index Firestore : collection attempts, userId (ASC), completedAt (DESC)
+ */
+export async function getLastAttemptForUser(userId) {
+  try {
+    const q = query(
+      collection(db, 'attempts'),
+      where('userId', '==', userId),
+      orderBy('completedAt', 'desc'),
+      limit(1)
+    )
+    const snapshot = await getDocs(q)
+    if (snapshot.empty) return null
+    const d = snapshot.docs[0]
+    return { id: d.id, ...d.data() }
+  } catch (error) {
+    console.warn('getLastAttemptForUser:', error)
+    return null
+  }
+}
+
+/**
+ * Retourne le nombre de tentatives réalisées sur les exercices d'un auteur (prof).
+ * Nécessite que les tentatives aient le champ authorId (dénormalisation).
+ */
+export async function getAttemptsCountByAuthor(authorId) {
+  try {
+    const q = query(
+      collection(db, 'attempts'),
+      where('authorId', '==', authorId)
+    )
+    const snapshot = await getCountFromServer(q)
+    return snapshot.data().count ?? 0
+  } catch (error) {
+    console.error('Erreur lors du comptage des tentatives par auteur:', error)
     throw error
   }
 }

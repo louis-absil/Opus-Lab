@@ -1,0 +1,223 @@
+/* Nouveaux Horizons – cartes par style (inspiré Parcours) */
+
+.horizons-map {
+  padding: 0 0 1.5rem 0;
+  max-width: 100%;
+  margin: 0 auto;
+  background: transparent;
+  border-radius: 0;
+}
+
+.horizons-map-header {
+  text-align: center;
+  margin-bottom: 1rem;
+  padding: 0 0.5rem;
+}
+
+.horizons-map-header-with-back {
+  text-align: left;
+  position: relative;
+  padding-left: 0;
+}
+
+/* Éviter la superposition du titre/sous-titre avec le bouton retour (quand le bouton est affiché) */
+.horizons-map-header-with-back:not(.horizons-map-header-back-hidden) .horizons-map-title,
+.horizons-map-header-with-back:not(.horizons-map-header-back-hidden) .horizons-map-subtitle {
+  padding-left: 4.5rem;
+}
+
+.horizons-map-back {
+  position: absolute;
+  left: 0;
+  top: 0;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary, #64748b);
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0.25rem 0;
+}
+
+.horizons-map-back:hover {
+  color: var(--text-primary, #1e293b);
+}
+
+.horizons-map-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary, #1e293b);
+  margin-bottom: 0.25rem;
+}
+
+.horizons-map-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #475569);
+}
+
+.horizons-map-empty {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--text-secondary, #64748b);
+  font-size: 0.95rem;
+  background: var(--surface, #f1f5f9);
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.horizons-map-empty-title {
+  font-weight: 700;
+  color: var(--text-primary, #1e293b);
+  margin-bottom: 0.5rem;
+}
+
+.horizons-map-empty-text {
+  margin-bottom: 1rem;
+}
+
+.horizons-map-empty-cta {
+  padding: 0.6rem 1.2rem;
+  border-radius: 12px;
+  border: none;
+  background: var(--accent, #6366f1);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.horizons-map-empty-cta:hover {
+  filter: brightness(1.05);
+}
+
+.horizons-map-empty-inline {
+  padding: 1.5rem;
+}
+
+.horizons-map-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.horizons-style-card {
+  display: block;
+  width: 100%;
+  min-height: 100px;
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  text-align: left;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  padding: 0;
+  font-family: inherit;
+}
+
+.horizons-style-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0.05) 60%);
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.horizons-style-card-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 1.25rem 1.5rem;
+  min-height: 100px;
+}
+
+.horizons-style-card-label {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  margin-bottom: 0.2rem;
+}
+
+.horizons-style-card-subtitle {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.95);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.horizons-style-card-lock {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  font-size: 1.25rem;
+  opacity: 0.9;
+}
+
+.horizons-style-card-unlocked:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.horizons-style-card-unlocked:active {
+  transform: translateY(0);
+}
+
+.horizons-style-card-locked {
+  cursor: not-allowed;
+  opacity: 0.85;
+  filter: saturate(0.7);
+}
+
+.horizons-map-actions {
+  margin-bottom: 1rem;
+}
+
+.horizons-map-random-btn {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  border: none;
+  background: var(--accent, #6366f1);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.horizons-map-random-btn:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.horizons-map-random-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.horizons-map-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 160px;
+}
+
+.horizons-map-exercise-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.spinner-small {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(0, 0, 0, 0.1);
+  border-top-color: var(--accent, #6366f1);
+  border-radius: 50%;
+  animation: horizons-spin 0.8s linear infinite;
+}
+
+@keyframes horizons-spin {
+  to { transform: rotate(360deg); }
+}

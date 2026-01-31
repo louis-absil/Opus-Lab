@@ -1,0 +1,132 @@
+.request-establishment-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.request-establishment-modal-container {
+  background: #fff;
+  border-radius: 12px;
+  max-width: 420px;
+  width: 90%;
+  padding: 0;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+.request-establishment-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.request-establishment-modal-header h2 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.request-establishment-modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 0 0.25rem;
+  line-height: 1;
+}
+
+.request-establishment-modal-close:hover {
+  color: #111827;
+}
+
+.request-establishment-modal-info {
+  padding: 1rem 1.25rem;
+  margin: 0;
+  font-size: 0.875rem;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.request-establishment-modal-form {
+  padding: 0 1.25rem 1.25rem;
+}
+
+.request-establishment-modal-form label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.5rem;
+}
+
+.request-establishment-modal-form input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  font-size: 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
+  box-sizing: border-box;
+}
+
+.request-establishment-modal-form input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+.request-establishment-modal-error {
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+  color: #dc2626;
+}
+
+.request-establishment-modal-success {
+  padding: 1.25rem;
+  margin: 0;
+  font-size: 0.9375rem;
+  color: #059669;
+  text-align: center;
+}
+
+.request-establishment-modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.request-establishment-modal-actions button {
+  padding: 0.5rem 1rem;
+  font-size: 0.9375rem;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
+}
+
+.request-establishment-modal-actions button:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+
+.request-establishment-modal-actions button[type="submit"] {
+  background: #667eea;
+  border-color: #667eea;
+  color: #fff;
+}
+
+.request-establishment-modal-actions button[type="submit"]:hover:not(:disabled) {
+  background: #5a67d8;
+}
+
+.request-establishment-modal-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
 import './ReviewDashboard.css'
 
 function ReviewDashboard({ 
@@ -15,13 +15,6 @@ function ReviewDashboard({
   const dashboardRef = useRef(null)
   const contentRef = useRef(null)
 
-  useEffect(() => {
-    if (dashboardRef.current && contentRef.current) {
-      const dashboardRect = dashboardRef.current.getBoundingClientRect()
-      const contentRect = contentRef.current.getBoundingClientRect()
-      fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ReviewDashboard.jsx:useEffect',message:'Dimensions dashboard',data:{dashboardHeight:dashboardRect.height,dashboardWidth:dashboardRect.width,contentHeight:contentRect.height,contentWidth:contentRect.width,viewportHeight:window.innerHeight,viewportWidth:window.innerWidth},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    }
-  }, [])
   // Message d'encouragement selon le pourcentage
   const getEncouragementMessage = () => {
     if (scorePercentage >= 90) return "Excellent ! 🎉"

@@ -45,6 +45,32 @@ export async function getExercisesByAuthor(authorId) {
 }
 
 /**
+ * Récupère tous les exercices (pour les profs : vue "Tous les exercices")
+ */
+export async function getAllExercisesForTeachers() {
+  try {
+    const q = query(collection(db, 'exercises'))
+    const querySnapshot = await getDocs(q)
+    const exercises = []
+    querySnapshot.forEach((docSnap) => {
+      exercises.push({
+        id: docSnap.id,
+        ...docSnap.data()
+      })
+    })
+    exercises.sort((a, b) => {
+      const dateA = a.createdAt?.toDate?.() || new Date(0)
+      const dateB = b.createdAt?.toDate?.() || new Date(0)
+      return dateB - dateA
+    })
+    return exercises
+  } catch (error) {
+    console.error('Erreur lors de la récupération des exercices:', error)
+    throw error
+  }
+}
+
+/**
  * Récupère un exercice par son ID
  */
 export async function getExerciseById(exerciseId) {
@@ -97,7 +123,18 @@ export async function searchPublicExercises(filters = {}) {
         ...doc.data()
       })
     })
-    
+
+    // Nouveaux Horizons : ne filtrer par section que lorsqu'on demande explicitement les horizons
+    // Sinon on renvoie tous les exercices publiés (y compris classiques sans section, pour éviter que des exercices publiés n'apparaissent nulle part)
+    if (filters.onlyHorizons) {
+      exercises = exercises.filter(ex => ex.metadata?.section === 'horizons')
+    }
+
+    // Filtrer par musicCategory si onlyHorizons et qu'un style est demandé
+    if (filters.onlyHorizons && filters.musicCategory) {
+      exercises = exercises.filter(ex => ex.metadata?.musicCategory === filters.musicCategory)
+    }
+
     // Filtrer par tags côté client si nécessaire
     if (filters.tags && filters.tags.length > 0) {
       return exercises.filter(exercise => {
@@ -310,12 +347,6 @@ export async function getExercisesForNode(nodeId) {
     // Sélectionner un exercice aléatoire parmi ceux qui conviennent
     const randomIndex = Math.floor(Math.random() * suitableExercises.length)
     const exercise = suitableExercises[randomIndex]
-    // #region agent log
-    const unlockedCadences = getUnlockedCadenceValues(undefined, nodeId)
-    const markerCadences = (exercise.markers || []).map(m => (typeof m === 'object' && m.chord ? m.chord : null)).filter(Boolean).map(c => c.cadence).filter(Boolean)
-    const hasCadenceNotUnlocked = markerCadences.some(c => !unlockedCadences.includes(c))
-    fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'exerciseService.js:getExercisesForNode',message:'selected',data:{nodeId,exerciseId:exercise.id,unlockedCadences,markerCadences,hasCadenceNotUnlocked},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
-    // #endregion
     return exercise
   } catch (error) {
     console.error('Erreur lors de la récupération d\'un exercice pour le nœud:', error)

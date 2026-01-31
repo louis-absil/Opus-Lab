@@ -3,6 +3,10 @@ import { useAuth } from './contexts/AuthContext'
 import LandingPage from './pages/LandingPage'
 import Dashboard from './pages/Dashboard'
 import StudentDashboard from './pages/StudentDashboard'
+import StudentCatalogue from './pages/StudentCatalogue'
+import TeacherCatalogue from './pages/TeacherCatalogue'
+import TeacherClasses from './pages/TeacherClasses'
+import TeacherAssignments from './pages/TeacherAssignments'
 import Editor from './pages/Editor'
 import Player from './pages/Player'
 
@@ -86,11 +90,16 @@ function AppRouter() {
         
         {/* Routes professeur */}
         <Route path="/dashboard" element={<PrivateRoute requiredRole="teacher"><Dashboard /></PrivateRoute>} />
+        <Route path="/dashboard/students" element={<PrivateRoute requiredRole="teacher"><StudentCatalogue /></PrivateRoute>} />
+        <Route path="/dashboard/classes" element={<PrivateRoute requiredRole="teacher"><TeacherClasses /></PrivateRoute>} />
+        <Route path="/dashboard/assignments" element={<PrivateRoute requiredRole="teacher"><TeacherAssignments /></PrivateRoute>} />
+        <Route path="/dashboard/teachers" element={<PrivateRoute requiredRole="teacher"><TeacherCatalogue /></PrivateRoute>} />
         <Route path="/editor" element={<PrivateRoute requiredRole="teacher"><Editor /></PrivateRoute>} />
         <Route path="/editor/:id" element={<PrivateRoute requiredRole="teacher"><Editor /></PrivateRoute>} />
         
         {/* Routes élève */}
         <Route path="/student-dashboard" element={<PrivateRoute><StudentDashboard /></PrivateRoute>} />
+        <Route path="/student-dashboard/horizons" element={<PrivateRoute><StudentDashboard /></PrivateRoute>} />
         
         {/* Route publique : Player (accessible sans connexion) */}
         <Route path="/play/:exerciseId" element={<Player />} />

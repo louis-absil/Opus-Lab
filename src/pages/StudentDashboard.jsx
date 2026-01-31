@@ -3,15 +3,17 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { getExerciseById, getLatestPublicExercises } from '../services/exerciseService'
 import { getUserAttempts, getAllUserAttempts } from '../services/attemptService'
+import { getEstablishments, getClasses } from '../services/referenceDataService'
+import { updateUserProfile } from '../services/userService'
+import { uploadAvatar, validateAvatarFile } from '../services/avatarService'
+import { joinTeacherClass, leaveTeacherClass, getTeacherClassById } from '../services/teacherClassService'
+import { getAssignmentsByClass } from '../services/assignmentService'
 import { validateAnswerWithFunctions } from '../utils/riemannFunctions'
-import ProfileModal from '../components/ProfileModal'
 import FreeMode from './FreeMode'
 import CampaignMap from '../components/CampaignMap'
 import SkillsRadar from '../components/SkillsRadar'
 import ActivityHeatmap from '../components/ActivityHeatmap'
 import PerformanceDetails from '../components/PerformanceDetails'
-import ProgressChart from '../components/ProgressChart'
-import BadgeSystem from '../components/BadgeSystem'
 import WeeklyObjectives from '../components/WeeklyObjectives'
 import TrendIndicators from '../components/TrendIndicators'
 import MilestoneCelebrations from '../components/MilestoneCelebrations'
@@ -19,29 +21,46 @@ import PeriodComparison from '../components/PeriodComparison'
 import ExerciseSuggestions from '../components/ExerciseSuggestions'
 import WeeklyStats from '../components/WeeklyStats'
 import AchievementsDashboard from '../components/AchievementsDashboard'
+import AttemptDetailModal from '../components/AttemptDetailModal'
+import RequestEstablishmentModal from '../components/RequestEstablishmentModal'
 import DailyLearningBlock from '../components/DailyLearningBlock'
 import ExerciseCard from '../components/ExerciseCard'
-import { checkAndUnlockBadges } from '../services/badgeService'
+import CodexView from '../components/CodexView'
+import HorizonsMap from '../components/HorizonsMap'
+import { checkAndUnlockBadges, getUnlockedHorizonsStyles } from '../services/badgeService'
 import { PREVIEW_SCENARIOS, getPreviewProgress, getPreviewXP, getPreviewStreak } from '../utils/previewScenarios'
 import './StudentDashboard.css'
 
 const PREVIEW_SCENARIO_STORAGE_KEY = 'opus_preview_prof_scenario'
+const PREVIEW_HORIZONS_STORAGE_KEY = 'opus_preview_horizons_override'
+/** Clé localStorage : l'élève a déjà ouvert la section Nouveaux Horizons → le conseil du jour repasse au tip normal */
+const HORIZONS_SEEN_STORAGE_KEY = 'opus_horizons_panel_seen'
 /** Nombre max d'entrées affichées dans la liste "Historique" (onglet Progression). */
 const PROGRESS_HISTORY_LIST_LIMIT = 10
-/** Nombre max de points affichés dans le graphique de progression (derniers exercices). */
-const PROGRESS_CHART_LIMIT = 50
-/** Même chose sur petit écran (≤768px) pour garder l'axe X lisible. */
-const PROGRESS_CHART_LIMIT_MOBILE = 30
+/** Nombre d'entrées visibles par défaut avant "Voir plus". */
+const PROGRESS_HISTORY_LIST_VISIBLE = 5
 
 function StudentDashboard() {
-  const { user, userData, logout, isGuest, disableGuestMode } = useAuth()
+  const { user, userData, logout, isGuest, disableGuestMode, refreshUserData } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const isHorizonsPage = location.pathname === '/student-dashboard/horizons'
   const [activeTab, setActiveTab] = useState('home')
+  // Codex : fiche sélectionnée et contexte d'ouverture (nœud ou fiche depuis Parcours / URL)
+  const [codexSelectedFicheId, setCodexSelectedFicheId] = useState(null)
+  const [codexInitialNodeId, setCodexInitialNodeId] = useState(null)
+  const [codexInitialFicheId, setCodexInitialFicheId] = useState(null)
   /** Mode preview prof : scénario simulé ('' = données réelles du prof). Persisté en sessionStorage pour survivre à la navigation (ex. lancement / sortie d'un exercice). */
   const [previewScenario, setPreviewScenario] = useState(() => {
     try {
       return typeof sessionStorage !== 'undefined' ? (sessionStorage.getItem(PREVIEW_SCENARIO_STORAGE_KEY) ?? '') : ''
+    } catch {
+      return ''
+    }
+  })
+  const [previewHorizonsOverride, setPreviewHorizonsOverride] = useState(() => {
+    try {
+      return typeof sessionStorage !== 'undefined' ? (sessionStorage.getItem(PREVIEW_HORIZONS_STORAGE_KEY) ?? '') : ''
     } catch {
       return ''
     }
@@ -54,15 +73,46 @@ function StudentDashboard() {
   // États pour Progression
   const [attempts, setAttempts] = useState([])
   const [loadingAttempts, setLoadingAttempts] = useState(true)
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
+  const [selectedAttempt, setSelectedAttempt] = useState(null)
+  const [historyExpanded, setHistoryExpanded] = useState(false)
+  
+  // États pour Profil (édition inline photo + nom)
+  const profileAvatarFileInputRef = useRef(null)
+  const [avatarUploading, setAvatarUploading] = useState(false)
+  const [avatarError, setAvatarError] = useState(null)
+  const [editingDisplayName, setEditingDisplayName] = useState(false)
+  const [displayNameInput, setDisplayNameInput] = useState('')
+  const [displayNameSaving, setDisplayNameSaving] = useState(false)
+  const [displayNameError, setDisplayNameError] = useState(null)
   
   // États pour Profil
   const [profileStats, setProfileStats] = useState(null)
   const [loadingProfileStats, setLoadingProfileStats] = useState(false)
   const [allAttempts, setAllAttempts] = useState([])
+  const [establishmentsList, setEstablishmentsList] = useState([])
+  const [classesList, setClassesList] = useState([])
+  const [loadingEstablishments, setLoadingEstablishments] = useState(false)
+  const [loadingClasses, setLoadingClasses] = useState(false)
+  const [profileEstablishment, setProfileEstablishment] = useState('')
+  const [profileClass, setProfileClass] = useState('')
+  const [requestModalOpen, setRequestModalOpen] = useState(false)
+  const [requestModalType, setRequestModalType] = useState('establishment')
+  const [teacherClassName, setTeacherClassName] = useState(null)
+  const [classCodeInput, setClassCodeInput] = useState('')
+  const [joinClassLoading, setJoinClassLoading] = useState(false)
+  const [joinClassError, setJoinClassError] = useState('')
+  const [assignmentsForClass, setAssignmentsForClass] = useState([])
+  const [attemptedExerciseIds, setAttemptedExerciseIds] = useState(new Set())
+  const [loadingAssignments, setLoadingAssignments] = useState(false)
   
   // État pour toutes les tentatives (pour le calcul du streak)
   const [allAttemptsForStreak, setAllAttemptsForStreak] = useState([])
+
+  // Onglet précédent (pour retour depuis la page Profil, ouverte via avatar)
+  const [previousTab, setPreviousTab] = useState('home')
+
+  // Objectifs de la semaine tous atteints (pour mise en avant suggestion prioritaire)
+  const [allObjectivesCompleted, setAllObjectivesCompleted] = useState(false)
 
   // Derniers exercices ajoutés (accueil)
   const [latestExercises, setLatestExercises] = useState([])
@@ -70,6 +120,37 @@ function StudentDashboard() {
 
   // Filtre initial pour le Mode Libre (clic sur une pastille → ouvrir Mode Libre avec ce filtre)
   const [freeModeInitialFilter, setFreeModeInitialFilter] = useState(null)
+
+  // Panneau Nouveaux Horizons (ouvert depuis le bouton Mode Libre ou depuis Progression, pas d’onglet dédié)
+  const [hasSeenHorizonsPanel, setHasSeenHorizonsPanel] = useState(() => {
+    try {
+      return typeof window !== 'undefined' && window.localStorage.getItem(HORIZONS_SEEN_STORAGE_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
+  const [highlightHorizonsInFreeMode, setHighlightHorizonsInFreeMode] = useState(false)
+  /**
+   * Navigation sur la page Nouveaux Horizons : pile de vues pour que "Retour" aille toujours au bon endroit.
+   * Niveau 0 = accueil Horizons (cartes) ; niveau 1+ = style ouvert, ou futur détail exercice, etc.
+   * Retour = dépiler ; si plus qu’un seul niveau, quitter la page vers le dashboard.
+   */
+  const [horizonsViewStack, setHorizonsViewStack] = useState(() => ['cards'])
+
+  useEffect(() => {
+    if (isHorizonsPage) {
+      try {
+        window.localStorage.setItem(HORIZONS_SEEN_STORAGE_KEY, '1')
+      } catch {}
+      setHasSeenHorizonsPanel(true)
+    }
+  }, [isHorizonsPage])
+
+  // IDs des exercices déjà faits (pour filtre Mode Libre)
+  const doneExerciseIds = useMemo(
+    () => [...new Set((allAttemptsForStreak || []).map((a) => a.exerciseId).filter(Boolean))],
+    [allAttemptsForStreak]
+  )
 
   // Ref pour scroll vers le parcours (onglet dédié)
   const campaignMapSectionRef = useRef(null)
@@ -82,6 +163,43 @@ function StudentDashboard() {
     mq.addEventListener('change', handler)
     return () => mq.removeEventListener('change', handler)
   }, [])
+
+  // Retour depuis la page Horizons : ouvrir l’onglet demandé (ex. free-mode)
+  // Réinitialiser la pile Horizons à l'arrivée sur la page (toujours afficher l'accueil Horizons)
+  const prevPathRef = useRef(location.pathname)
+  useEffect(() => {
+    if (location.pathname === '/student-dashboard/horizons' && prevPathRef.current !== '/student-dashboard/horizons') {
+      setHorizonsViewStack(['cards'])
+    }
+    prevPathRef.current = location.pathname
+  }, [location.pathname])
+
+  useEffect(() => {
+    if (location.pathname === '/student-dashboard' && location.state?.tab) {
+      setActiveTab(location.state.tab)
+    }
+  }, [location.pathname, location.state?.tab])
+
+  // URL : tab=codex, fiche=id, node=nodeId (pour deep link et retour depuis Player)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const tab = params.get('tab')
+    const fiche = params.get('fiche')
+    const node = params.get('node')
+    if (tab === 'codex') {
+      setActiveTab('codex')
+      if (fiche) setCodexInitialFicheId(fiche)
+      if (node) setCodexInitialNodeId(node)
+    }
+  }, [location.search])
+
+  // Réinitialiser le contexte d'ouverture Codex quand on quitte l'onglet
+  useEffect(() => {
+    if (activeTab !== 'codex') {
+      setCodexInitialNodeId(null)
+      setCodexInitialFicheId(null)
+    }
+  }, [activeTab])
 
   // Charger l'historique des tentatives (uniquement si connecté, pas en mode invité)
   useEffect(() => {
@@ -118,6 +236,64 @@ function StudentDashboard() {
       loadProfileStats()
     }
   }, [user, isGuest, activeTab])
+
+  // Charger listes établissements / classes quand on ouvre le profil
+  useEffect(() => {
+    if (activeTab !== 'profile') return
+    setLoadingEstablishments(true)
+    setLoadingClasses(true)
+    getEstablishments()
+      .then((list) => setEstablishmentsList(list))
+      .catch(() => setEstablishmentsList([]))
+      .finally(() => setLoadingEstablishments(false))
+    getClasses()
+      .then((list) => setClassesList(list))
+      .catch(() => setClassesList([]))
+      .finally(() => setLoadingClasses(false))
+  }, [activeTab])
+
+  // Synchroniser établissement/classe depuis userData à l'ouverture du profil
+  useEffect(() => {
+    if (activeTab === 'profile' && userData) {
+      setProfileEstablishment(userData.establishment ?? '')
+      setProfileClass(userData.class ?? '')
+    }
+  }, [activeTab, userData?.establishment, userData?.class])
+
+  // Charger le nom de la classe prof quand l'élève a rejoint une classe
+  useEffect(() => {
+    if (!userData?.teacherClassId) {
+      setTeacherClassName(null)
+      return
+    }
+    getTeacherClassById(userData.teacherClassId)
+      .then((tc) => setTeacherClassName(tc?.name ?? null))
+      .catch(() => setTeacherClassName(null))
+  }, [userData?.teacherClassId])
+
+  // Charger les devoirs de la classe + tentatives (pour Fait/À faire) — 2 requêtes, limitées
+  useEffect(() => {
+    if (!user?.uid || !userData?.teacherClassId || isGuest) {
+      setAssignmentsForClass([])
+      setAttemptedExerciseIds(new Set())
+      return
+    }
+    setLoadingAssignments(true)
+    Promise.all([
+      getAssignmentsByClass(userData.teacherClassId, 30),
+      getAllUserAttempts(user.uid)
+    ])
+      .then(([assignments, attempts]) => {
+        setAssignmentsForClass(assignments || [])
+        const ids = new Set((attempts || []).map((a) => a.exerciseId))
+        setAttemptedExerciseIds(ids)
+      })
+      .catch(() => {
+        setAssignmentsForClass([])
+        setAttemptedExerciseIds(new Set())
+      })
+      .finally(() => setLoadingAssignments(false))
+  }, [user?.uid, userData?.teacherClassId, isGuest])
 
   // Charger les stats du profil aussi pour l'onglet progression (pour les suggestions)
   useEffect(() => {
@@ -295,7 +471,63 @@ function StudentDashboard() {
 
   const userName = userData?.displayName || user?.displayName || 'Élève'
   const firstName = userName.split(' ')[0]
+  const profilePhotoURL = userData?.photoURL ?? user?.photoURL
   const streak = usePreviewValues ? getPreviewStreak(previewScenario) : calculateStreak(allAttemptsForStreak)
+
+  const handleProfileAvatarChange = async (e) => {
+    const file = e.target?.files?.[0]
+    if (!file || !user?.uid) return
+    e.target.value = ''
+    setAvatarError(null)
+    const validation = validateAvatarFile(file)
+    if (!validation.valid) {
+      setAvatarError(validation.error)
+      return
+    }
+    setAvatarUploading(true)
+    try {
+      const url = await uploadAvatar(user.uid, file)
+      await updateUserProfile(user.uid, { photoURL: url })
+      await refreshUserData()
+    } catch (err) {
+      setAvatarError(err.message || 'Erreur lors du chargement de l\'image.')
+    } finally {
+      setAvatarUploading(false)
+    }
+  }
+
+  const startEditingDisplayName = () => {
+    setDisplayNameInput(userData?.displayName || user?.displayName || '')
+    setDisplayNameError(null)
+    setEditingDisplayName(true)
+  }
+
+  const cancelEditingDisplayName = () => {
+    setEditingDisplayName(false)
+    setDisplayNameInput('')
+    setDisplayNameError(null)
+  }
+
+  const saveDisplayName = async () => {
+    const trimmed = displayNameInput?.trim() || ''
+    if (!user?.uid) return
+    setDisplayNameError(null)
+    if (!trimmed) {
+      setDisplayNameError('Le nom ne peut pas être vide.')
+      return
+    }
+    setDisplayNameSaving(true)
+    try {
+      await updateUserProfile(user.uid, { displayName: trimmed })
+      await refreshUserData()
+      setEditingDisplayName(false)
+      setDisplayNameInput('')
+    } catch (err) {
+      setDisplayNameError(err.message || 'Erreur lors de l\'enregistrement.')
+    } finally {
+      setDisplayNameSaving(false)
+    }
+  }
 
   // Détection montée de niveau pour modal (persisté en session pour afficher au retour d'un exercice)
   const [showLevelUpModal, setShowLevelUpModal] = useState(false)
@@ -619,11 +851,11 @@ function StudentDashboard() {
 
     const allStats = []
 
-    // Ajouter les stats de degrés
+    // Ajouter les stats de degrés — utiliser le score moyen (0-100) comme pourcentage de réussite, pas seulement correct/total
     Object.entries(degreeStats).forEach(([degree, stats]) => {
-      const percentage = stats.total > 0 
-        ? Math.round((stats.correct / stats.total) * 100) 
-        : 0
+      const percentage = stats.averageScore != null
+        ? Math.round(stats.averageScore)
+        : (stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0)
       allStats.push({
         name: degree,
         percentage,
@@ -631,11 +863,11 @@ function StudentDashboard() {
       })
     })
 
-    // Ajouter les stats de cadences
+    // Ajouter les stats de cadences — idem : score moyen = pourcentage de réussite
     Object.entries(cadenceStats).forEach(([cadence, stats]) => {
-      const percentage = stats.total > 0 
-        ? Math.round((stats.correct / stats.total) * 100) 
-        : 0
+      const percentage = stats.averageScore != null
+        ? Math.round(stats.averageScore)
+        : (stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0)
       allStats.push({
         name: cadenceLabels[cadence] || cadence,
         percentage,
@@ -660,9 +892,31 @@ function StudentDashboard() {
     }
   }, [profileStats])
 
+  const handleHorizonsBack = () => {
+    if (horizonsViewStack.length > 1) {
+      setHorizonsViewStack((prev) => prev.slice(0, -1))
+    } else {
+      navigate('/student-dashboard')
+    }
+  }
+
+  /** Dérivé : style actuellement ouvert (null = on est sur l’accueil Horizons) */
+  const selectedHorizonsStyleId =
+    horizonsViewStack.length > 1 && horizonsViewStack[horizonsViewStack.length - 1] !== 'cards'
+      ? horizonsViewStack[horizonsViewStack.length - 1]
+      : null
+
+  const setSelectedHorizonsStyleId = (styleIdOrNull) => {
+    if (styleIdOrNull == null) {
+      setHorizonsViewStack(['cards'])
+    } else {
+      setHorizonsViewStack((prev) => [...prev, styleIdOrNull])
+    }
+  }
+
   return (
     <div className="student-dashboard">
-      {/* Bannière Preview pour les professeurs */}
+      {/* Bannière Preview pour les professeurs (y compris sur la page Nouveaux Horizons) */}
       {isPreviewMode && (
         <div className="preview-banner">
           <div className="preview-banner-content">
@@ -692,6 +946,30 @@ function StudentDashboard() {
                 ))}
               </select>
             </label>
+            <label className="preview-scenario-label">
+              Nouveaux Horizons (test) :
+              <select
+                className="preview-scenario-select"
+                value={previewHorizonsOverride}
+                onChange={(e) => {
+                  const value = e.target.value
+                  setPreviewHorizonsOverride(value)
+                  try {
+                    if (typeof sessionStorage !== 'undefined') {
+                      sessionStorage.setItem(PREVIEW_HORIZONS_STORAGE_KEY, value)
+                    }
+                  } catch (_) {}
+                }}
+                title="Débloquer des styles Nouveaux Horizons pour tester (Film, JV, Anime, etc.)"
+              >
+                <option value="">Aucun</option>
+                <option value="film">Film</option>
+                <option value="film,game">Film + JV</option>
+                <option value="film,game,anime">Film + JV + Anime</option>
+                <option value="film,game,anime,variety">Film + JV + Anime + Variété</option>
+                <option value="film,game,anime,variety,pop">Tous</option>
+              </select>
+            </label>
           </div>
           <button 
             className="preview-back-btn"
@@ -702,30 +980,69 @@ function StudentDashboard() {
         </div>
       )}
       
-      {/* Header enrichi : branding, indicateurs, CTA ; différenciation par onglet et niveau */}
-      <header
-        className={`student-header student-header--${activeTab} student-header--${levelTier}`}
-        data-level-tier={levelTier}
-      >
-        <div className="student-header-content">
-          <div className="student-header-left">
-            <span className="student-header-brand" aria-hidden="true">Opus Lab</span>
-            <div className="student-greeting">
-              <h1>Bonjour, {firstName} 👋</h1>
-              {isGuest && (
-                <p className="guest-badge">Mode invité</p>
-              )}
-              {!isGuest && (
-                <>
-                  <p className="student-header-subtitle student-header-tier-label">{levelTierLabel}</p>
-                  {streak > 0 && (
-                    <p className="student-header-subtitle">Continue ta série</p>
-                  )}
-                </>
-              )}
+      {/* Header : sur Nouveaux Horizons = un seul bouton retour + titre ; sinon header enrichi habituel */}
+      {isHorizonsPage ? (
+        <header className="student-header student-header--horizons">
+          <div className="student-header-content">
+            <div className="student-header-left">
+              <button
+                type="button"
+                className="student-header-back"
+                onClick={handleHorizonsBack}
+                aria-label="Retour"
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="19" y1="12" x2="5" y2="12" />
+                  <polyline points="12 19 5 12 12 5" />
+                </svg>
+                <span>Retour</span>
+              </button>
+            </div>
+            <div className="student-header-center student-header-center--title-only">
+              <h1 className="student-header-page-title">Nouveaux Horizons</h1>
+            </div>
+            <div className="student-header-right">
+              <button
+                className="student-avatar-btn"
+                onClick={() => {
+                  if (!isGuest) {
+                    navigate('/student-dashboard', { state: { tab: 'profile' } })
+                  }
+                }}
+                aria-label="Profil"
+              >
+                {!isGuest && user?.photoURL ? (
+                  <img src={user.photoURL} alt={userName} className="student-avatar" />
+                ) : (
+                  <div className="student-avatar-placeholder">{firstName[0]?.toUpperCase() || 'E'}</div>
+                )}
+              </button>
             </div>
           </div>
-          <div className="student-header-center">
+        </header>
+      ) : (
+        <header
+          className={`student-header student-header--${activeTab} student-header--${levelTier}`}
+          data-level-tier={levelTier}
+        >
+          <div className="student-header-content">
+            <div className="student-header-left">
+              <button
+                type="button"
+                className="student-header-brand"
+                onClick={() => {
+                  setActiveTab('home')
+                  window.scrollTo({ top: 0, behavior: 'smooth' })
+                }}
+                aria-label="Retour à l'accueil"
+              >
+                Opus Lab
+              </button>
+              {isGuest && (
+                <span className="student-header-guest-badge">Mode invité</span>
+              )}
+            </div>
+            <div className="student-header-center">
             {!isGuest && (
               <>
                 <span
@@ -762,7 +1079,12 @@ function StudentDashboard() {
           <div className="student-header-right">
             <button
               className="student-avatar-btn"
-              onClick={() => !isGuest && setActiveTab('profile')}
+              onClick={() => {
+                if (!isGuest) {
+                  if (activeTab !== 'profile') setPreviousTab(activeTab)
+                  setActiveTab('profile')
+                }
+              }}
               aria-label="Profil"
             >
               {!isGuest && user?.photoURL ? (
@@ -780,6 +1102,7 @@ function StudentDashboard() {
           </div>
         </div>
       </header>
+      )}
 
       {/* Modal montée de niveau (sobre) */}
       {showLevelUpModal && levelUpValue != null && (
@@ -800,17 +1123,85 @@ function StudentDashboard() {
         </div>
       )}
 
-      {/* Contenu principal */}
+      {/* Contenu principal : Nouveaux Horizons ou onglets habituels */}
       <main className="student-main">
+        {isHorizonsPage ? (
+          <div className="student-horizons-main">
+            <HorizonsMap
+              attempts={allAttemptsForStreak || []}
+              userXp={userData?.xp ?? 0}
+              onSwitchTab={(tab) => navigate('/student-dashboard', { state: { tab } })}
+              onClose={() => navigate('/student-dashboard')}
+              previewUnlockedHorizonsStyles={
+                isPreviewMode && previewHorizonsOverride
+                  ? previewHorizonsOverride.split(',').map((s) => s.trim()).filter(Boolean)
+                  : null
+              }
+              selectedStyleId={selectedHorizonsStyleId}
+              setSelectedStyleId={setSelectedHorizonsStyleId}
+              hideInternalBack
+            />
+          </div>
+        ) : (
+        <>
         {activeTab === 'home' && (
           <div className="student-content">
             {/* Bloc pédagogique : prochaine étape + conseil du jour + CTA */}
             {!isGuest && (
               <DailyLearningBlock
                 userId={previewScenario ? undefined : user?.uid}
+                attempts={allAttemptsForStreak || []}
                 previewProgress={previewScenario ? getPreviewProgress(previewScenario) : null}
                 onContinueClick={handleHeaderCtaClick}
+                unlockedHorizonsCount={
+                  isPreviewMode && previewHorizonsOverride
+                    ? previewHorizonsOverride.split(',').map((s) => s.trim()).filter(Boolean).length
+                    : getUnlockedHorizonsStyles(allAttemptsForStreak || [], { xp: userData?.xp ?? 0 }).length
+                }
+                hasSeenHorizonsPanel={hasSeenHorizonsPanel}
+                onConseilHorizonsClick={() => {
+                  setActiveTab('free-mode')
+                  setHighlightHorizonsInFreeMode(true)
+                }}
               />
+            )}
+
+            {/* Devoirs (classe du prof) — affiché seulement si l'élève a rejoint une classe */}
+            {!isGuest && userData?.teacherClassId && (
+              <div className="student-devoirs-section">
+                <h3 className="student-devoirs-title">Devoirs</h3>
+                {loadingAssignments ? (
+                  <div className="student-devoirs-loading">
+                    <div className="spinner" aria-hidden="true" />
+                    <p>Chargement des devoirs…</p>
+                  </div>
+                ) : assignmentsForClass.length === 0 ? (
+                  <p className="student-devoirs-empty">Aucun devoir pour le moment.</p>
+                ) : (
+                  <ul className="student-devoirs-list">
+                    {assignmentsForClass.map((a) => {
+                      const done = attemptedExerciseIds.has(a.exerciseId)
+                      const dueDate = a.dueDate ? (a.dueDate.toDate ? a.dueDate.toDate() : new Date(a.dueDate)) : null
+                      const dueStr = dueDate ? dueDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : null
+                      return (
+                        <li key={a.id} className="student-devoirs-item">
+                          <button
+                            type="button"
+                            className="student-devoirs-card"
+                            onClick={() => navigate(`/play/${a.exerciseId}`)}
+                          >
+                            <span className="student-devoirs-card-title">{a.title || a.exerciseTitle || 'Exercice'}</span>
+                            {dueStr && <span className="student-devoirs-card-due">Pour le {dueStr}</span>}
+                            <span className={`student-devoirs-card-status ${done ? 'done' : 'todo'}`}>
+                              {done ? 'Fait' : 'À faire'}
+                            </span>
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </div>
             )}
 
             {/* Derniers exercices ajoutés */}
@@ -837,13 +1228,27 @@ function StudentDashboard() {
                       />
                     ))}
                   </div>
-                  <button
-                    type="button"
-                    className="latest-exercises-cta"
-                    onClick={() => setActiveTab('free-mode')}
-                  >
-                    Voir tout en Mode Libre
-                  </button>
+                  <div className="latest-exercises-cta-row">
+                    <button
+                      type="button"
+                      className="latest-exercises-cta"
+                      onClick={() => setActiveTab('free-mode')}
+                    >
+                      Voir tout en Mode Libre
+                    </button>
+                    {!isGuest && doneExerciseIds.length > 0 && (
+                      <button
+                        type="button"
+                        className="latest-exercises-cta latest-exercises-cta-secondary"
+                        onClick={() => {
+                          setFreeModeInitialFilter({ doneStatus: 'done' })
+                          setActiveTab('free-mode')
+                        }}
+                      >
+                        Voir les exercices déjà faits
+                      </button>
+                    )}
+                  </div>
                 </>
               ) : null}
             </div>
@@ -884,6 +1289,10 @@ function StudentDashboard() {
                   userId={previewScenario ? undefined : user.uid}
                   isPreviewMode={isPreviewMode}
                   previewProgress={previewScenario ? getPreviewProgress(previewScenario) : null}
+                  onOpenCodex={(nodeId) => {
+                    setCodexInitialNodeId(nodeId)
+                    setActiveTab('codex')
+                  }}
                 />
               </div>
             ) : (
@@ -911,6 +1320,14 @@ function StudentDashboard() {
             <div className="progression-section">
               <h2 className="section-title">Ma Progression</h2>
             
+            {(() => {
+              // #region agent log
+              if (activeTab === 'progress') {
+                fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'StudentDashboard.jsx:progress-branch', message: 'Progress tab branch', data: { loadingAttempts, attemptsLength: attempts.length, allAttemptsForStreakLength: allAttemptsForStreak?.length ?? 0, isGuest }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H1-H2' }) }).catch(() => {})
+              }
+              // #endregion
+              return null
+            })()}
             {loadingAttempts ? (
               <div className="loading-state">
                 <div className="spinner"></div>
@@ -932,98 +1349,110 @@ function StudentDashboard() {
               </div>
             ) : (
               <>
-                {/* Graphique de progression (N derniers exercices pour lisibilité) */}
-                {attempts.length >= 2 && (
-                  <div className="progress-chart-section">
-                    <ProgressChart 
-                      data={[...attempts]
-                        .sort((a, b) => {
-                          const dateA = a.completedAt?.toDate ? a.completedAt.toDate() : new Date(a.completedAt || 0)
-                          const dateB = b.completedAt?.toDate ? b.completedAt.toDate() : new Date(b.completedAt || 0)
-                          return dateA - dateB
-                        })
-                        .slice(-(isSmallScreen ? PROGRESS_CHART_LIMIT_MOBILE : PROGRESS_CHART_LIMIT))
-                        .map((attempt, index) => ({
-                          name: `Ex. ${index + 1}`,
-                          score: attempt.score,
-                          date: formatDate(attempt.completedAt),
-                          exerciseTitle: cleanExerciseTitle(attempt.exerciseTitle)
-                        }))}
-                    />
-                  </div>
-                )}
-
-                {/* Objectifs hebdomadaires */}
-                {!isGuest && (
-                  <div className="progress-section-card">
-                    <WeeklyObjectives userId={user?.uid} attempts={allAttemptsForStreak} />
-                  </div>
-                )}
-
-                {/* Statistiques hebdomadaires */}
+                {/* Cette semaine (en tête) */}
                 <div className="progress-section-card">
                   <WeeklyStats attempts={allAttemptsForStreak} />
                 </div>
 
-                {/* Indicateurs de tendance */}
+                {/* Tendances (en deuxième) */}
                 <div className="progress-section-card">
                   <TrendIndicators attempts={allAttemptsForStreak} />
                 </div>
+
+                {/* Objectifs hebdomadaires */}
+                {!isGuest && (
+                  <div className="progress-section-card">
+                    <WeeklyObjectives
+                      userId={user?.uid}
+                      attempts={allAttemptsForStreak}
+                      onObjectivesComplete={setAllObjectivesCompleted}
+                    />
+                  </div>
+                )}
 
                 {/* Comparaison de périodes */}
                 <div className="progress-section-card">
                   <PeriodComparison attempts={allAttemptsForStreak} />
                 </div>
 
-                {/* Accomplissements */}
+                {/* Accomplissements (10 derniers + reste débloqués + non obtenus) */}
                 {!isGuest && (
                   <div className="progress-section-card">
-                    <AchievementsDashboard userId={user?.uid} attempts={allAttemptsForStreak} userXp={userData?.xp} />
-                  </div>
-                )}
-
-                {/* Badges récents */}
-                {!isGuest && (
-                  <div className="progress-section-card">
-                    <BadgeSystem userId={user?.uid} attempts={allAttemptsForStreak} userXp={userData?.xp} />
+                    <AchievementsDashboard userId={user?.uid} attempts={allAttemptsForStreak} userXp={userData?.xp} onOpenHorizons={() => navigate('/student-dashboard/horizons')} />
                   </div>
                 )}
 
                 {/* Suggestions d'exercices */}
-                {!isGuest && profileStats && (
+                {!isGuest && (
                   <div className="progress-section-card">
-                    <ExerciseSuggestions profileStats={profileStats} attempts={allAttemptsForStreak} />
+                    <ExerciseSuggestions
+                      profileStats={profileStats}
+                      attempts={allAttemptsForStreak}
+                      onSwitchTab={setActiveTab}
+                      onPillClick={(payload) => {
+                        if (payload.type === 'tag') setFreeModeInitialFilter({ tag: payload.value })
+                        else if (payload.type === 'difficulty') setFreeModeInitialFilter({ difficulty: payload.value })
+                        else if (payload.type === 'doneStatus') setFreeModeInitialFilter({ doneStatus: payload.value })
+                        setActiveTab('free-mode')
+                      }}
+                      allObjectivesCompleted={allObjectivesCompleted}
+                    />
                   </div>
                 )}
 
-                {/* Historique des exercices */}
+                {/* Historique des exercices (en bas de l'onglet, liste compacte + Voir plus) */}
                 <div className="progress-section-card">
                   <h3 className="progress-section-title">Historique</h3>
-                  <div className="attempts-list">
-                    {attempts.slice(0, PROGRESS_HISTORY_LIST_LIMIT).map((attempt) => (
-                      <div key={attempt.id} className="attempt-card">
-                        <div className="attempt-main">
-                          <div className="attempt-info">
-                            <h4 className="attempt-title">
+                  <div className="attempts-list attempts-list--compact">
+                    {(() => {
+                      // #region agent log
+                      const visibleCount = historyExpanded ? PROGRESS_HISTORY_LIST_LIMIT : PROGRESS_HISTORY_LIST_VISIBLE
+                      const sliced = attempts.slice(0, visibleCount)
+                      fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'StudentDashboard.jsx:historique-render', message: 'Historique list render', data: { attemptsLength: attempts.length, visibleCount, slicedLength: sliced.length, historyExpanded }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H3' }) }).catch(() => {})
+                      // #endregion
+                      return null
+                    })()}
+                    {attempts
+                      .slice(0, historyExpanded ? PROGRESS_HISTORY_LIST_LIMIT : PROGRESS_HISTORY_LIST_VISIBLE)
+                      .map((attempt) => (
+                        <div
+                          key={attempt.id}
+                          role="button"
+                          tabIndex={0}
+                          className="attempt-row attempt-row-clickable"
+                          onClick={() => setSelectedAttempt(attempt)}
+                          onKeyDown={(e) => e.key === 'Enter' && setSelectedAttempt(attempt)}
+                          aria-label={`Voir le détail : ${cleanExerciseTitle(attempt.exerciseTitle)}`}
+                        >
+                          <div className="attempt-row-main">
+                            <span className="attempt-row-title" title={cleanExerciseTitle(attempt.exerciseTitle)}>
                               {cleanExerciseTitle(attempt.exerciseTitle)}
-                            </h4>
-                            <p className="attempt-date">{formatDate(attempt.completedAt)}</p>
+                            </span>
+                            <span className="attempt-row-meta">
+                              {formatDate(attempt.completedAt)}
+                              {' · '}
+                              ✅ {attempt.correctCount}/{attempt.totalQuestions}
+                              {attempt.xpGained > 0 && (
+                                <span className="attempt-row-xp"> +{attempt.xpGained} XP</span>
+                              )}
+                            </span>
                           </div>
-                          <div className={`attempt-score attempt-score-${attempt.score >= 80 ? 'high' : attempt.score >= 60 ? 'medium' : 'low'}`}>
+                          <span className={`attempt-row-score attempt-score-${attempt.score >= 80 ? 'high' : attempt.score >= 60 ? 'medium' : 'low'}`}>
                             {attempt.score}%
-                          </div>
-                        </div>
-                        <div className="attempt-footer">
-                          <span className="attempt-stats">
-                            ✅ {attempt.correctCount}/{attempt.totalQuestions}
                           </span>
-                          {attempt.xpGained > 0 && (
-                            <span className="attempt-xp">+{attempt.xpGained} XP</span>
-                          )}
                         </div>
-                      </div>
-                    ))}
+                      ))}
                   </div>
+                  {!historyExpanded && attempts.length > PROGRESS_HISTORY_LIST_VISIBLE && (
+                    <button
+                      type="button"
+                      className="progress-history-see-more"
+                      onClick={() => setHistoryExpanded(true)}
+                      aria-label={`Afficher ${Math.min(attempts.length - PROGRESS_HISTORY_LIST_VISIBLE, PROGRESS_HISTORY_LIST_LIMIT - PROGRESS_HISTORY_LIST_VISIBLE)} entrée(s) de plus`}
+                    >
+                      Voir plus
+                    </button>
+                  )}
                 </div>
               </>
             )}
@@ -1031,12 +1460,42 @@ function StudentDashboard() {
           </div>
         )}
 
-        {activeTab === 'free-mode' && (
-          <FreeMode
-            initialFilter={freeModeInitialFilter}
-            onInitialFilterConsumed={() => setFreeModeInitialFilter(null)}
-          />
+        {activeTab === 'codex' && (
+          <div className="student-content codex-tab-content">
+            <CodexView
+              selectedEntryId={codexSelectedFicheId}
+              onSelectEntry={setCodexSelectedFicheId}
+              initialFicheId={codexInitialFicheId}
+              initialNodeId={codexInitialNodeId}
+              onOpenParcoursNode={(nodeId) => {
+                setActiveTab('campaign')
+                setCodexSelectedFicheId(null)
+              }}
+              onOpenFreeModeWithTag={(tag) => {
+                setFreeModeInitialFilter(tag ? { tag } : null)
+                setActiveTab('free-mode')
+                setCodexSelectedFicheId(null)
+              }}
+            />
+          </div>
         )}
+
+        {activeTab === 'free-mode' && (() => {
+          const unlockedCount = isPreviewMode && previewHorizonsOverride
+            ? previewHorizonsOverride.split(',').map((s) => s.trim()).filter(Boolean).length
+            : getUnlockedHorizonsStyles(allAttemptsForStreak || [], { xp: userData?.xp ?? 0 }).length
+          return (
+            <FreeMode
+              doneExerciseIds={doneExerciseIds}
+              initialFilter={freeModeInitialFilter}
+              onInitialFilterConsumed={() => setFreeModeInitialFilter(null)}
+              onOpenHorizons={unlockedCount > 0 ? () => navigate('/student-dashboard/horizons') : null}
+              unlockedHorizonsCount={unlockedCount}
+              highlightHorizonsButton={highlightHorizonsInFreeMode}
+              onHighlightConsumed={() => setHighlightHorizonsInFreeMode(false)}
+            />
+          )
+        })()}
 
         {activeTab === 'profile' && (
           <div className="student-content profile-page">
@@ -1070,24 +1529,114 @@ function StudentDashboard() {
               </div>
             ) : (
               <>
-                {/* Section 1: Header & Global (Gamification) */}
+                {/* Barre retour (Profil accessible uniquement via avatar) */}
+                <div className="profile-top-bar">
+                  <button
+                    type="button"
+                    className="profile-back-btn"
+                    onClick={() => setActiveTab(previousTab || 'home')}
+                    aria-label="Retour"
+                  >
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="19" y1="12" x2="5" y2="12"></line>
+                      <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
+                  </button>
+                  <h1 className="profile-top-bar-title">Profil</h1>
+                </div>
+
+                {/* Section 1: Header & Global (Gamification) — sans grosses stats */}
                 <div className="profile-header-section">
                   <div className="profile-header-gamification">
-                    <div className="profile-avatar-container">
-                      {user?.photoURL ? (
-                        <img 
-                          src={user.photoURL} 
-                          alt={userName} 
-                          className="profile-page-avatar"
-                        />
-                      ) : (
-                        <div className="profile-page-avatar-placeholder">
-                          {firstName[0]?.toUpperCase() || 'E'}
-                        </div>
+                    <div className="profile-inline-avatar-edit">
+                      <div className="profile-avatar-container">
+                        {profilePhotoURL ? (
+                          <img 
+                            src={profilePhotoURL} 
+                            alt={userName} 
+                            className="profile-page-avatar"
+                          />
+                        ) : (
+                          <div className="profile-page-avatar-placeholder">
+                            {firstName[0]?.toUpperCase() || 'E'}
+                          </div>
+                        )}
+                      </div>
+                      {!isGuest && user?.uid && (
+                        <>
+                          <input
+                            ref={profileAvatarFileInputRef}
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/gif"
+                            className="profile-inline-avatar-input"
+                            aria-label="Changer la photo de profil"
+                            onChange={handleProfileAvatarChange}
+                            disabled={avatarUploading}
+                          />
+                          <button
+                            type="button"
+                            className="profile-inline-avatar-btn"
+                            onClick={() => profileAvatarFileInputRef.current?.click()}
+                            disabled={avatarUploading}
+                          >
+                            {avatarUploading ? 'Chargement…' : 'Changer la photo'}
+                          </button>
+                          {avatarError && (
+                            <p className="profile-inline-avatar-error" role="alert">{avatarError}</p>
+                          )}
+                        </>
                       )}
                     </div>
                     <div className="profile-header-info">
-                      <h2 className="profile-page-name">{userName}</h2>
+                      <div className="profile-inline-name-edit">
+                        {editingDisplayName ? (
+                          <>
+                            <input
+                              type="text"
+                              className="profile-inline-name-input"
+                              value={displayNameInput}
+                              onChange={(e) => setDisplayNameInput(e.target.value)}
+                              placeholder="Votre nom"
+                              disabled={displayNameSaving}
+                              aria-label="Nom d'affichage"
+                            />
+                            <div className="profile-inline-name-actions">
+                              <button
+                                type="button"
+                                className="profile-inline-name-save"
+                                onClick={saveDisplayName}
+                                disabled={displayNameSaving}
+                              >
+                                {displayNameSaving ? 'Enregistrement…' : 'Enregistrer'}
+                              </button>
+                              <button
+                                type="button"
+                                className="profile-inline-name-cancel"
+                                onClick={cancelEditingDisplayName}
+                                disabled={displayNameSaving}
+                              >
+                                Annuler
+                              </button>
+                            </div>
+                            {displayNameError && (
+                              <p className="profile-inline-name-error" role="alert">{displayNameError}</p>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <h2 className="profile-page-name">{userName}</h2>
+                            {!isGuest && user?.uid && (
+                              <button
+                                type="button"
+                                className="profile-inline-name-edit-btn"
+                                onClick={startEditingDisplayName}
+                              >
+                                Modifier le nom
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
                       <div className="profile-header-stats">
                         <div className="profile-stat-item">
                           <span className="profile-stat-label">Niveau</span>
@@ -1109,23 +1658,136 @@ function StudentDashboard() {
                       </div>
                     </div>
                   </div>
+                </div>
 
-                  {/* Bloc 3 Grosses Stats */}
-                  {profileStats && (
-                    <div className="profile-big-stats">
-                      <div className="big-stat-card">
-                        <div className="big-stat-value">{profileStats.totalAttempts}</div>
-                        <div className="big-stat-label">Exercices complétés</div>
-                      </div>
-                      <div className="big-stat-card">
-                        <div className="big-stat-value">{Math.round(profileStats.averageScore)}%</div>
-                        <div className="big-stat-label">Score moyen</div>
-                      </div>
-                      <div className="big-stat-card">
-                        <div className="big-stat-value">{profileStats.totalCorrect}</div>
-                        <div className="big-stat-label">Réponses correctes</div>
-                      </div>
+                {/* Établissement et classe */}
+                <div className="profile-section-card profile-establishment-section">
+                  <h3 className="profile-section-title">Établissement et classe</h3>
+                  <p className="profile-establishment-hint">Ces informations permettent à ton professeur de filtrer les élèves par niveau.</p>
+                  <div className="profile-establishment-fields">
+                    <div className="profile-establishment-field">
+                      <label htmlFor="profile-establishment-select">Établissement</label>
+                      <select
+                        id="profile-establishment-select"
+                        value={profileEstablishment}
+                        onChange={(e) => {
+                          const v = e.target.value
+                          if (v === 'Autre') {
+                            setRequestModalType('establishment')
+                            setRequestModalOpen(true)
+                            setProfileEstablishment(profileEstablishment)
+                            return
+                          }
+                          setProfileEstablishment(v)
+                          if (user?.uid) updateUserProfile(user.uid, { establishment: v || null }).catch(console.error)
+                        }}
+                        disabled={loadingEstablishments}
+                      >
+                        <option value="">— Choisir —</option>
+                        {establishmentsList.map((name) => (
+                          <option key={name} value={name}>{name}</option>
+                        ))}
+                      </select>
                     </div>
+                    <div className="profile-establishment-field">
+                      <label htmlFor="profile-class-select">Classe</label>
+                      <select
+                        id="profile-class-select"
+                        value={profileClass}
+                        onChange={(e) => {
+                          const v = e.target.value
+                          if (v === 'Autre') {
+                            setRequestModalType('class')
+                            setRequestModalOpen(true)
+                            setProfileClass(profileClass)
+                            return
+                          }
+                          setProfileClass(v)
+                          if (user?.uid) updateUserProfile(user.uid, { class: v || null }).catch(console.error)
+                        }}
+                        disabled={loadingClasses}
+                      >
+                        <option value="">— Choisir —</option>
+                        {classesList.map((name) => (
+                          <option key={name} value={name}>{name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Rejoindre une classe (code donné par le professeur) */}
+                <div className="profile-section-card profile-teacher-class-section">
+                  <h3 className="profile-section-title">Ma classe</h3>
+                  {userData?.teacherClassId && teacherClassName ? (
+                    <>
+                      <p className="profile-teacher-class-joined">
+                        Vous êtes dans la classe : <strong>{teacherClassName}</strong>
+                      </p>
+                      <button
+                        type="button"
+                        className="profile-teacher-class-leave"
+                        onClick={async () => {
+                          if (!user?.uid) return
+                          setJoinClassLoading(true)
+                          setJoinClassError('')
+                          try {
+                            await leaveTeacherClass(user.uid)
+                            await refreshUserData()
+                            setTeacherClassName(null)
+                          } catch (err) {
+                            setJoinClassError(err.message || 'Erreur')
+                          } finally {
+                            setJoinClassLoading(false)
+                          }
+                        }}
+                        disabled={joinClassLoading}
+                      >
+                        {joinClassLoading ? '…' : 'Quitter la classe'}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="profile-teacher-class-hint">
+                        Entre le code donné par ton professeur pour rejoindre sa classe.
+                      </p>
+                      <div className="profile-teacher-class-join-row">
+                        <input
+                          type="text"
+                          className="profile-teacher-class-code-input"
+                          placeholder="Code classe"
+                          value={classCodeInput}
+                          onChange={(e) => {
+                            setClassCodeInput(e.target.value.toUpperCase().trim())
+                            setJoinClassError('')
+                          }}
+                          disabled={joinClassLoading}
+                        />
+                        <button
+                          type="button"
+                          className="profile-teacher-class-join-btn"
+                          onClick={async () => {
+                            const code = classCodeInput.trim()
+                            if (!code || !user?.uid) return
+                            setJoinClassLoading(true)
+                            setJoinClassError('')
+                            try {
+                              await joinTeacherClass(user.uid, code)
+                              await refreshUserData()
+                              setClassCodeInput('')
+                            } catch (err) {
+                              setJoinClassError(err.message || 'Code invalide.')
+                            } finally {
+                              setJoinClassLoading(false)
+                            }
+                          }}
+                          disabled={joinClassLoading || !classCodeInput.trim()}
+                        >
+                          {joinClassLoading ? '…' : 'Rejoindre'}
+                        </button>
+                      </div>
+                      {joinClassError && <p className="profile-teacher-class-error">{joinClassError}</p>}
+                    </>
                   )}
                 </div>
 
@@ -1160,13 +1822,11 @@ function StudentDashboard() {
                             <p className="tactical-card-item">{weakestPoint.name}</p>
                             <p className="tactical-card-percentage">{weakestPoint.percentage}% de réussite</p>
                             <button 
+                              type="button"
                               className="tactical-card-action"
-                              onClick={() => {
-                                // TODO: Implémenter la fonctionnalité d'entraînement ciblé
-                                alert('Fonctionnalité à venir : entraînement ciblé sur ce point faible')
-                              }}
+                              onClick={() => setActiveTab('progress')}
                             >
-                              Travailler ce point faible
+                              Voir les suggestions
                             </button>
                           </div>
                         </div>
@@ -1217,13 +1877,15 @@ function StudentDashboard() {
             )}
           </div>
         )}
+        </>
+        )}
       </main>
 
-      {/* Bottom Navigation */}
+      {/* Bottom Navigation (sur la page Horizons, les clics ramènent au dashboard avec l'onglet choisi) */}
       <nav className="bottom-nav">
         <button
-          className={`nav-item ${activeTab === 'home' ? 'nav-item-active' : ''}`}
-          onClick={() => setActiveTab('home')}
+          className={`nav-item ${!isHorizonsPage && activeTab === 'home' ? 'nav-item-active' : ''}`}
+          onClick={() => isHorizonsPage ? navigate('/student-dashboard', { state: { tab: 'home' } }) : setActiveTab('home')}
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
@@ -1232,8 +1894,8 @@ function StudentDashboard() {
           <span>Accueil</span>
         </button>
         <button
-          className={`nav-item ${activeTab === 'campaign' ? 'nav-item-active' : ''}`}
-          onClick={() => setActiveTab('campaign')}
+          className={`nav-item ${!isHorizonsPage && activeTab === 'campaign' ? 'nav-item-active' : ''}`}
+          onClick={() => isHorizonsPage ? navigate('/student-dashboard', { state: { tab: 'campaign' } }) : setActiveTab('campaign')}
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
@@ -1241,8 +1903,8 @@ function StudentDashboard() {
           <span>Parcours</span>
         </button>
         <button
-          className={`nav-item ${activeTab === 'progress' ? 'nav-item-active' : ''}`}
-          onClick={() => setActiveTab('progress')}
+          className={`nav-item ${!isHorizonsPage && activeTab === 'progress' ? 'nav-item-active' : ''}`}
+          onClick={() => isHorizonsPage ? navigate('/student-dashboard', { state: { tab: 'progress' } }) : setActiveTab('progress')}
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
@@ -1250,8 +1912,8 @@ function StudentDashboard() {
           <span>Progression</span>
         </button>
         <button
-          className={`nav-item ${activeTab === 'free-mode' ? 'nav-item-active' : ''}`}
-          onClick={() => setActiveTab('free-mode')}
+          className={`nav-item ${!isHorizonsPage && activeTab === 'free-mode' ? 'nav-item-active' : ''}`}
+          onClick={() => isHorizonsPage ? navigate('/student-dashboard', { state: { tab: 'free-mode' } }) : setActiveTab('free-mode')}
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8"></circle>
@@ -1260,22 +1922,33 @@ function StudentDashboard() {
           <span>Mode Libre</span>
         </button>
         <button
-          className={`nav-item ${activeTab === 'profile' ? 'nav-item-active' : ''}`}
-          onClick={() => setActiveTab('profile')}
+          className={`nav-item ${!isHorizonsPage && activeTab === 'codex' ? 'nav-item-active' : ''}`}
+          onClick={() => isHorizonsPage ? navigate('/student-dashboard', { state: { tab: 'codex' } }) : setActiveTab('codex')}
+          aria-label="Codex"
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-            <circle cx="12" cy="7" r="4"></circle>
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2"></path>
+            <path d="M8 7h8"></path>
+            <path d="M8 11h8"></path>
           </svg>
-          <span>Profil</span>
+          <span>Codex</span>
         </button>
       </nav>
 
-      <ProfileModal
-        isOpen={isProfileModalOpen}
-        onClose={() => setIsProfileModalOpen(false)}
-        userRole={isPreviewMode ? 'student' : (userData?.role || 'student')}
-        isPreviewMode={isPreviewMode}
+      {selectedAttempt && (
+        <AttemptDetailModal
+          attempt={selectedAttempt}
+          exerciseTitle={cleanExerciseTitle(selectedAttempt.exerciseTitle)}
+          onClose={() => setSelectedAttempt(null)}
+        />
+      )}
+
+      <RequestEstablishmentModal
+        isOpen={requestModalOpen}
+        onClose={() => setRequestModalOpen(false)}
+        type={requestModalType}
+        userId={user?.uid}
       />
     </div>
   )

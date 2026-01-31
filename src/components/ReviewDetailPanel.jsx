@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Play, Pause, RotateCcw } from 'lucide-react'
 import { formatChordDetailed, FIGURES } from '../utils/chordFormatter'
 import { ChordLabelFigure } from './ChordLabel'
@@ -15,8 +16,10 @@ function ReviewDetailPanel({
   segmentEndTime,
   playerRef,
   exerciseStartTime,
-  exerciseEndTime
+  exerciseEndTime,
+  codexEntry = null
 }) {
+  const navigate = useNavigate()
   const [isPlayingSegment, setIsPlayingSegment] = useState(false)
   const [isLooping, setIsLooping] = useState(false)
   const segmentIntervalRef = useRef(null)
@@ -321,6 +324,17 @@ function ReviewDetailPanel({
             </div>
           </div>
         ) : null}
+        {codexEntry && (
+          <div className="review-codex-link-wrap">
+            <button
+              type="button"
+              className="review-codex-link"
+              onClick={() => navigate(`/student-dashboard?tab=codex&fiche=${codexEntry.id}`)}
+            >
+              Revoir la fiche : {codexEntry.title}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

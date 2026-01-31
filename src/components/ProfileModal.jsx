@@ -1,20 +1,37 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { getAllUserAttempts } from '../services/attemptService'
+import { getAllUserAttempts, getAttemptsCountByAuthor } from '../services/attemptService'
 import { getExercisesByAuthor } from '../services/exerciseService'
+import { getStudentsCount, updateUserProfile } from '../services/userService'
+import { uploadAvatar, validateAvatarFile } from '../services/avatarService'
+import { getEstablishments, getPendingEstablishmentRequests, getPendingClassRequests } from '../services/referenceDataService'
 import { validateAnswerWithFunctions } from '../utils/riemannFunctions'
 import { getFigureKeyLabel } from '../utils/tagFormatter'
+import { TEACHER_SUBJECTS } from '../data/teacherSubjects'
 import './ProfileModal.css'
 
 /** Ordre d'affichage des figures (renversements) */
 const FIGURE_ORDER = ['', '5', '6', '64', '7', '65', '43', '2', '42', '9', '54']
 
-function ProfileModal({ isOpen, onClose, userRole, isPreviewMode = false }) {
-  const { user, userData } = useAuth()
+function ProfileModal({ isOpen, onClose, userRole, isPreviewMode = false, onNavigate }) {
+  const { user, userData, refreshUserData } = useAuth()
   const [loading, setLoading] = useState(true)
   const [studentStats, setStudentStats] = useState(null)
   const [teacherStats, setTeacherStats] = useState(null)
   const [expandedDegrees, setExpandedDegrees] = useState({})
+  // Prof : établissements et matières (édition)
+  const [profileEstablishments, setProfileEstablishments] = useState([])
+  const [profileSubjects, setProfileSubjects] = useState([])
+  const [establishmentsList, setEstablishmentsList] = useState([])
+  const [loadingEstablishments, setLoadingEstablishments] = useState(false)
+  const [avatarUploading, setAvatarUploading] = useState(false)
+  const [avatarError, setAvatarError] = useState(null)
+  const fileInputRef = useRef(null)
+  // Édition du nom (prof et élève)
+  const [editingDisplayName, setEditingDisplayName] = useState(false)
+  const [displayNameInput, setDisplayNameInput] = useState('')
+  const [displayNameSaving, setDisplayNameSaving] = useState(false)
+  const [displayNameError, setDisplayNameError] = useState(null)
 
   useEffect(() => {
     if (isOpen) {
@@ -26,6 +43,32 @@ function ProfileModal({ isOpen, onClose, userRole, isPreviewMode = false }) {
       }
     }
   }, [isOpen, user, userRole, isPreviewMode])
+
+  // Prof : charger liste établissements et synchroniser établissements/matières depuis userData
+  useEffect(() => {
+    if (!isOpen || isPreviewMode) return
+    const isTeacher = userRole === 'teacher' || userData?.role === 'teacher'
+    if (isTeacher) {
+      setProfileEstablishments(Array.isArray(userData?.teacherEstablishments) ? [...userData.teacherEstablishments] : [])
+      setProfileSubjects(Array.isArray(userData?.teacherSubjects) ? [...userData.teacherSubjects] : [])
+      setLoadingEstablishments(true)
+      getEstablishments()
+        .then(setEstablishmentsList)
+        .catch(() => setEstablishmentsList([]))
+        .finally(() => setLoadingEstablishments(false))
+    }
+  }, [isOpen, isPreviewMode, userRole, userData?.role, userData?.teacherEstablishments, userData?.teacherSubjects])
+
+  // Prof : backfill listedInTeacherCatalogue pour les comptes existants (sinon ils n'apparaissent pas dans l'annuaire)
+  useEffect(() => {
+    if (!isOpen || isPreviewMode || !user?.uid) return
+    const isTeacher = userRole === 'teacher' || userData?.role === 'teacher'
+    if (isTeacher && userData?.listedInTeacherCatalogue === undefined) {
+      updateUserProfile(user.uid, { listedInTeacherCatalogue: true })
+        .then(() => refreshUserData())
+        .catch(console.error)
+    }
+  }, [isOpen, isPreviewMode, user?.uid, userRole, userData?.role, userData?.listedInTeacherCatalogue])
 
   const loadStats = async () => {
     try {
@@ -207,12 +250,52 @@ function ProfileModal({ isOpen, onClose, userRole, isPreviewMode = false }) {
       composerCount[composer] = (composerCount[composer] || 0) + 1
     })
 
+    // Compter les exercices par difficulté
+    const difficultyCount = {}
+    exercises.forEach(ex => {
+      const difficulty = ex.metadata?.difficulty || 'Non spécifié'
+      difficultyCount[difficulty] = (difficultyCount[difficulty] || 0) + 1
+    })
+
+    // Exercices récents (déjà triés par date dans getExercisesByAuthor)
+    const recentExercises = exercises.slice(0, 5)
+
+    let studentsCount = null
+    try {
+      studentsCount = await getStudentsCount()
+    } catch (err) {
+      console.warn('ProfileModal: getStudentsCount', err)
+    }
+
+    let pendingRequestsCount = 0
+    try {
+      const [pendingEst, pendingCls] = await Promise.all([
+        getPendingEstablishmentRequests(),
+        getPendingClassRequests()
+      ])
+      pendingRequestsCount = pendingEst.length + pendingCls.length
+    } catch (err) {
+      console.warn('ProfileModal: pending requests', err)
+    }
+
+    let attemptsOnMyExercisesCount = null
+    try {
+      attemptsOnMyExercisesCount = await getAttemptsCountByAuthor(user.uid)
+    } catch (err) {
+      console.warn('ProfileModal: getAttemptsCountByAuthor', err)
+    }
+
     setTeacherStats({
       totalExercises: exercises.length,
       publishedCount,
       draftCount,
       totalMarkers,
-      composerCount
+      composerCount,
+      difficultyCount,
+      recentExercises,
+      studentsCount,
+      pendingRequestsCount,
+      attemptsOnMyExercisesCount
     })
   }
 
@@ -234,6 +317,64 @@ function ProfileModal({ isOpen, onClose, userRole, isPreviewMode = false }) {
 
   const toggleDegreeExpand = (degree) => {
     setExpandedDegrees(prev => ({ ...prev, [degree]: !prev[degree] }))
+  }
+
+  // Image de profil : priorité à Firestore (photo personnalisée), sinon Auth (ex. Google)
+  const profilePhotoURL = userData?.photoURL ?? user?.photoURL
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target?.files?.[0]
+    if (!file || !user?.uid) return
+    e.target.value = ''
+    setAvatarError(null)
+    const validation = validateAvatarFile(file)
+    if (!validation.valid) {
+      setAvatarError(validation.error)
+      return
+    }
+    setAvatarUploading(true)
+    try {
+      const url = await uploadAvatar(user.uid, file)
+      await updateUserProfile(user.uid, { photoURL: url })
+      await refreshUserData()
+    } catch (err) {
+      setAvatarError(err.message || 'Erreur lors du chargement de l\'image.')
+    } finally {
+      setAvatarUploading(false)
+    }
+  }
+
+  const startEditingDisplayName = () => {
+    setDisplayNameInput(userData?.displayName || user?.displayName || '')
+    setDisplayNameError(null)
+    setEditingDisplayName(true)
+  }
+
+  const cancelEditingDisplayName = () => {
+    setEditingDisplayName(false)
+    setDisplayNameInput('')
+    setDisplayNameError(null)
+  }
+
+  const saveDisplayName = async () => {
+    const trimmed = displayNameInput?.trim() || ''
+    if (!user?.uid) return
+    setDisplayNameError(null)
+    if (!trimmed) {
+      setDisplayNameError('Le nom ne peut pas être vide.')
+      return
+    }
+    setDisplayNameSaving(true)
+    try {
+      await updateUserProfile(user.uid, { displayName: trimmed })
+      await refreshUserData()
+      setEditingDisplayName(false)
+      setDisplayNameInput('')
+    } catch (err) {
+      setDisplayNameError(err.message || 'Erreur lors de l\'enregistrement.')
+    } finally {
+      setDisplayNameSaving(false)
+    }
   }
 
   return (
@@ -269,17 +410,98 @@ function ProfileModal({ isOpen, onClose, userRole, isPreviewMode = false }) {
                 </>
               ) : (
                 <>
-                  {user?.photoURL && (
-                    <img src={user.photoURL} alt={user.displayName} className="profile-avatar-large" />
-                  )}
+                  <div className="profile-avatar-wrap">
+                    {profilePhotoURL ? (
+                      <img src={profilePhotoURL} alt={userData?.displayName || user?.displayName} className="profile-avatar-large" />
+                    ) : (
+                      <div className="profile-avatar-large profile-avatar-placeholder" aria-hidden="true">
+                        <span className="profile-avatar-initials">
+                          {(userData?.displayName || user?.displayName || 'U').charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                    {!isPreviewMode && user?.uid && (
+                      <>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          className="profile-avatar-input"
+                          aria-label="Changer la photo de profil"
+                          onChange={handleAvatarChange}
+                          disabled={avatarUploading}
+                        />
+                        <button
+                          type="button"
+                          className="profile-avatar-change-btn"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={avatarUploading}
+                          title="Changer la photo de profil"
+                        >
+                          {avatarUploading ? 'Chargement…' : 'Changer la photo'}
+                        </button>
+                        {avatarError && (
+                          <p className="profile-avatar-error" role="alert">{avatarError}</p>
+                        )}
+                      </>
+                    )}
+                  </div>
                   <div>
-                    <h3>{userData?.displayName || user?.displayName || 'Utilisateur'}</h3>
+                    {!isPreviewMode && user?.uid && editingDisplayName ? (
+                      <div className="profile-display-name-edit">
+                        <input
+                          type="text"
+                          className="profile-display-name-input"
+                          value={displayNameInput}
+                          onChange={(e) => setDisplayNameInput(e.target.value)}
+                          placeholder="Votre nom"
+                          disabled={displayNameSaving}
+                          aria-label="Nom d'affichage"
+                        />
+                        <div className="profile-display-name-actions">
+                          <button
+                            type="button"
+                            className="profile-display-name-save"
+                            onClick={saveDisplayName}
+                            disabled={displayNameSaving}
+                          >
+                            {displayNameSaving ? 'Enregistrement…' : 'Enregistrer'}
+                          </button>
+                          <button
+                            type="button"
+                            className="profile-display-name-cancel"
+                            onClick={cancelEditingDisplayName}
+                            disabled={displayNameSaving}
+                          >
+                            Annuler
+                          </button>
+                        </div>
+                        {displayNameError && (
+                          <p className="profile-display-name-error" role="alert">{displayNameError}</p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="profile-display-name-wrap">
+                        <h3 className="profile-display-name">{userData?.displayName || user?.displayName || 'Utilisateur'}</h3>
+                        {!isPreviewMode && user?.uid && (
+                          <button
+                            type="button"
+                            className="profile-display-name-edit-btn"
+                            onClick={startEditingDisplayName}
+                          >
+                            Modifier le nom
+                          </button>
+                        )}
+                      </div>
+                    )}
                     <p className="profile-role">{userRole === 'teacher' || userData?.role === 'teacher' ? 'Professeur' : 'Élève'}</p>
                     {userData?.xp !== undefined && (() => {
                       const lvl = Math.floor((userData.xp || 0) / 100) + 1
                       const title = lvl <= 4 ? 'Débutant' : lvl <= 9 ? 'En progression' : lvl <= 24 ? 'Régulier' : lvl <= 49 ? 'Assidu' : 'Expert'
+                      const isTeacher = userRole === 'teacher' || userData?.role === 'teacher'
                       return (
                         <p className="profile-xp">
+                          {isTeacher && <span className="profile-xp-mode-label">Progression en mode élève : </span>}
                           <span className="profile-level-title">{title}</span>
                           <span className="profile-xp-value"> · Niv. {lvl} · {userData.xp} XP</span>
                         </p>
@@ -289,6 +511,153 @@ function ProfileModal({ isOpen, onClose, userRole, isPreviewMode = false }) {
                 </>
               )}
             </div>
+
+            {/* Prof : Où j'enseigne / Mes matières (éditable) */}
+            {(userRole === 'teacher' || userData?.role === 'teacher') && !isPreviewMode && user?.uid && (
+              <div className="profile-stats-section profile-teacher-edit-section">
+                <h3>Où j'enseigne / Mes matières</h3>
+                <p className="profile-teacher-edit-hint">
+                  Ajoutez des établissements et des matières via les listes déroulantes. Choisissez « Enseignement instrumental » si vous n'enseignez pas de matière théorique.
+                </p>
+                <div className="profile-teacher-edit-fields">
+                  <div className="profile-teacher-edit-field">
+                    <label htmlFor="profile-teacher-establishment-select">Établissements</label>
+                    {loadingEstablishments ? (
+                      <p className="profile-teacher-edit-loading">Chargement…</p>
+                    ) : (
+                      <>
+                        <select
+                          id="profile-teacher-establishment-select"
+                          className="profile-teacher-select"
+                          value=""
+                          onChange={async (e) => {
+                            const v = e.target.value
+                            if (!v) return
+                            if (profileEstablishments.includes(v)) return
+                            const next = [...profileEstablishments, v]
+                            setProfileEstablishments(next)
+                            e.target.value = ''
+                            try {
+                              await updateUserProfile(user.uid, { teacherEstablishments: next })
+                              await refreshUserData()
+                            } catch (err) {
+                              console.error(err)
+                              setProfileEstablishments(profileEstablishments)
+                            }
+                          }}
+                        >
+                          <option value="">— Ajouter un établissement —</option>
+                          {establishmentsList
+                            .filter((name) => name !== 'Autre' && !profileEstablishments.includes(name))
+                            .map((name) => (
+                              <option key={name} value={name}>{name}</option>
+                            ))}
+                        </select>
+                        <div className="profile-teacher-chips">
+                          {profileEstablishments.map((name) => (
+                            <span key={name} className="profile-teacher-chip">
+                              {name}
+                              <button
+                                type="button"
+                                className="profile-teacher-chip-remove"
+                                onClick={async () => {
+                                  const next = profileEstablishments.filter((e) => e !== name)
+                                  setProfileEstablishments(next)
+                                  try {
+                                    await updateUserProfile(user.uid, { teacherEstablishments: next })
+                                    await refreshUserData()
+                                  } catch (err) {
+                                    console.error(err)
+                                    setProfileEstablishments(profileEstablishments)
+                                  }
+                                }}
+                                aria-label={`Retirer ${name}`}
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <div className="profile-teacher-edit-field">
+                    <label htmlFor="profile-teacher-subject-select">Matières</label>
+                    <select
+                      id="profile-teacher-subject-select"
+                      className="profile-teacher-select"
+                      value=""
+                      onChange={async (e) => {
+                        const v = e.target.value
+                        if (!v) return
+                        if (profileSubjects.includes(v)) return
+                        const next = [...profileSubjects, v]
+                        setProfileSubjects(next)
+                        e.target.value = ''
+                        try {
+                          await updateUserProfile(user.uid, { teacherSubjects: next })
+                          await refreshUserData()
+                        } catch (err) {
+                          console.error(err)
+                          setProfileSubjects(profileSubjects)
+                        }
+                      }}
+                    >
+                      <option value="">— Ajouter une matière —</option>
+                      {TEACHER_SUBJECTS.filter((s) => !profileSubjects.includes(s)).map((subject) => (
+                        <option key={subject} value={subject}>{subject}</option>
+                      ))}
+                    </select>
+                    <div className="profile-teacher-chips">
+                      {profileSubjects.map((name) => (
+                        <span key={name} className="profile-teacher-chip">
+                          {name}
+                          <button
+                            type="button"
+                            className="profile-teacher-chip-remove"
+                            onClick={async () => {
+                              const next = profileSubjects.filter((s) => s !== name)
+                              setProfileSubjects(next)
+                              try {
+                                await updateUserProfile(user.uid, { teacherSubjects: next })
+                                await refreshUserData()
+                              } catch (err) {
+                                console.error(err)
+                                setProfileSubjects(profileSubjects)
+                              }
+                            }}
+                            aria-label={`Retirer ${name}`}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="profile-teacher-edit-field profile-teacher-listed-toggle">
+                  <label className="profile-teacher-checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={userData?.listedInTeacherCatalogue !== false}
+                      onChange={async (e) => {
+                        const checked = e.target.checked
+                        try {
+                          await updateUserProfile(user.uid, { listedInTeacherCatalogue: checked })
+                          await refreshUserData()
+                        } catch (err) {
+                          console.error(err)
+                        }
+                      }}
+                    />
+                    <span>Apparaître dans l'annuaire des professeurs</span>
+                  </label>
+                  <p className="profile-teacher-edit-hint profile-teacher-listed-hint">
+                    Décochez pour ne plus apparaître dans l'annuaire (les autres profs ne pourront plus vous y voir ni vous contacter depuis la liste).
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Stats Élève */}
             {((userRole === 'student' || userData?.role === 'student') || isPreviewMode) && studentStats && (
@@ -424,6 +793,23 @@ function ProfileModal({ isOpen, onClose, userRole, isPreviewMode = false }) {
             {/* Stats Professeur */}
             {(userRole === 'teacher' || userData?.role === 'teacher') && teacherStats && (
               <>
+                {teacherStats.pendingRequestsCount > 0 && (
+                  <div className="profile-stats-section profile-pending-banner">
+                    <div className="profile-pending-banner-inner">
+                      <span className="profile-pending-banner-text">
+                        {teacherStats.pendingRequestsCount} demande{teacherStats.pendingRequestsCount > 1 ? 's' : ''} en attente
+                      </span>
+                      <button
+                        type="button"
+                        className="profile-pending-banner-btn"
+                        onClick={() => onNavigate?.('/dashboard/students')}
+                      >
+                        Gérer
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="profile-stats-section">
                   <h3>📚 Vue d'ensemble</h3>
                   <div className="stats-grid">
@@ -443,6 +829,18 @@ function ProfileModal({ isOpen, onClose, userRole, isPreviewMode = false }) {
                       <div className="stat-value">{teacherStats.totalMarkers}</div>
                       <div className="stat-label">Marqueurs total</div>
                     </div>
+                    {teacherStats.studentsCount !== null && teacherStats.studentsCount !== undefined && (
+                      <div className="stat-card">
+                        <div className="stat-value">{teacherStats.studentsCount}</div>
+                        <div className="stat-label">Élèves (catalogue)</div>
+                      </div>
+                    )}
+                    {teacherStats.attemptsOnMyExercisesCount !== null && teacherStats.attemptsOnMyExercisesCount !== undefined && (
+                      <div className="stat-card">
+                        <div className="stat-value">{teacherStats.attemptsOnMyExercisesCount}</div>
+                        <div className="stat-label">Tentatives sur mes exercices</div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -458,6 +856,66 @@ function ProfileModal({ isOpen, onClose, userRole, isPreviewMode = false }) {
                             <span className="composer-count">{count} exercice{count > 1 ? 's' : ''}</span>
                           </div>
                         ))}
+                    </div>
+                  </div>
+                )}
+
+                {Object.keys(teacherStats.difficultyCount || {}).length > 0 && (
+                  <div className="profile-stats-section">
+                    <h3>📊 Répartition par difficulté</h3>
+                    <div className="difficulty-stats-list">
+                      {Object.entries(teacherStats.difficultyCount)
+                        .sort((a, b) => b[1] - a[1])
+                        .map(([difficulty, count]) => (
+                          <div key={difficulty} className="difficulty-stat-item">
+                            <span className="difficulty-stat-name">{difficulty}</span>
+                            <span className="difficulty-stat-count">{count} exercice{count > 1 ? 's' : ''}</span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {teacherStats.recentExercises?.length > 0 && (
+                  <div className="profile-stats-section">
+                    <h3>📝 Exercices récents</h3>
+                    <ul className="profile-recent-exercises">
+                      {teacherStats.recentExercises.map((ex) => (
+                        <li key={ex.id} className="profile-recent-exercise-item">
+                          <a
+                            href={`/editor/${ex.id}`}
+                            className="profile-recent-exercise-link"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              onNavigate?.('/editor/' + ex.id)
+                            }}
+                          >
+                            <span className="profile-recent-exercise-title">
+                              {ex.metadata?.workTitle || ex.metadata?.exerciseTitle || ex.metadata?.title || 'Sans titre'}
+                            </span>
+                            <span className={`profile-recent-exercise-status profile-recent-exercise-status--${ex.status || 'draft'}`}>
+                              {ex.status === 'published' ? 'Publié' : 'Brouillon'}
+                            </span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {onNavigate && (
+                  <div className="profile-stats-section">
+                    <h3>🔗 Accès rapides</h3>
+                    <div className="profile-quick-links">
+                      <button type="button" className="profile-quick-link" onClick={() => onNavigate('/dashboard/students')}>
+                        Catalogue élèves
+                      </button>
+                      <button type="button" className="profile-quick-link" onClick={() => onNavigate('/student-dashboard')}>
+                        Vue élève
+                      </button>
+                      <button type="button" className="profile-quick-link" onClick={() => onNavigate('/editor')}>
+                        Créer un exercice
+                      </button>
                     </div>
                   </div>
                 )}

@@ -1091,6 +1091,87 @@ body.player-active {
   overflow: hidden;
 }
 
+/* Bannière badges débloqués (notification post-exercice) */
+.player-badge-unlocked-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.95) 0%, rgba(102, 126, 234, 0.95) 100%);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  animation: player-badge-banner-in 0.4s ease-out;
+}
+
+@keyframes player-badge-banner-in {
+  from {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.player-badge-unlocked-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.player-badge-unlocked-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.player-badge-unlocked-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+
+.player-badge-unlocked-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  opacity: 0.95;
+}
+
+.player-badge-unlocked-emoji {
+  font-size: 1.1rem;
+}
+
+.player-badge-unlocked-dismiss {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+  font-size: 1.25rem;
+  line-height: 1;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.player-badge-unlocked-dismiss:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
 /* Zone Supérieure : Dashboard */
 .player-review-upper-zone {
   position: relative;
@@ -1350,6 +1431,28 @@ body.player-active {
   margin: 0.35rem 0 0 0;
   font-size: 0.8rem;
   color: rgba(255, 255, 255, 0.7);
+}
+
+.player-validation-feedback-codex {
+  margin: 0.5rem 0 0 0;
+}
+
+.player-codex-link {
+  display: inline-block;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.8rem;
+  color: #93c5fd;
+  background: transparent;
+  border: 1px solid rgba(147, 197, 253, 0.4);
+  border-radius: 8px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.player-codex-link:hover {
+  color: #bfdbfe;
+  border-color: rgba(147, 197, 253, 0.7);
+  text-decoration: underline;
 }
 
 /* Tooltip au tap sur un segment (accord + feedback, lisible sur mobile) */

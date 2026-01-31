@@ -1,16 +1,21 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { getExercisesByAuthor, deleteExercise, duplicateExercise } from '../services/exerciseService'
+import EmailLoginModal from '../components/EmailLoginModal'
+import { getExercisesByAuthor, getAllExercisesForTeachers, deleteExercise, duplicateExercise } from '../services/exerciseService'
+import { getPendingEstablishmentRequests, getPendingClassRequests } from '../services/referenceDataService'
 import { getAuthErrorMessage } from '../utils/errorHandler'
 import ProfileModal from '../components/ProfileModal'
 import EditTagsModal from '../components/EditTagsModal'
+import AssignToClassModal from '../components/AssignToClassModal'
 import './Dashboard.css'
 
 function Dashboard() {
   const { user, userData, loading: authLoading, signInWithGoogle, logout } = useAuth()
+  const [showEmailLoginModal, setShowEmailLoginModal] = useState(false)
   const navigate = useNavigate()
   const [exercises, setExercises] = useState([])
+  const [exerciseFilter, setExerciseFilter] = useState('mine') // 'mine' | 'all'
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState(null)
   const [duplicatingId, setDuplicatingId] = useState(null)
@@ -19,6 +24,8 @@ function Dashboard() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const [tagsTooltipId, setTagsTooltipId] = useState(null)
   const [editTagsExercise, setEditTagsExercise] = useState(null)
+  const [assignExercise, setAssignExercise] = useState(null)
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0)
   const menuRefs = useRef({})
   const userMenuRef = useRef(null)
 
@@ -30,7 +37,14 @@ function Dashboard() {
     }
     
     loadExercises()
-  }, [user, authLoading])
+  }, [user, authLoading, exerciseFilter])
+
+  useEffect(() => {
+    if (!user || userData?.role !== 'teacher') return
+    Promise.all([getPendingEstablishmentRequests(), getPendingClassRequests()])
+      .then(([est, cls]) => setPendingRequestsCount((est?.length ?? 0) + (cls?.length ?? 0)))
+      .catch(() => setPendingRequestsCount(0))
+  }, [user, userData?.role])
 
   // Fermer les menus au clic extérieur
   useEffect(() => {
@@ -60,9 +74,12 @@ function Dashboard() {
   }, [])
 
   const loadExercises = async () => {
+    if (!user) return
     try {
       setLoading(true)
-      const data = await getExercisesByAuthor(user.uid)
+      const data = exerciseFilter === 'mine'
+        ? await getExercisesByAuthor(user.uid)
+        : await getAllExercisesForTeachers()
       setExercises(data)
     } catch (error) {
       console.error('Erreur lors du chargement des exercices:', error)
@@ -71,8 +88,12 @@ function Dashboard() {
     }
   }
 
-  const handleDelete = async (exerciseId) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cet exercice ?')) {
+  const handleDelete = async (exerciseId, authorId, authorName) => {
+    const isOwn = authorId === user.uid
+    const msg = isOwn
+      ? 'Êtes-vous sûr de vouloir supprimer cet exercice ?'
+      : `Cet exercice appartient à ${authorName || 'un autre professeur'}. Supprimer quand même ?`
+    if (!window.confirm(msg)) {
       return
     }
 
@@ -158,7 +179,15 @@ function Dashboard() {
           >
             Se connecter avec Google
           </button>
+          <button
+            type="button"
+            className="dashboard-signin-email-link"
+            onClick={() => setShowEmailLoginModal(true)}
+          >
+            Se connecter avec email
+          </button>
         </div>
+        <EmailLoginModal isOpen={showEmailLoginModal} onClose={() => setShowEmailLoginModal(false)} />
       </div>
     )
   }
@@ -169,6 +198,19 @@ function Dashboard() {
       <header className="dashboard-header">
           <h1 className="dashboard-title">Mes Exercices</h1>
         <div className="dashboard-header-right" ref={userMenuRef}>
+          {userData?.role === 'teacher' && (
+            <button
+              type="button"
+              className="dashboard-header-student-btn"
+              onClick={() => navigate('/student-dashboard')}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+              <span>Voir interface élève</span>
+            </button>
+          )}
           <button
             className="dashboard-user-avatar-btn"
             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
@@ -213,6 +255,69 @@ function Dashboard() {
                 <span>Profil et statistiques</span>
               </button>
               {userData?.role === 'teacher' && (
+              <>
+              <button 
+                  className="dashboard-user-menu-item"
+                  onClick={() => {
+                    navigate('/dashboard/students')
+                    setIsUserMenuOpen(false)
+                  }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="9" cy="7" r="4"></circle>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+                <span>Catalogue élèves</span>
+                {pendingRequestsCount > 0 && (
+                  <span className="dashboard-user-menu-badge">{pendingRequestsCount}</span>
+                )}
+              </button>
+              <button 
+                  className="dashboard-user-menu-item"
+                  onClick={() => {
+                    navigate('/dashboard/classes')
+                    setIsUserMenuOpen(false)
+                  }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                  <line x1="8" y1="6" x2="16" y2="6"></line>
+                  <line x1="8" y1="10" x2="16" y2="10"></line>
+                </svg>
+                <span>Mes classes</span>
+              </button>
+              <button 
+                  className="dashboard-user-menu-item"
+                  onClick={() => {
+                    navigate('/dashboard/assignments')
+                    setIsUserMenuOpen(false)
+                  }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                  <line x1="16" y1="17" x2="8" y2="17"></line>
+                  <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+                <span>Devoirs</span>
+              </button>
+              <button 
+                  className="dashboard-user-menu-item"
+                  onClick={() => {
+                    navigate('/dashboard/teachers')
+                    setIsUserMenuOpen(false)
+                  }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 14l9-5-9-5-9 5 9 5z"></path>
+                  <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path>
+                </svg>
+                <span>Annuaire des professeurs</span>
+              </button>
               <button 
                   className="dashboard-user-menu-item"
                   onClick={() => {
@@ -226,6 +331,7 @@ function Dashboard() {
                 </svg>
                 <span>Voir interface élève</span>
               </button>
+              </>
           )}
               <div className="dashboard-user-menu-divider"></div>
           <button 
@@ -252,6 +358,24 @@ function Dashboard() {
         </div>
       </header>
 
+      {/* Filtre Mes exercices / Tous les exercices */}
+      <div className="dashboard-filter-tabs">
+        <button
+          type="button"
+          className={`dashboard-filter-tab ${exerciseFilter === 'mine' ? 'active' : ''}`}
+          onClick={() => setExerciseFilter('mine')}
+        >
+          Mes exercices
+        </button>
+        <button
+          type="button"
+          className={`dashboard-filter-tab ${exerciseFilter === 'all' ? 'active' : ''}`}
+          onClick={() => setExerciseFilter('all')}
+        >
+          Tous les exercices
+        </button>
+      </div>
+
       {/* Contenu principal */}
       <main className="dashboard-content">
         {loading ? (
@@ -262,8 +386,8 @@ function Dashboard() {
         ) : exercises.length === 0 ? (
           <div className="dashboard-empty">
             <div className="dashboard-empty-icon">📚</div>
-            <h2>Aucun exercice pour le moment</h2>
-            <p>Créez votre premier exercice d'analyse harmonique</p>
+            <h2>{exerciseFilter === 'mine' ? 'Aucun exercice pour le moment' : 'Aucun exercice'}</h2>
+            <p>{exerciseFilter === 'mine' ? "Créez votre premier exercice d'analyse harmonique" : 'Aucun exercice créé par les professeurs.'}</p>
           </div>
         ) : (
           <div className="dashboard-grid">
@@ -368,8 +492,23 @@ function Dashboard() {
                             <span>{duplicatingId === exercise.id ? 'Duplication...' : 'Dupliquer'}</span>
                           </button>
                           <button
+                            className="dashboard-card-menu-item"
+                            onClick={() => {
+                              setAssignExercise(exercise)
+                              setOpenMenuId(null)
+                            }}
+                          >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                              <line x1="8" y1="6" x2="16" y2="6"></line>
+                              <line x1="8" y1="10" x2="16" y2="10"></line>
+                            </svg>
+                            <span>Assigner à une classe</span>
+                          </button>
+                          <button
                             className="dashboard-card-menu-item dashboard-card-menu-item-danger"
-                            onClick={() => handleDelete(exercise.id)}
+                            onClick={() => handleDelete(exercise.id, exercise.authorId, exercise.authorName)}
                             disabled={deletingId === exercise.id}
                           >
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -387,6 +526,11 @@ function Dashboard() {
                         {exercise.metadata.composer}
                       </p>
                 )}
+                    {(exerciseFilter === 'all' && (exercise.authorName || exercise.authorId)) && (
+                      <p className="dashboard-card-author">
+                        Par {exercise.authorId === user.uid ? 'vous' : (exercise.authorName || 'Professeur')}
+                      </p>
+                    )}
 
                     {/* Tags avec défilement horizontal */}
                 {exercise.autoTags && exercise.autoTags.length > 0 && (
@@ -483,6 +627,10 @@ function Dashboard() {
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
         userRole={userData?.role || 'teacher'}
+        onNavigate={(path) => {
+          navigate(path)
+          setIsProfileModalOpen(false)
+        }}
       />
 
       <EditTagsModal
@@ -490,6 +638,14 @@ function Dashboard() {
         exercise={editTagsExercise}
         onClose={() => setEditTagsExercise(null)}
         onSave={loadExercises}
+      />
+
+      <AssignToClassModal
+        isOpen={!!assignExercise}
+        onClose={() => setAssignExercise(null)}
+        exercise={assignExercise}
+        teacherId={user?.uid}
+        onSuccess={() => {}}
       />
     </div>
   )

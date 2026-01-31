@@ -1,0 +1,382 @@
+/* Codex – liste des fiches et détail */
+
+.codex-view {
+  padding: 0 0 1.5rem 0;
+  max-width: 100%;
+  margin: 0 auto;
+  min-height: 0;
+}
+
+.codex-view--list {
+  padding-bottom: 2rem;
+}
+
+.codex-header {
+  text-align: center;
+  margin-bottom: 1rem;
+  padding: 0 0.5rem;
+}
+
+.codex-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 0.25rem;
+}
+
+.codex-subtitle {
+  font-size: 0.8rem;
+  color: #475569;
+}
+
+.codex-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.codex-category {
+  background: #f8fafc;
+  border-radius: 16px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.codex-category-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 0.75rem;
+  padding-left: 0.25rem;
+}
+
+.codex-entry-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.codex-entry-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.codex-entry-card:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.codex-entry-card:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.codex-entry-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 0.25rem;
+}
+
+.codex-entry-desc {
+  font-size: 0.8rem;
+  color: #64748b;
+  line-height: 1.35;
+}
+
+/* Détail fiche */
+.codex-view--detail {
+  padding-bottom: 2rem;
+}
+
+.codex-back {
+  margin-bottom: 1rem;
+  padding: 0.5rem 0;
+  background: none;
+  border: none;
+  font-size: 0.9rem;
+  color: #3b82f6;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.codex-back:hover {
+  text-decoration: underline;
+}
+
+.codex-back:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.codex-detail {
+  background: #f8fafc;
+  border-radius: 16px;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.codex-detail-illustration {
+  margin: -0.25rem -0.5rem 1rem -0.5rem;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #e2e8f0;
+}
+
+.codex-detail-img {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 8 / 5;
+  object-fit: cover;
+  display: block;
+}
+
+.codex-detail-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 0.5rem;
+}
+
+.codex-detail-desc {
+  font-size: 0.9rem;
+  color: #64748b;
+  margin-bottom: 1rem;
+  font-style: italic;
+}
+
+.codex-detail-content {
+  margin-bottom: 1.5rem;
+}
+
+.codex-detail-content p {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: #334155;
+  margin-bottom: 0.75rem;
+}
+
+.codex-detail-content p:last-child {
+  margin-bottom: 0;
+}
+
+.codex-detail-content strong {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+/* Table des matières */
+.codex-toc {
+  margin: 1rem 0 1.25rem;
+  padding: 1rem 1.25rem;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.codex-toc-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 0.5rem;
+}
+
+.codex-toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.codex-toc-list li {
+  margin-bottom: 0.35rem;
+}
+
+.codex-toc-link {
+  font-size: 0.9rem;
+  color: #3b82f6;
+  text-decoration: none;
+}
+
+.codex-toc-link:hover {
+  text-decoration: underline;
+}
+
+.codex-toc-link:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Sections (fiches avec sections) */
+.codex-detail-section {
+  margin-top: 1.25rem;
+  scroll-margin-top: 0.5rem;
+}
+
+.codex-detail-section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 0.5rem;
+}
+
+.codex-detail-section-content p {
+  margin-bottom: 0.75rem;
+}
+
+.codex-detail-section-content p:last-child {
+  margin-bottom: 0;
+}
+
+/* Navigation précédent / suivant */
+.codex-detail-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.codex-nav-btn {
+  max-width: 50%;
+  padding: 0.5rem 0.75rem;
+  background: none;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  color: #3b82f6;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.codex-nav-btn:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.codex-nav-btn:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.codex-nav-next {
+  margin-left: auto;
+}
+
+/* Blocs exemples musicaux */
+.codex-detail-examples {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.codex-examples-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 0.75rem;
+}
+
+.codex-detail-links {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.codex-detail-block h4 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 0.5rem;
+}
+
+.codex-node-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.codex-node-btn {
+  display: inline-block;
+  text-align: left;
+  padding: 0.4rem 0;
+  background: none;
+  border: none;
+  font-size: 0.9rem;
+  color: #3b82f6;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.codex-node-btn:hover {
+  text-decoration: underline;
+}
+
+.codex-node-stage {
+  color: #64748b;
+  font-weight: 400;
+}
+
+.codex-detail-hint {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-bottom: 0.5rem;
+}
+
+.codex-pratiquer-btn {
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #fff;
+  background: #3b82f6;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.codex-pratiquer-btn:hover {
+  background: #2563eb;
+}
+
+.codex-pratiquer-btn:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Responsive – détail fiche */
+@media (max-width: 640px) {
+  .codex-detail {
+    padding: 1rem 1.25rem;
+  }
+  .codex-detail-illustration {
+    margin-left: -1rem;
+    margin-right: -1rem;
+    border-radius: 0;
+  }
+  .codex-detail-nav {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .codex-nav-btn {
+    max-width: none;
+  }
+}

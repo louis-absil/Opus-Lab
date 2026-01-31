@@ -56,6 +56,8 @@ function Editor() {
   const [dragStartTime, setDragStartTime] = useState(0)
   const [draggingMarkerIndex, setDraggingMarkerIndex] = useState(null)
   const [loadedAutoTags, setLoadedAutoTags] = useState([])
+  const [loadedSection, setLoadedSection] = useState(null)
+  const [loadedMusicCategory, setLoadedMusicCategory] = useState(null)
   
   const playerRef = useRef(null)
   const intervalRef = useRef(null)
@@ -151,6 +153,8 @@ function Editor() {
 
       setExerciseId(exerciseId)
       setLoadedAutoTags(exercise.autoTags && Array.isArray(exercise.autoTags) ? [...exercise.autoTags] : [])
+      setLoadedSection(exercise.metadata?.section ?? null)
+      setLoadedMusicCategory(exercise.metadata?.musicCategory ?? null)
       setIsEditingUrl(false)
       setShowVideoSearch(false)
       
@@ -349,11 +353,6 @@ function Editor() {
 
         // Gérer le fade out avant la fin
         const timeUntilEnd = endTime - time
-        // #region agent log
-        if (time % 1 < 0.1) { // Log environ une fois par seconde
-          fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Editor.jsx:updateTime:volumeCheck',message:'Volume check in updateTime',data:{time,timeUntilEnd,fadeDuration,hasFadeInterval:!!fadeIntervalRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{})
-        }
-        // #endregion
         if (timeUntilEnd <= fadeDuration && timeUntilEnd > 0) {
           // Fade out progressif
           const fadeOutProgress = 1 - (timeUntilEnd / fadeDuration)
@@ -366,16 +365,10 @@ function Editor() {
           // MAIS ne pas écraser un fade in en cours
           if (playerRef.current && !fadeIntervalRef.current) {
             playerRef.current.setVolume(100)
-            // #region agent log
-            fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Editor.jsx:updateTime:volumeReset',message:'Volume reset to 100%',data:{time,timeUntilEnd},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{})
-            // #endregion
           }
         }
 
           if (time >= endTime) {
-          // #region agent log
-          fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Editor.jsx:updateTime:endReached',message:'End time reached',data:{time,endTime,isPlaying},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{})
-          // #endregion
           // Nettoyer les fades en cours
           if (fadeIntervalRef.current) {
             clearInterval(fadeIntervalRef.current)
@@ -508,11 +501,7 @@ function Editor() {
 
   const handlePlayPause = () => {
     if (!playerRef.current) return
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Editor.jsx:handlePlayPause:entry',message:'handlePlayPause called',data:{isPlaying,currentTime:currentTimeRef.current||currentTime,startTime,endTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{})
-    // #endregion
-    
+
     if (isPlaying) {
       // Nettoyer les fades en cours
       if (fadeIntervalRef.current) {
@@ -526,11 +515,7 @@ function Editor() {
     } else {
       const current = currentTimeRef.current || currentTime
       const fadeDuration = 0.5 // Durée du fade en secondes
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Editor.jsx:handlePlayPause:beforeSeek',message:'Before seek check',data:{current,startTime,endTime,needsSeek:current<startTime||current>=endTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{})
-      // #endregion
-      
+
       // Si on est en dehors de l'extrait (avant ou après), revenir au début
       if (current < startTime || current >= endTime) {
         // Mettre à jour immédiatement les références de temps AVANT de lancer la lecture
@@ -557,25 +542,13 @@ function Editor() {
         if (playerRef.current) {
           playerRef.current.setVolume(volume)
         }
-        // #region agent log
-        if (fadeInStep % 5 === 0) {
-          fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Editor.jsx:handlePlayPause:fadeInProgress',message:'Fade in step',data:{fadeInStep,volume,fadeInSteps},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{})
-        }
-        // #endregion
         if (fadeInStep >= fadeInSteps) {
           if (fadeIntervalRef.current) {
             clearInterval(fadeIntervalRef.current)
             fadeIntervalRef.current = null
           }
-          // #region agent log
-          fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Editor.jsx:handlePlayPause:fadeInComplete',message:'Fade in completed',data:{fadeInStep},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{})
-          // #endregion
         }
       }, fadeInInterval)
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Editor.jsx:handlePlayPause:fadeInStarted',message:'Fade in interval started',data:{fadeIntervalRef:!!fadeIntervalRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{})
-      // #endregion
     }
   }
 
@@ -862,7 +835,9 @@ function Editor() {
           composer: metadata.composer,
           workTitle: metadata.workTitle,
           exerciseTitle: metadata.exerciseTitle,
-          difficulty: metadata.difficulty || null
+          difficulty: metadata.difficulty || null,
+          ...(metadata.section != null && { section: metadata.section }),
+          ...(metadata.musicCategory != null && { musicCategory: metadata.musicCategory })
         },
         autoTags: metadata.autoTags || []
       }
@@ -1356,9 +1331,6 @@ function Editor() {
               {markers.map((marker, index) => {
                 const chord = chordData[index]
                 const chordLabel = formatChordLabel(chord)
-                // #region agent log
-                fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Editor.jsx:ruban-accords',message:'ruban marker/chord',data:{index,markerType:typeof marker,markerChord:typeof marker?.chord,chordDefined:!!chord,chordLabelExists:!!chordLabel,isFunctionOnly:!!chordLabel?.isFunctionOnly},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'H1'})}).catch(()=>{});
-                // #endregion
                 const isSelected = selectedMarkerId === index
                 const chordFunction = getChordFunction(chord)
                 
@@ -1410,9 +1382,6 @@ function Editor() {
                             </span>
                           ) : (
                             <div className={`flex items-center gap-0.5 ${chordLabel.isBorrowed ? 'px-1' : ''}`}>
-                              {/* #region agent log */}
-                              {(()=>{fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Editor.jsx:ChordLabel-props',message:'ChordLabel reçoit chord',data:{index,passingChord:!!chord,chordPassedToLabel:!!chord},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'H2'})}).catch(()=>{});return null})()}
-                              {/* #endregion */}
                               <ChordLabel
                                 chord={chord}
                                 className="font-chord text-3xl font-bold text-white [&_.chord-label-figure]:text-white/70"
@@ -1837,6 +1806,8 @@ function Editor() {
           chordData={chordData}
           isEditMode={!!exerciseId}
           initialAutoTags={exerciseId ? loadedAutoTags : undefined}
+          initialSection={exerciseId ? loadedSection : undefined}
+          initialMusicCategory={exerciseId ? loadedMusicCategory : undefined}
         />
         
         {/* Modale de confirmation de sortie */}

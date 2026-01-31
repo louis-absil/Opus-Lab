@@ -6,7 +6,8 @@ import VideoCockpit from '../VideoCockpit'
 import ReviewDashboard from '../components/ReviewDashboard'
 import ReviewDetailPanel from '../components/ReviewDetailPanel'
 import { getExerciseById } from '../services/exerciseService'
-import { saveAttempt } from '../services/attemptService'
+import { saveAttempt, getAllUserAttempts } from '../services/attemptService'
+import { checkAndUnlockBadges } from '../services/badgeService'
 import { useAuth } from '../contexts/AuthContext'
 import { validateAnswerWithFunctions, DEGREE_TO_FUNCTIONS, normalizeCadence, PRIMARY_DEGREES } from '../utils/riemannFunctions'
 import { getUserProgress, updateNodeProgress, calculateNodeScore } from '../services/progressionService'
@@ -15,6 +16,7 @@ import { formatChordDetailed } from '../utils/chordFormatter'
 import { formatChordString as formatChordStringQcm } from '../utils/qcmOptions'
 import ChordLabel from '../components/ChordLabel'
 import { getNodePhase, getEnabledFunctions, getUnlockedChordKeys, getPrecisionFunctions, isCadenceAvailableForNode, getUnlockedCadenceValues, PHASE_INTUITION, PHASE_PRECISION, PHASE_MAITRISE } from '../data/parcoursTree'
+import { getCodexEntriesForCorrection } from '../utils/codexHelpers'
 import { Play, Pause, SkipBack, SkipForward, Pencil, RotateCcw } from 'lucide-react'
 import './Player.css'
 
@@ -47,7 +49,7 @@ function Player() {
   const { exerciseId } = useParams()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const { user, isGuest } = useAuth()
+  const { user, userData, isGuest } = useAuth()
   const [exercise, setExercise] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -76,6 +78,7 @@ function Player() {
   const [parcoursContext, setParcoursContext] = useState(null)
   const [nodeStatsForQCM, setNodeStatsForQCM] = useState(null) // nodeStats[nodeId] pour QCM adaptatif
   const [relevantChordIndices, setRelevantChordIndices] = useState([])
+  const [newlyUnlockedBadges, setNewlyUnlockedBadges] = useState([]) // badges débloqués à l'issue de cet exercice (affichés en bannière)
   
   const playerRef = useRef(null)
   const intervalRef = useRef(null)
@@ -91,6 +94,13 @@ function Player() {
     mq.addEventListener('change', handler)
     return () => mq.removeEventListener('change', handler)
   }, [])
+
+  // Auto-dismiss bannière badges débloqués après 5 secondes
+  useEffect(() => {
+    if (newlyUnlockedBadges.length === 0) return
+    const t = setTimeout(() => setNewlyUnlockedBadges([]), 5000)
+    return () => clearTimeout(t)
+  }, [newlyUnlockedBadges.length])
 
   /** Convertit un accord attendu en clé parcours (ex. I, I6, V7, N6, V64, cad64) pour comparer à unlockedChordKeys */
   const chordToParcoursKey = useCallback((chord) => {
@@ -998,16 +1008,46 @@ function Player() {
         // Score final : accord (100) + bonus cadence (10 si attendue et correcte) par marqueur
         const score = maxScore > 0 ? Math.round(((totalScore + totalCadenceBonus) / maxScore) * 100) : 0
         
-        // Sauvegarder la tentative
-        await saveAttempt(
-          user.uid, 
-          exercise.id, 
-          answersArray, 
-          correctAnswersArray, 
+        // Sauvegarder la tentative (métadonnées pour badges contenu musical)
+        const saveResult = await saveAttempt(
+          user.uid,
+          exercise.id,
+          answersArray,
+          correctAnswersArray,
           score,
           exercise.metadata?.exerciseTitle || exercise.metadata?.workTitle || 'Exercice',
-          { functionOnlyAvailable: progressionMode === 'functions' }
+          {
+            functionOnlyAvailable: progressionMode === 'functions',
+            authorId: exercise.authorId ?? null,
+            authorName: exercise.authorName ?? null,
+            exerciseMetadata: {
+              composer: exercise.metadata?.composer ?? null,
+              difficulty: exercise.metadata?.difficulty ?? null,
+              autoTags: exercise.autoTags ?? [],
+              sourceNodeId: exerciseMode === 'parcours' ? (nodeId ?? parcoursContext?.currentNodeId ?? null) : null,
+              ...(exercise.metadata?.section === 'horizons' && {
+                section: 'horizons',
+                musicCategory: exercise.metadata?.musicCategory ?? null
+              })
+            }
+          }
         )
+        // Vérifier et débloquer les badges, puis afficher une notification si nouveaux badges
+        try {
+          const allAttempts = await getAllUserAttempts(user.uid)
+          const sortedAttempts = [...allAttempts].sort((a, b) => {
+            const dateA = a.completedAt?.toDate?.() || new Date(a.completedAt || 0)
+            const dateB = b.completedAt?.toDate?.() || new Date(b.completedAt || 0)
+            return dateB - dateA
+          })
+          const xpAfterAttempt = (userData?.xp ?? 0) + (saveResult?.xpGained ?? 0)
+          const newlyUnlocked = await checkAndUnlockBadges(user.uid, sortedAttempts, { xp: xpAfterAttempt })
+          if (newlyUnlocked.length > 0) {
+            setNewlyUnlockedBadges(newlyUnlocked)
+          }
+        } catch (badgeError) {
+          console.error('Erreur lors de la vérification des badges:', badgeError)
+        }
       } catch (error) {
         console.error('Erreur lors de la sauvegarde de la tentative:', error)
         // Continuer quand même pour afficher les résultats
@@ -1018,6 +1058,7 @@ function Player() {
   }
 
   const handleReplay = () => {
+    setNewlyUnlockedBadges([])
     // Réinitialiser l'exercice
     setMode('exercise')
     setCurrentMarkerIndex(0)
@@ -1755,6 +1796,34 @@ function Player() {
   if (mode === 'review') {
     return (
       <div className="player-immersive player-review-mode">
+        {/* Bannière badges débloqués */}
+        {newlyUnlockedBadges.length > 0 && (
+          <div className="player-badge-unlocked-banner" role="alert">
+            <div className="player-badge-unlocked-content">
+              <span className="player-badge-unlocked-title">
+                {newlyUnlockedBadges.length === 1
+                  ? 'Badge débloqué'
+                  : `${newlyUnlockedBadges.length} badges débloqués`}
+              </span>
+              <div className="player-badge-unlocked-list">
+                {newlyUnlockedBadges.map((b) => (
+                  <span key={b.id} className="player-badge-unlocked-item">
+                    <span className="player-badge-unlocked-emoji">{b.emoji}</span>
+                    <span>{b.name}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+            <button
+              type="button"
+              className="player-badge-unlocked-dismiss"
+              onClick={() => setNewlyUnlockedBadges([])}
+              aria-label="Fermer"
+            >
+              ×
+            </button>
+          </div>
+        )}
         {/* Zone Supérieure : Dashboard de Scores */}
         <div 
           className="player-review-upper-zone"
@@ -1986,6 +2055,13 @@ function Player() {
               playerRef={playerRef}
               exerciseStartTime={startTime}
               exerciseEndTime={endTime}
+              codexEntry={(() => {
+                const val = answerValidations[selectedSegmentIndex]
+                const correct = exercise.markers[selectedSegmentIndex]?.chord ?? null
+                if (!correct || (val?.level !== 0 && val?.level !== 0.5 && val?.level !== 2 && val?.level !== 3)) return null
+                const entries = getCodexEntriesForCorrection(correct, nodeId)
+                return entries.length > 0 ? entries[0] : null
+              })()}
             />
           </ReviewDetailErrorBoundary>
           </div>
@@ -2443,6 +2519,9 @@ function Player() {
             ? `${correctChord.selectedFunction} (${PRIMARY_DEGREES[correctChord.selectedFunction][0]})`
             : formatChordDetailed(correctChord)
           : null
+        const showCodexLink = (validation.level === 0 || validation.level === 0.5 || validation.level === 2 || validation.level === 3) && correctChord
+        const codexEntries = showCodexLink ? getCodexEntriesForCorrection(correctChord, nodeId) : []
+        const firstCodex = codexEntries.length > 0 ? codexEntries[0] : null
         return (
           <div
             className={`player-segment-tooltip player-validation-feedback--level-${validation.level ?? 0}`}
@@ -2453,27 +2532,55 @@ function Player() {
             {revelation && (
               <p className="player-validation-feedback-revelation">En réalité, c&apos;était précisément un {revelation}.</p>
             )}
+            {firstCodex && (
+              <p className="player-validation-feedback-codex">
+                <button
+                  type="button"
+                  className="player-codex-link"
+                  onClick={() => navigate(`/student-dashboard?tab=codex&fiche=${firstCodex.id}`)}
+                >
+                  Revoir la fiche : {firstCodex.title}
+                </button>
+              </p>
+            )}
           </div>
         )
       })()}
       
       {/* Double correction : validation fonctionnelle + révélation accord précis (en parcours : feedback uniquement en fin de séquence, dans le panneau de relecture) */}
-      {answerValidations[currentMarkerIndex] && exercise?.markers?.[currentMarkerIndex] && exerciseMode !== 'parcours' && (
-        <div className={`player-validation-feedback player-validation-feedback--level-${answerValidations[currentMarkerIndex].level ?? 0}`}>
-          <p className="player-validation-feedback-main">{answerValidations[currentMarkerIndex].feedback}</p>
-          {(() => {
-            const marker = exercise.markers[currentMarkerIndex]
-            const correctChord = typeof marker === 'object' && marker.chord ? marker.chord : null
-            if (correctChord) {
-              const revelation = (!correctChord.degree && !correctChord.specialRoot && correctChord.selectedFunction && PRIMARY_DEGREES[correctChord.selectedFunction])
-                ? `${correctChord.selectedFunction} (${PRIMARY_DEGREES[correctChord.selectedFunction][0]})`
-                : formatChordDetailed(correctChord)
-              return <p className="player-validation-feedback-revelation">En réalité, c&apos;était précisément un {revelation}.</p>
-            }
-            return null
-          })()}
-        </div>
-      )}
+      {answerValidations[currentMarkerIndex] && exercise?.markers?.[currentMarkerIndex] && exerciseMode !== 'parcours' && (() => {
+        const validation = answerValidations[currentMarkerIndex]
+        const marker = exercise.markers[currentMarkerIndex]
+        const correctChord = typeof marker === 'object' && marker.chord ? marker.chord : null
+        const showCodexLink = (validation.level === 0 || validation.level === 0.5 || validation.level === 2 || validation.level === 3) && correctChord
+        const codexEntries = showCodexLink ? getCodexEntriesForCorrection(correctChord, nodeId) : []
+        const firstCodex = codexEntries.length > 0 ? codexEntries[0] : null
+        return (
+          <div className={`player-validation-feedback player-validation-feedback--level-${validation.level ?? 0}`}>
+            <p className="player-validation-feedback-main">{validation.feedback}</p>
+            {correctChord && (
+              <p className="player-validation-feedback-revelation">
+                En réalité, c&apos;était précisément un {
+                  (!correctChord.degree && !correctChord.specialRoot && correctChord.selectedFunction && PRIMARY_DEGREES[correctChord.selectedFunction])
+                    ? `${correctChord.selectedFunction} (${PRIMARY_DEGREES[correctChord.selectedFunction][0]})`
+                    : formatChordDetailed(correctChord)
+                }.
+              </p>
+            )}
+            {firstCodex && (
+              <p className="player-validation-feedback-codex">
+                <button
+                  type="button"
+                  className="player-codex-link"
+                  onClick={() => navigate(`/student-dashboard?tab=codex&fiche=${firstCodex.id}`)}
+                >
+                  Revoir la fiche : {firstCodex.title}
+                </button>
+              </p>
+            )}
+          </div>
+        )
+      })()}
     </div>
   )
 }

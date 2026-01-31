@@ -1,0 +1,37 @@
+/* CodexAudioPlayer – bouton Écouter */
+
+.codex-audio-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #fff;
+  background: #3b82f6;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.codex-audio-btn:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.codex-audio-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.codex-audio-btn--playing {
+  background: #dc2626;
+}
+
+.codex-audio-btn--playing:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.codex-audio-label {
+  line-height: 1;
+}

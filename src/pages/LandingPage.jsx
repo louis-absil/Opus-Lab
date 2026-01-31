@@ -2,12 +2,14 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { getAuthErrorMessage } from '../utils/errorHandler'
+import EmailLoginModal from '../components/EmailLoginModal'
 import './LandingPage.css'
 
 function LandingPage() {
   const { signInWithGoogle, loading, enableGuestMode } = useAuth()
   const navigate = useNavigate()
   const [isSigningIn, setIsSigningIn] = useState(false)
+  const [showEmailModal, setShowEmailModal] = useState(false)
   const heroRef = useRef(null)
   const featuresRef = useRef(null)
   const ctaRef = useRef(null)
@@ -99,6 +101,14 @@ function LandingPage() {
               <p className="cta-reassurance">
                 Accès gratuit. Aucune carte bancaire requise.
               </p>
+              <button
+                type="button"
+                className="cta-email-link"
+                onClick={() => setShowEmailModal(true)}
+                disabled={isSigningIn || loading}
+              >
+                Se connecter avec email
+              </button>
             </div>
           </div>
           <div className="hero-visual fade-up">
@@ -289,9 +299,19 @@ function LandingPage() {
             >
               Essayer une démo sans compte
             </button>
+            <button
+              type="button"
+              className="cta-email-link"
+              onClick={() => setShowEmailModal(true)}
+              disabled={isSigningIn || loading}
+            >
+              Se connecter avec email
+            </button>
+          </div>
         </div>
-      </div>
       </section>
+
+      <EmailLoginModal isOpen={showEmailModal} onClose={() => setShowEmailModal(false)} />
 
       {/* Footer */}
       <footer className="landing-footer">

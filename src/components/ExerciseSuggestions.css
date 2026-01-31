@@ -25,6 +25,28 @@
   margin: 0;
 }
 
+.suggestions-empty-hint {
+  font-size: 0.8125rem;
+  color: #9ca3af;
+  margin: 0.5rem 0 1rem 0;
+}
+
+.suggestions-cta-row {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.suggestion-button-secondary {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.suggestion-button-secondary:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
 .suggestions-title {
   font-size: 1.125rem;
   font-weight: 700;
@@ -33,69 +55,13 @@
 }
 
 .suggestions-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.75rem;
 }
 
-.suggestion-card {
-  background: #ffffff;
-  border: 2px solid #e5e7eb;
-  border-radius: 16px;
-  padding: 1.25rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-  transition: all 0.3s ease;
-}
-
-.suggestion-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  border-color: #667eea;
-}
-
-.suggestion-info {
-  flex: 1;
+.suggestions-list .exercise-card {
   min-width: 0;
-}
-
-.suggestion-badge {
-  display: inline-block;
-  padding: 0.25rem 0.5rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #ffffff;
-  border-radius: 8px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-}
-
-.suggestion-name {
-  font-size: 1rem;
-  font-weight: 700;
-  color: #111827;
-  margin: 0 0 0.25rem 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.suggestion-composer {
-  font-size: 0.875rem;
-  color: #6b7280;
-  margin: 0 0 0.5rem 0;
-}
-
-.suggestion-difficulty {
-  display: inline-block;
-  padding: 0.25rem 0.5rem;
-  background: #f3f4f6;
-  color: #374151;
-  border-radius: 8px;
-  font-size: 0.75rem;
-  font-weight: 500;
 }
 
 .suggestion-button {
@@ -120,15 +86,12 @@
   transform: scale(0.98);
 }
 
-/* Responsive */
 @media (max-width: 768px) {
-  .suggestion-card {
-    flex-direction: column;
-    align-items: flex-start;
-    padding: 1rem;
+  .suggestions-list {
+    grid-template-columns: 1fr;
   }
 
-  .suggestion-button {
+  .suggestions-cta-row .suggestion-button {
     width: 100%;
   }
 }

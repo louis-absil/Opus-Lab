@@ -5,7 +5,7 @@ import { formatTagForDisplay } from '../utils/tagFormatter'
 import ExerciseCard from '../components/ExerciseCard'
 import './FreeMode.css'
 
-function FreeMode({ initialFilter = null, onInitialFilterConsumed }) {
+function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterConsumed, onOpenHorizons = null, unlockedHorizonsCount = 0, highlightHorizonsButton = false, onHighlightConsumed = null }) {
   const navigate = useNavigate()
   
   // États de recherche et filtres
@@ -15,6 +15,7 @@ function FreeMode({ initialFilter = null, onInitialFilterConsumed }) {
   const [selectedDifficulty, setSelectedDifficulty] = useState('')
   const [selectedTags, setSelectedTags] = useState([])
   const [selectedGenre, setSelectedGenre] = useState('')
+  const [selectedDoneStatus, setSelectedDoneStatus] = useState('all') // 'all' | 'done' | 'not-done'
   
   // États des données
   const [exercises, setExercises] = useState([])
@@ -68,11 +69,62 @@ function FreeMode({ initialFilter = null, onInitialFilterConsumed }) {
       })
     return () => { cancelled = true }
   }, [])
-  
+
+  // Mise en avant du bouton Horizons (depuis conseil du jour) : annuler après 12 s
+  useEffect(() => {
+    if (!highlightHorizonsButton || !onHighlightConsumed) return
+    const t = setTimeout(() => onHighlightConsumed(), 12000)
+    return () => clearTimeout(t)
+  }, [highlightHorizonsButton, onHighlightConsumed])
+
+  // doneSet et filterExercises doivent être déclarés AVANT le useEffect qui les utilise (évite ReferenceError "Cannot access before initialization")
+  const doneSet = useMemo(() => new Set(doneExerciseIds || []), [doneExerciseIds])
+
+  const filterExercises = useCallback(() => {
+    let filtered = [...exercises]
+    if (selectedDoneStatus === 'done') {
+      filtered = filtered.filter(ex => doneSet.has(ex.id))
+    } else if (selectedDoneStatus === 'not-done') {
+      filtered = filtered.filter(ex => !doneSet.has(ex.id))
+    }
+    if (debouncedSearchText.trim()) {
+      const searchLower = debouncedSearchText.toLowerCase()
+      filtered = filtered.filter(ex => {
+        const workTitle = ex.metadata?.workTitle || ''
+        const exerciseTitle = ex.metadata?.exerciseTitle || ''
+        const composer = ex.metadata?.composer || ''
+        return (
+          workTitle.toLowerCase().includes(searchLower) ||
+          exerciseTitle.toLowerCase().includes(searchLower) ||
+          composer.toLowerCase().includes(searchLower)
+        )
+      })
+    }
+    if (selectedComposer) {
+      filtered = filtered.filter(ex => ex.metadata?.composer === selectedComposer)
+    }
+    if (selectedDifficulty) {
+      filtered = filtered.filter(ex => ex.metadata?.difficulty === selectedDifficulty)
+    }
+    if (selectedTags.length > 0) {
+      filtered = filtered.filter(ex => {
+        const exerciseTags = ex.autoTags || []
+        return selectedTags.some(tag => exerciseTags.includes(tag))
+      })
+    }
+    if (selectedGenre) {
+      filtered = filtered.filter(ex => {
+        const workTitle = ex.metadata?.workTitle || ''
+        return workTitle.toLowerCase().includes(selectedGenre.toLowerCase())
+      })
+    }
+    setFilteredExercises(filtered)
+  }, [debouncedSearchText, selectedComposer, selectedDifficulty, selectedTags, selectedGenre, selectedDoneStatus, exercises, doneSet])
+
   // Filtrer les exercices quand les filtres changent
   useEffect(() => {
     filterExercises()
-  }, [debouncedSearchText, selectedComposer, selectedDifficulty, selectedTags, selectedGenre, exercises])
+  }, [debouncedSearchText, selectedComposer, selectedDifficulty, selectedTags, selectedGenre, selectedDoneStatus, exercises, doneSet, filterExercises])
 
   // Appliquer le filtre initial (clic pastille depuis le dashboard élève)
   useEffect(() => {
@@ -82,6 +134,9 @@ function FreeMode({ initialFilter = null, onInitialFilterConsumed }) {
     }
     if (initialFilter.tag) {
       setSelectedTags([initialFilter.tag])
+    }
+    if (initialFilter.doneStatus === 'done' || initialFilter.doneStatus === 'not-done') {
+      setSelectedDoneStatus(initialFilter.doneStatus)
     }
     onInitialFilterConsumed()
   }, [initialFilter, onInitialFilterConsumed])
@@ -168,10 +223,7 @@ function FreeMode({ initialFilter = null, onInitialFilterConsumed }) {
     // Normaliser pour gérer underscores et casse
     const normalizeTagForExclusion = (tag) => tag.replace(/_/g, '').toLowerCase()
     const excludedTagsNormalized = [
-      'renversementsmultiples',
-      'multiplescadences',
-      'structurecomplexe',
-      'structuremoyenne'
+      'renversementsmultiples'
     ]
     
     tags.forEach(tag => {
@@ -219,53 +271,6 @@ function FreeMode({ initialFilter = null, onInitialFilterConsumed }) {
     return categories
   }
   
-  const filterExercises = useCallback(() => {
-    let filtered = [...exercises]
-    
-    // Recherche textuelle
-    if (debouncedSearchText.trim()) {
-      const searchLower = debouncedSearchText.toLowerCase()
-      filtered = filtered.filter(ex => {
-        const workTitle = ex.metadata?.workTitle || ''
-        const exerciseTitle = ex.metadata?.exerciseTitle || ''
-        const composer = ex.metadata?.composer || ''
-        return (
-          workTitle.toLowerCase().includes(searchLower) ||
-          exerciseTitle.toLowerCase().includes(searchLower) ||
-          composer.toLowerCase().includes(searchLower)
-        )
-      })
-    }
-    
-    // Filtre compositeur
-    if (selectedComposer) {
-      filtered = filtered.filter(ex => ex.metadata?.composer === selectedComposer)
-    }
-    
-    // Filtre difficulté
-    if (selectedDifficulty) {
-      filtered = filtered.filter(ex => ex.metadata?.difficulty === selectedDifficulty)
-    }
-    
-    // Filtre tags (au moins un tag sélectionné doit être présent)
-    if (selectedTags.length > 0) {
-      filtered = filtered.filter(ex => {
-        const exerciseTags = ex.autoTags || []
-        return selectedTags.some(tag => exerciseTags.includes(tag))
-      })
-    }
-    
-    // Filtre genre
-    if (selectedGenre) {
-      filtered = filtered.filter(ex => {
-        const workTitle = ex.metadata?.workTitle || ''
-        return workTitle.toLowerCase().includes(selectedGenre.toLowerCase())
-      })
-    }
-    
-    setFilteredExercises(filtered)
-  }, [debouncedSearchText, selectedComposer, selectedDifficulty, selectedTags, selectedGenre, exercises])
-  
   const toggleTag = (tag) => {
     setSelectedTags(prev => 
       prev.includes(tag) 
@@ -280,6 +285,7 @@ function FreeMode({ initialFilter = null, onInitialFilterConsumed }) {
     setSelectedDifficulty('')
     setSelectedTags([])
     setSelectedGenre('')
+    setSelectedDoneStatus('all')
   }
   
   const handleExerciseClick = (exerciseId) => {
@@ -349,10 +355,37 @@ function FreeMode({ initialFilter = null, onInitialFilterConsumed }) {
             <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
           </svg>
           <span>Filtrer</span>
-          {(selectedComposer || selectedDifficulty || selectedTags.length > 0 || selectedGenre) && (
-            <span className="free-mode-filter-badge">{[selectedComposer, selectedDifficulty, selectedTags.length, selectedGenre].filter(Boolean).length}</span>
+          {(selectedComposer || selectedDifficulty || selectedTags.length > 0 || selectedGenre || selectedDoneStatus !== 'all') && (
+            <span className="free-mode-filter-badge">{[selectedComposer, selectedDifficulty, selectedTags.length, selectedGenre, selectedDoneStatus !== 'all' ? 1 : 0].filter(Boolean).length}</span>
           )}
         </button>
+        {/* Bouton Nouveaux Horizons */}
+        {onOpenHorizons && (
+          <div className={`free-mode-horizons-wrap ${highlightHorizonsButton ? 'free-mode-horizons-wrap-highlight' : ''}`}>
+            {highlightHorizonsButton && (
+              <span className="free-mode-horizons-hint" role="status">C'est ici ! Nouveaux Horizons se trouve dans ce bouton.</span>
+            )}
+            <button
+              type="button"
+              className={`free-mode-horizons-btn ${highlightHorizonsButton ? 'free-mode-horizons-btn-highlight' : ''}`}
+              onClick={() => {
+                if (highlightHorizonsButton && onHighlightConsumed) onHighlightConsumed()
+                onOpenHorizons()
+              }}
+              aria-label="Découvrir Nouveaux Horizons"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M2 12h20"></path>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+              </svg>
+              <span>Nouveaux Horizons</span>
+              {unlockedHorizonsCount > 0 && (
+                <span className="free-mode-horizons-badge">{unlockedHorizonsCount}</span>
+              )}
+            </button>
+          </div>
+        )}
       </div>
       
       <div className="free-mode-content">
@@ -360,11 +393,41 @@ function FreeMode({ initialFilter = null, onInitialFilterConsumed }) {
         <aside className="free-mode-filters">
           <div className="free-mode-filters-header">
             <h3>Filtres</h3>
-            {(selectedComposer || selectedDifficulty || selectedTags.length > 0 || selectedGenre) && (
+            {(selectedComposer || selectedDifficulty || selectedTags.length > 0 || selectedGenre || selectedDoneStatus !== 'all') && (
               <button className="free-mode-clear-filters" onClick={clearAllFilters}>
                 Réinitialiser
               </button>
             )}
+          </div>
+
+          {/* Bloc Statut : déjà fait / pas encore fait */}
+          <div className="free-mode-filter-block free-mode-filter-block-statut">
+            <h4 className="free-mode-filter-block-title">Statut</h4>
+            <div className="free-mode-filter-group">
+              <div className="free-mode-statut-chips">
+                <button
+                  type="button"
+                  className={`free-mode-statut-chip ${selectedDoneStatus === 'all' ? 'free-mode-statut-chip-active' : ''}`}
+                  onClick={() => setSelectedDoneStatus('all')}
+                >
+                  Tous
+                </button>
+                <button
+                  type="button"
+                  className={`free-mode-statut-chip ${selectedDoneStatus === 'done' ? 'free-mode-statut-chip-active' : ''}`}
+                  onClick={() => setSelectedDoneStatus('done')}
+                >
+                  Déjà fait
+                </button>
+                <button
+                  type="button"
+                  className={`free-mode-statut-chip ${selectedDoneStatus === 'not-done' ? 'free-mode-statut-chip-active' : ''}`}
+                  onClick={() => setSelectedDoneStatus('not-done')}
+                >
+                  Pas encore fait
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Bloc Accès rapide : niveau + pastilles (notions) */}
@@ -739,13 +802,17 @@ function FreeMode({ initialFilter = null, onInitialFilterConsumed }) {
           {latestExercises.length > 0 && (
             <div className="free-mode-latest-section">
               <h3 className="free-mode-latest-title">Derniers exercices ajoutés</h3>
-              {!selectedComposer && !selectedDifficulty && selectedTags.length === 0 && !selectedGenre && !debouncedSearchText ? (
+              {!selectedComposer && !selectedDifficulty && selectedTags.length === 0 && !selectedGenre && selectedDoneStatus === 'all' && !debouncedSearchText ? (
                 <div className="free-mode-latest-grid">
                   {latestExercises.map((exercise) => (
                     <ExerciseCard
                       key={exercise.id}
                       exercise={exercise}
                       onClick={(id) => handleExerciseClick(id)}
+                      onPillClick={(payload) => {
+                        if (payload.type === 'difficulty') setSelectedDifficulty((prev) => (prev === payload.value ? '' : payload.value))
+                        else if (payload.type === 'tag') setSelectedTags((prev) => (prev.includes(payload.value) ? prev.filter((t) => t !== payload.value) : [...prev, payload.value]))
+                      }}
                     />
                   ))}
                 </div>
@@ -772,7 +839,7 @@ function FreeMode({ initialFilter = null, onInitialFilterConsumed }) {
               <p className="free-mode-empty-text">
                 Essaye de modifier tes critères de recherche ou tes filtres pour trouver plus d'exercices.
               </p>
-              {(selectedComposer || selectedDifficulty || selectedTags.length > 0 || selectedGenre || debouncedSearchText) && (
+              {(selectedComposer || selectedDifficulty || selectedTags.length > 0 || selectedGenre || selectedDoneStatus !== 'all' || debouncedSearchText) && (
                 <button className="free-mode-empty-cta" onClick={clearAllFilters}>
                   Réinitialiser les filtres
                 </button>
@@ -791,6 +858,10 @@ function FreeMode({ initialFilter = null, onInitialFilterConsumed }) {
                     key={exercise.id}
                     exercise={exercise}
                     onClick={(id) => handleExerciseClick(id)}
+                    onPillClick={(payload) => {
+                      if (payload.type === 'difficulty') setSelectedDifficulty((prev) => (prev === payload.value ? '' : payload.value))
+                      else if (payload.type === 'tag') setSelectedTags((prev) => (prev.includes(payload.value) ? prev.filter((t) => t !== payload.value) : [...prev, payload.value]))
+                    }}
                   />
                 ))}
               </div>
@@ -822,6 +893,36 @@ function FreeMode({ initialFilter = null, onInitialFilterConsumed }) {
             </div>
             
             <div className="free-mode-filter-drawer-content">
+              {/* Statut */}
+              <div className="free-mode-filter-block free-mode-filter-block-statut">
+                <h4 className="free-mode-filter-block-title">Statut</h4>
+                <div className="free-mode-filter-group">
+                  <div className="free-mode-statut-chips">
+                    <button
+                      type="button"
+                      className={`free-mode-statut-chip ${selectedDoneStatus === 'all' ? 'free-mode-statut-chip-active' : ''}`}
+                      onClick={() => setSelectedDoneStatus('all')}
+                    >
+                      Tous
+                    </button>
+                    <button
+                      type="button"
+                      className={`free-mode-statut-chip ${selectedDoneStatus === 'done' ? 'free-mode-statut-chip-active' : ''}`}
+                      onClick={() => setSelectedDoneStatus('done')}
+                    >
+                      Déjà fait
+                    </button>
+                    <button
+                      type="button"
+                      className={`free-mode-statut-chip ${selectedDoneStatus === 'not-done' ? 'free-mode-statut-chip-active' : ''}`}
+                      onClick={() => setSelectedDoneStatus('not-done')}
+                    >
+                      Pas encore fait
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               {/* Accès rapide */}
               <div className="free-mode-filter-block free-mode-filter-block-quick">
                 <h4 className="free-mode-filter-block-title">Accès rapide</h4>

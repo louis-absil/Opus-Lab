@@ -82,11 +82,180 @@
   margin-bottom: 2rem;
 }
 
+.profile-avatar-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .profile-avatar-large {
   width: 80px;
   height: 80px;
   border-radius: 50%;
   border: 3px solid #667eea;
+  object-fit: cover;
+}
+
+.profile-avatar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: 3px solid #667eea;
+}
+
+.profile-avatar-initials {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.profile-avatar-input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+.profile-avatar-change-btn {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #667eea;
+  background: rgba(102, 126, 234, 0.15);
+  border: 1px solid rgba(102, 126, 234, 0.4);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.profile-avatar-change-btn:hover:not(:disabled) {
+  background: rgba(102, 126, 234, 0.25);
+  border-color: #667eea;
+}
+
+.profile-avatar-change-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.profile-avatar-error {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #f87171;
+  max-width: 180px;
+  text-align: center;
+}
+
+/* Édition du nom (prof et élève) */
+.profile-display-name-wrap {
+  margin-bottom: 0.25rem;
+}
+
+.profile-display-name-wrap .profile-display-name {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.5rem;
+  color: #ffffff;
+}
+
+.profile-display-name-edit-btn {
+  display: inline-block;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #a5b4fc;
+  background: transparent;
+  border: 1px solid rgba(102, 126, 234, 0.4);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.profile-display-name-edit-btn:hover {
+  background: rgba(102, 126, 234, 0.2);
+  border-color: #667eea;
+  color: #c7d2fe;
+}
+
+.profile-display-name-edit {
+  margin-bottom: 0.5rem;
+}
+
+.profile-display-name-input {
+  display: block;
+  width: 100%;
+  max-width: 280px;
+  padding: 0.5rem 0.75rem;
+  font-size: 1rem;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(102, 126, 234, 0.5);
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+}
+
+.profile-display-name-input::placeholder {
+  color: #9ca3af;
+}
+
+.profile-display-name-input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.3);
+}
+
+.profile-display-name-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.profile-display-name-save {
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.profile-display-name-save:hover:not(:disabled) {
+  opacity: 0.95;
+}
+
+.profile-display-name-save:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.profile-display-name-cancel {
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #b0b0b0;
+  background: transparent;
+  border: 1px solid #4a4a4a;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.profile-display-name-cancel:hover:not(:disabled) {
+  background: #3a3a3a;
+  color: #e5e5e5;
+}
+
+.profile-display-name-error {
+  margin: 0.5rem 0 0 0;
+  font-size: 0.8rem;
+  color: #f87171;
 }
 
 .preview-avatar {
@@ -129,6 +298,14 @@
   color: #6b7280;
   font-size: 0.9375rem;
 }
+
+.profile-xp-mode-label {
+  font-size: 0.8rem;
+  color: #9ca3af;
+  font-style: italic;
+  margin-right: 0.25rem;
+}
+
 .profile-level-title {
   font-weight: 600;
   color: #111827;
@@ -317,6 +494,287 @@
   color: #b0b0b0;
 }
 
+.difficulty-stats-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.difficulty-stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+}
+
+.difficulty-stat-name {
+  font-size: 1rem;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.difficulty-stat-count {
+  font-size: 0.9rem;
+  color: #b0b0b0;
+}
+
+.profile-recent-exercises {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.profile-recent-exercise-item {
+  margin: 0;
+}
+
+.profile-recent-exercise-link {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.profile-recent-exercise-link:hover {
+  border-color: #667eea;
+  background: rgba(102, 126, 234, 0.1);
+}
+
+.profile-recent-exercise-title {
+  font-size: 0.95rem;
+  color: #ffffff;
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-recent-exercise-status {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.profile-recent-exercise-status--published {
+  background: rgba(34, 197, 94, 0.2);
+  color: #86efac;
+}
+
+.profile-recent-exercise-status--draft {
+  background: rgba(234, 179, 8, 0.2);
+  color: #fde047;
+}
+
+/* Section prof : Où j'enseigne / Mes matières */
+.profile-teacher-edit-section {
+  background: rgba(102, 126, 234, 0.06);
+  border: 1px solid rgba(102, 126, 234, 0.2);
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.profile-teacher-edit-hint {
+  margin: 0 0 1.25rem 0;
+  font-size: 0.9rem;
+  color: #b0b0b0;
+  line-height: 1.4;
+}
+
+.profile-teacher-edit-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+.profile-teacher-edit-field label {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #e5e7eb;
+  margin-bottom: 0.75rem;
+}
+
+.profile-teacher-edit-loading {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #9ca3af;
+}
+
+.profile-teacher-select {
+  width: 100%;
+  max-width: 100%;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.9375rem;
+  color: #e5e7eb;
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
+  cursor: pointer;
+}
+
+.profile-teacher-select:hover,
+.profile-teacher-select:focus {
+  border-color: #667eea;
+  outline: none;
+}
+
+.profile-teacher-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.profile-teacher-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.875rem;
+  background: rgba(102, 126, 234, 0.2);
+  border: 1px solid rgba(102, 126, 234, 0.4);
+  border-radius: 8px;
+  color: #e5e7eb;
+}
+
+.profile-teacher-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  padding: 0;
+  margin: 0;
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  border-radius: 4px;
+  color: #e5e7eb;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.profile-teacher-chip-remove:hover {
+  background: rgba(239, 68, 68, 0.4);
+  color: #fff;
+}
+
+.profile-teacher-listed-toggle {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid rgba(102, 126, 234, 0.2);
+}
+
+.profile-teacher-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #e5e7eb;
+}
+
+.profile-teacher-checkbox-label input {
+  width: 1.2rem;
+  height: 1.2rem;
+  accent-color: #667eea;
+  cursor: pointer;
+}
+
+.profile-teacher-listed-hint {
+  margin: 0.5rem 0 0 1.95rem;
+  font-size: 0.85rem;
+}
+
+.profile-pending-banner {
+  margin-bottom: 1rem;
+}
+
+.profile-pending-banner-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  background: rgba(234, 179, 8, 0.15);
+  border: 1px solid rgba(234, 179, 8, 0.4);
+  border-radius: 12px;
+}
+
+.profile-pending-banner-text {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #fde047;
+}
+
+.profile-pending-banner-btn {
+  padding: 0.5rem 1rem;
+  background: rgba(234, 179, 8, 0.3);
+  border: 1px solid rgba(234, 179, 8, 0.5);
+  border-radius: 8px;
+  color: #fef08a;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.profile-pending-banner-btn:hover {
+  background: rgba(234, 179, 8, 0.4);
+  border-color: #fde047;
+}
+
+.profile-quick-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.profile-quick-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  color: #e5e7eb;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.profile-quick-link:hover {
+  border-color: #667eea;
+  background: rgba(102, 126, 234, 0.1);
+  color: #ffffff;
+}
+
+.profile-quick-link:focus-visible {
+  outline: 2px solid #667eea;
+  outline-offset: 2px;
+}
+
 .spinner {
   width: 40px;
   height: 40px;
@@ -357,6 +815,10 @@
 
   .degree-stats-list,
   .cadence-stats-list {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-teacher-edit-fields {
     grid-template-columns: 1fr;
   }
 }

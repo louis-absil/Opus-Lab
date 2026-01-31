@@ -1,0 +1,12 @@
+/* CodexNotation – rendu abcjs */
+
+.codex-notation {
+  min-height: 80px;
+  overflow-x: auto;
+  padding: 0.75rem 0;
+}
+
+.codex-notation svg {
+  max-width: 100%;
+  height: auto;
+}

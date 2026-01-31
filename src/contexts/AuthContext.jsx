@@ -1,6 +1,9 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
 import { 
   signInWithPopup, 
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
   signOut, 
   onAuthStateChanged 
 } from 'firebase/auth'
@@ -89,9 +92,6 @@ export function AuthProvider({ children }) {
   }, [user, userData, isGuest])
 
   useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:useEffect',message:'useEffect exécuté',data:{isGuest,hasUser:!!user,hasUserData:!!userData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-    // #endregion
     // Timeout de sécurité pour éviter un blocage infini
     const timeoutId = setTimeout(() => {
       console.warn('AuthContext: Timeout - onAuthStateChanged ne s\'est pas déclenché dans les 5 secondes')
@@ -112,9 +112,6 @@ export function AuthProvider({ children }) {
 
     try {
       const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-        // #region agent log
-        fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.jsx:onAuthStateChanged',message:'onAuthStateChanged callback',data:{hasFirebaseUser:!!firebaseUser,uid:firebaseUser?.uid},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-        // #endregion
         clearTimeout(timeoutId)
         setUser(firebaseUser)
         
@@ -213,6 +210,30 @@ export function AuthProvider({ children }) {
     }
   }
 
+  const signInWithEmailPassword = async (email, password) => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      const networkError = new Error('Aucune connexion internet détectée. Veuillez vérifier votre connexion réseau.')
+      networkError.code = 'network/offline'
+      throw networkError
+    }
+    await signInWithEmailAndPassword(auth, email.trim(), password)
+    // loadUserData sera appelé automatiquement par onAuthStateChanged
+  }
+
+  const registerWithEmailPassword = async (email, password, displayName = null) => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      const networkError = new Error('Aucune connexion internet détectée. Veuillez vérifier votre connexion réseau.')
+      networkError.code = 'network/offline'
+      throw networkError
+    }
+    const normalizedEmail = email.trim()
+    const userCredential = await createUserWithEmailAndPassword(auth, normalizedEmail, password)
+    if (displayName && displayName.trim()) {
+      await updateProfile(userCredential.user, { displayName: displayName.trim() })
+    }
+    // loadUserData sera appelé automatiquement par onAuthStateChanged
+  }
+
   const logout = async () => {
     try {
       await signOut(auth)
@@ -249,6 +270,8 @@ export function AuthProvider({ children }) {
     loading,
     isGuest, // Mode invité
     signInWithGoogle,
+    signInWithEmailPassword,
+    registerWithEmailPassword,
     logout,
     refreshUserData,
     enableGuestMode,

@@ -103,6 +103,26 @@
   font-weight: 400;
 }
 
+.cta-email-link {
+  background: none;
+  border: none;
+  color: #667eea;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0.5rem 0;
+  font-family: inherit;
+}
+
+.cta-email-link:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.cta-email-link:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* Device Mockup */
 .hero-visual {
   display: flex;

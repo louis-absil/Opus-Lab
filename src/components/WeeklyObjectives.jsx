@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { getUserObjectives, generateAdaptiveObjectives, createObjective } from '../services/objectiveService'
 import './WeeklyObjectives.css'
 
-function WeeklyObjectives({ userId, attempts }) {
+function WeeklyObjectives({ userId, attempts, onObjectivesComplete }) {
   const [objectives, setObjectives] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -16,43 +16,81 @@ function WeeklyObjectives({ userId, attempts }) {
     try {
       setLoading(true)
       let userObjectives = await getUserObjectives(userId)
+      const currentWeekAttempts = getCurrentWeekAttempts(attempts || [])
 
-      // Si pas d'objectifs, en créer de nouveaux
-      if (userObjectives.length === 0 && attempts) {
-        const currentWeekAttempts = getCurrentWeekAttempts(attempts)
+      // Créer uniquement les objectifs dont le type n'existe pas encore (déduplication)
+      if (attempts) {
+        const existingTypeIds = new Set(
+          userObjectives.map(o => o.objectiveTypeId || o.id)
+        )
         const newObjectives = generateAdaptiveObjectives(attempts, currentWeekAttempts)
-        
-        // Créer les objectifs dans Firestore
-        for (const obj of newObjectives) {
+        const toCreate = newObjectives.filter(obj => !existingTypeIds.has(obj.id))
+        for (const obj of toCreate) {
           await createObjective(userId, obj)
+          existingTypeIds.add(obj.id)
         }
-        
-        userObjectives = await getUserObjectives(userId)
+        if (toCreate.length > 0) {
+          userObjectives = await getUserObjectives(userId)
+        }
       }
 
-      // Mettre à jour la progression
+      // Mettre à jour la progression affichée et dédupliquer par type (un seul objectif par objectiveTypeId)
       if (userObjectives.length > 0 && attempts) {
-        const currentWeekAttempts = getCurrentWeekAttempts(attempts)
         const updatedObjectives = userObjectives.map(obj => {
           if (obj.category === 'quantity') {
             return { ...obj, current: currentWeekAttempts.length }
-          } else if (obj.category === 'quality') {
+          }
+          if (obj.category === 'quality') {
             const avg = currentWeekAttempts.length > 0
               ? currentWeekAttempts.reduce((sum, a) => sum + (a.score || 0), 0) / currentWeekAttempts.length
               : 0
             return { ...obj, current: Math.round(avg) }
           }
+          if (obj.category === 'variety') {
+            const uniqueIds = new Set(
+              currentWeekAttempts.map(a => a.exerciseId).filter(Boolean)
+            )
+            return { ...obj, current: uniqueIds.size }
+          }
           return obj
         })
-        setObjectives(updatedObjectives)
+        const deduped = deduplicateObjectivesByType(updatedObjectives)
+        setObjectives(deduped)
+        const allCompleted = deduped.length > 0 && deduped.every(
+          obj => (obj.current || 0) >= (obj.target || 0)
+        )
+        onObjectivesComplete?.(allCompleted)
       } else {
-        setObjectives(userObjectives)
+        const deduped = deduplicateObjectivesByType(userObjectives)
+        setObjectives(deduped)
+        const allCompleted = deduped.length > 0 && deduped.every(
+          obj => (obj.current || 0) >= (obj.target || 0)
+        )
+        onObjectivesComplete?.(allCompleted)
       }
     } catch (error) {
       console.error('Erreur lors du chargement des objectifs:', error)
     } finally {
       setLoading(false)
     }
+  }
+
+  /** Un seul objectif par type (évite les doublons en base ou anciens doublons). */
+  const deduplicateObjectivesByType = (list) => {
+    const seen = new Set()
+    return list.filter(obj => {
+      const typeId = obj.objectiveTypeId ?? typeIdFromCategory(obj.category) ?? obj.id
+      if (seen.has(typeId)) return false
+      seen.add(typeId)
+      return true
+    })
+  }
+
+  const typeIdFromCategory = (category) => {
+    if (category === 'quantity') return 'weekly_exercises'
+    if (category === 'quality') return 'weekly_score'
+    if (category === 'variety') return 'weekly_variety'
+    return null
   }
 
   const getCurrentWeekAttempts = (allAttempts) => {
@@ -84,9 +122,18 @@ function WeeklyObjectives({ userId, attempts }) {
     )
   }
 
+  const allCompleted = objectives.length > 0 && objectives.every(
+    obj => (obj.current || 0) >= (obj.target || 0)
+  )
+
   return (
     <div className="weekly-objectives">
       <h3 className="objectives-title">Mes Objectifs</h3>
+      {allCompleted && (
+        <p className="objectives-unlocked-message">
+          Objectifs atteints : une suggestion prioritaire t&apos;attend plus bas.
+        </p>
+      )}
       <div className="objectives-list">
         {objectives.map(objective => {
           const progress = Math.min((objective.current / objective.target) * 100, 100)

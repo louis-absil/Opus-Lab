@@ -46,7 +46,7 @@ export const NODE_ILLUSTRATIONS = {
   'revision-etage-4': 'summit',   // Révision parcours complet
 }
 
-function CampaignMap({ userId, isPreviewMode = false, previewProgress = null }) {
+function CampaignMap({ userId, isPreviewMode = false, previewProgress = null, onOpenCodex = null }) {
   const navigate = useNavigate()
   const [progress, setProgress] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -271,9 +271,18 @@ function CampaignMap({ userId, isPreviewMode = false, previewProgress = null }) 
                   {loadingNode === selectedNodeId ? 'Chargement…' : 'Lancer un exercice'}
                 </button>
               )}
-              <a href="#" className="campaign-modal-btn campaign-modal-btn-codex" onClick={(e) => { e.preventDefault() }}>
+              <button
+                type="button"
+                className="campaign-modal-btn campaign-modal-btn-codex"
+                onClick={() => {
+                  if (onOpenCodex && selectedNodeId) {
+                    onOpenCodex(selectedNodeId)
+                    setSelectedNodeId(null)
+                  }
+                }}
+              >
                 Voir le cours (Codex)
-              </a>
+              </button>
             </div>
           </div>
         </div>

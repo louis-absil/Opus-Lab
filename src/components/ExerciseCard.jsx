@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getGlobalNotionsFromAutoTags, getTagForNotionLabel } from '../utils/globalNotions'
 import './ExerciseCard.css'
 
@@ -23,9 +23,35 @@ function useIsMobile() {
   return isMobile
 }
 
-function ExerciseCard({ exercise, onClick, onPillClick }) {
+const TOOLTIP_HIDE_DELAY_MS = 180
+
+function ExerciseCard({ exercise, onClick, onPillClick, recommendedLabel, recommendedPillPayload, variant }) {
   const isMobile = useIsMobile()
   const [showTooltip, setShowTooltip] = useState(false)
+  const hideTooltipTimeoutRef = useRef(null)
+  const isMini = variant === 'mini'
+
+  useEffect(() => {
+    return () => {
+      if (hideTooltipTimeoutRef.current) clearTimeout(hideTooltipTimeoutRef.current)
+    }
+  }, [])
+  const showRecommended = Boolean(recommendedLabel)
+  const recommendedPriority = showRecommended && recommendedLabel.includes('objectif')
+  const canClickRecommended = Boolean(onPillClick && recommendedPillPayload)
+  const recommendedPillProps = canClickRecommended
+    ? {
+        role: 'button',
+        tabIndex: 0,
+        onClick: (e) => handlePillClick(e, recommendedPillPayload),
+        onKeyDown: (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onPillClick(recommendedPillPayload)
+          }
+        }
+      }
+    : {}
 
   const videoId = exercise.video?.id
   const thumbnailUrl = getYouTubeThumbnail(videoId)
@@ -45,6 +71,9 @@ function ExerciseCard({ exercise, onClick, onPillClick }) {
 
   const handlePillClick = (e, payload) => {
     e.stopPropagation()
+    // #region agent log
+    fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'ExerciseCard.jsx:handlePillClick', message: 'pill click', data: { type: payload.type, value: payload.value }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H2' }) }).catch(() => {})
+    // #endregion
     onPillClick(payload)
   }
 
@@ -99,11 +128,19 @@ function ExerciseCard({ exercise, onClick, onPillClick }) {
 
   // Desktop : difficulté + 2 notions visibles (max 3 pastilles)
   const visibleForDesktop = difficulty ? [difficulty, ...notions.slice(0, 2)] : notions.slice(0, 3)
+  const pillCount = (showRecommended ? 1 : 0) + (difficulty ? 1 : 0) + notions.length
+  const useScrollLayout = isMobile
+  const showTooltipForMini = isMini && (showRecommended || difficulty || notions.length > 0)
 
   return (
     <div
-      className="exercise-card"
-      onClick={() => onClick(exercise.id)}
+      className={`exercise-card${isMini ? ' exercise-card--mini' : ''}`}
+      onClick={(e) => {
+        // #region agent log
+        fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'ExerciseCard.jsx:card-onClick', message: 'card click', data: { targetTag: e.target.tagName, targetClass: (e.target.className || '').slice(0, 80), currentTargetClass: (e.currentTarget?.className || '').slice(0, 40) }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H1' }) }).catch(() => {})
+        // #endregion
+        onClick(exercise.id)
+      }}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
@@ -144,25 +181,65 @@ function ExerciseCard({ exercise, onClick, onPillClick }) {
         {exercise.metadata?.composer && (
           <p className="exercise-card-composer">{exercise.metadata.composer}</p>
         )}
-        {(difficulty || notions.length > 0) && (
+        {(showRecommended || difficulty || notions.length > 0) && (
           <div className="exercise-card-footer">
-            {isMobile ? (
+            {useScrollLayout ? (
               <div className="exercise-card-pills exercise-card-pills--scroll">
+                {showRecommended && (
+                  <span className={`exercise-card-pill exercise-card-pill--recommended${recommendedPriority ? ' exercise-card-pill--recommended-priority' : ''}${canClickRecommended ? ' exercise-card-pill-clickable' : ''}`} {...recommendedPillProps}>
+                    {recommendedLabel}
+                  </span>
+                )}
                 {difficulty && renderPill(difficulty, 0, true)}
                 {notions.map((label, i) => renderPill(label, i, false))}
               </div>
             ) : (
               <div
                 className="exercise-card-pills-wrapper"
-                onMouseEnter={() => setShowTooltip(true)}
-                onMouseLeave={() => setShowTooltip(false)}
+                onMouseEnter={() => {
+                  if (hideTooltipTimeoutRef.current) {
+                    clearTimeout(hideTooltipTimeoutRef.current)
+                    hideTooltipTimeoutRef.current = null
+                  }
+                  setShowTooltip(true)
+                }}
+                onMouseLeave={() => {
+                  hideTooltipTimeoutRef.current = setTimeout(() => setShowTooltip(false), TOOLTIP_HIDE_DELAY_MS)
+                }}
               >
                 <div className="exercise-card-pills exercise-card-pills--visible">
+                  {showRecommended && (
+                    <span className={`exercise-card-pill exercise-card-pill--recommended${recommendedPriority ? ' exercise-card-pill--recommended-priority' : ''}${canClickRecommended ? ' exercise-card-pill-clickable' : ''}`} {...recommendedPillProps}>
+                      {recommendedLabel}
+                    </span>
+                  )}
                   {difficulty && renderPill(difficulty, 0, true)}
                   {visibleForDesktop.filter((l) => l !== difficulty).map((label, i) => renderPill(label, i, false))}
                 </div>
-                {hasMorePills && showTooltip && (
-                  <div className="exercise-card-pills-tooltip" role="tooltip">
+                {((hasMorePills || showTooltipForMini) && showTooltip) && (
+                  <div
+                    className="exercise-card-pills-tooltip"
+                    role="tooltip"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      // #region agent log
+                      fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'ExerciseCard.jsx:tooltip-onClick', message: 'tooltip area click', data: { targetTag: e.target.tagName, targetClass: (e.target.className || '').slice(0, 80) }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H3' }) }).catch(() => {})
+                      // #endregion
+                    }}
+                    onMouseEnter={() => {
+                      if (hideTooltipTimeoutRef.current) {
+                        clearTimeout(hideTooltipTimeoutRef.current)
+                        hideTooltipTimeoutRef.current = null
+                      }
+                      setShowTooltip(true)
+                    }}
+                    onMouseLeave={() => setShowTooltip(false)}
+                  >
+                    {showRecommended && (
+                      <span className={`exercise-card-pill exercise-card-pill--recommended${recommendedPriority ? ' exercise-card-pill--recommended-priority' : ''}${canClickRecommended ? ' exercise-card-pill-clickable' : ''}`} {...recommendedPillProps}>
+                        {recommendedLabel}
+                      </span>
+                    )}
                     {difficulty && renderPill(difficulty, 0, true)}
                     {notions.map((label, i) => renderPill(label, i, false))}
                   </div>

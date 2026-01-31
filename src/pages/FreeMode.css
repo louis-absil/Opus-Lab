@@ -109,6 +109,111 @@
   text-align: center;
 }
 
+.free-mode-horizons-wrap {
+  position: relative;
+}
+
+.free-mode-horizons-wrap-highlight {
+  position: relative;
+}
+
+.free-mode-horizons-hint {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  padding: 0.5rem 0.75rem;
+  background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+  color: #ffffff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border-radius: 12px;
+  white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(14, 165, 233, 0.4);
+  z-index: 10;
+  pointer-events: none;
+  animation: free-mode-horizons-hint-in 0.3s ease-out;
+}
+
+.free-mode-horizons-hint::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -6px;
+  border: 6px solid transparent;
+  border-top-color: #06b6d4;
+}
+
+@media (max-width: 480px) {
+  .free-mode-horizons-hint {
+    white-space: normal;
+    max-width: 200px;
+    text-align: center;
+  }
+}
+
+@keyframes free-mode-horizons-hint-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-8px);
+  }
+}
+
+.free-mode-horizons-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1.25rem;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.12) 0%, rgba(91, 33, 182, 0.08) 100%);
+  border: 2px solid rgba(124, 58, 237, 0.4);
+  border-radius: 16px;
+  color: #5b21b6;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.free-mode-horizons-btn:hover {
+  border-color: #7c3aed;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.18) 0%, rgba(91, 33, 182, 0.12) 100%);
+}
+
+.free-mode-horizons-btn-highlight {
+  animation: free-mode-horizons-pulse 1.5s ease-in-out infinite;
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 0 rgba(14, 165, 233, 0.5);
+}
+
+@keyframes free-mode-horizons-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(14, 165, 233, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 12px rgba(14, 165, 233, 0);
+  }
+}
+
+.free-mode-horizons-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.125rem 0.375rem;
+  border-radius: 10px;
+  min-width: 20px;
+  text-align: center;
+}
+
 /* Contenu principal */
 .free-mode-content {
   display: grid; /* Au lieu de flex */
@@ -226,6 +331,40 @@
 }
 
 .free-mode-notion-chip-active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #ffffff;
+  border-color: transparent;
+}
+
+/* Bloc Statut (déjà fait / pas encore fait) */
+.free-mode-filter-block-statut {
+  margin-bottom: 1.25rem;
+}
+
+.free-mode-statut-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.free-mode-statut-chip {
+  padding: 0.5rem 0.875rem;
+  background: #f3f4f6;
+  border: 2px solid transparent;
+  border-radius: 14px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.free-mode-statut-chip:hover {
+  background: #e5e7eb;
+  border-color: #d1d5db;
+}
+
+.free-mode-statut-chip-active {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: #ffffff;
   border-color: transparent;

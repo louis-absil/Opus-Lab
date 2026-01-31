@@ -2,6 +2,10 @@
   width: 100%;
 }
 
+.trend-indicators--bourse .trend-indicators-title {
+  margin-bottom: 1.25rem;
+}
+
 .trend-indicators-title {
   font-size: 1.125rem;
   font-weight: 700;
@@ -9,6 +13,264 @@
   margin: 0 0 1rem 0;
 }
 
+/* KPI type bourse */
+.trend-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.trend-kpi-card {
+  background: #ffffff;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.trend-kpi-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.trend-kpi-up {
+  border-color: #10b981;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.06) 0%, rgba(5, 150, 105, 0.04) 100%);
+}
+
+.trend-kpi-down {
+  border-color: #ef4444;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.06) 0%, rgba(220, 38, 38, 0.04) 100%);
+}
+
+.trend-kpi-stable {
+  border-color: #e5e7eb;
+}
+
+.trend-kpi-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 0.5rem;
+}
+
+.trend-kpi-value-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.trend-kpi-icon {
+  flex-shrink: 0;
+}
+
+.trend-kpi-up .trend-kpi-value,
+.trend-kpi-up .trend-kpi-icon {
+  color: #059669;
+}
+
+.trend-kpi-down .trend-kpi-value,
+.trend-kpi-down .trend-kpi-icon {
+  color: #dc2626;
+}
+
+.trend-kpi-stable .trend-kpi-value,
+.trend-kpi-icon-stable {
+  color: #6b7280;
+}
+
+.trend-kpi-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1.2;
+}
+
+.trend-kpi-raw {
+  font-size: 0.75rem;
+  margin-top: 0.35rem;
+  color: #6b7280;
+}
+
+.trend-kpi-current {
+  font-weight: 600;
+  color: #111827;
+}
+
+.trend-kpi-vs {
+  color: #9ca3af;
+}
+
+.trend-kpi-previous {
+  color: #9ca3af;
+}
+
+.trend-kpi-count {
+  font-size: 0.7rem;
+  color: #9ca3af;
+  margin-top: 0.2rem;
+}
+
+.trend-kpi-value--best {
+  font-size: 1.125rem;
+}
+
+.trend-kpi-encouragement {
+  margin: 0.5rem 0 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #059669;
+  line-height: 1.3;
+}
+
+/* Contenu pédagogique */
+.trend-pedagogical-section {
+  margin-bottom: 1.5rem;
+}
+
+.trend-pedagogical-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #6b7280;
+  margin: 0 0 0.75rem 0;
+}
+
+.trend-pedagogical-grid {
+  margin-bottom: 0;
+}
+
+.trend-pedago-card {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.trend-pedago-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 0.5rem;
+}
+
+.trend-pedago-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.trend-pedago-row {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.trend-pedago-row-label {
+  min-width: 0;
+  color: #374151;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trend-pedago-bar-wrap {
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.trend-pedago-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.trend-pedago-row-value {
+  font-weight: 700;
+  color: #111827;
+  min-width: 2.5rem;
+  text-align: right;
+}
+
+.trend-pedago-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.trend-pedago-line {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: #374151;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.trend-pedago-strong {
+  color: #059669;
+  font-weight: 600;
+}
+
+.trend-pedago-weak {
+  color: #6b7280;
+}
+
+.trend-pedago-empty {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: #9ca3af;
+}
+
+/* Graphique évolution */
+.trend-chart-section {
+  margin-bottom: 1.5rem;
+}
+
+.trend-chart-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #6b7280;
+  margin: 0 0 0.5rem 0;
+}
+
+.trend-chart-wrap {
+  background: #fafafa;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 0.5rem;
+}
+
+.trend-chart-tooltip {
+  background: #111827;
+  color: #fff;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.trend-chart-tooltip-date {
+  color: #9ca3af;
+}
+
+.trend-chart-tooltip-value {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+/* Legacy grid (kept for fallback) */
 .trend-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -81,8 +343,242 @@
   color: #6b7280;
 }
 
-/* Responsive */
+.trend-raw {
+  font-size: 0.7rem;
+  color: #6b7280;
+  margin-top: 0.25rem;
+}
+
+.trend-raw-current {
+  font-weight: 600;
+  color: #111827;
+}
+
+.trend-raw-vs {
+  color: #9ca3af;
+}
+
+.trend-raw-previous {
+  font-weight: 500;
+}
+
+.trend-count {
+  font-size: 0.7rem;
+  color: #9ca3af;
+  margin-top: 0.125rem;
+}
+
+.trend-details-wrap {
+  margin-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 1rem;
+}
+
+.trend-details-toggle {
+  background: none;
+  border: none;
+  font-size: 0.875rem;
+  color: #4b5563;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.trend-details-toggle:hover {
+  color: #111827;
+}
+
+.trend-details {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 12px;
+}
+
+.trend-detail-block {
+  margin-bottom: 1rem;
+}
+
+.trend-detail-block:last-child {
+  margin-bottom: 0;
+}
+
+.trend-detail-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 0.25rem 0;
+}
+
+.trend-detail-value {
+  font-size: 0.875rem;
+  color: #374151;
+  margin: 0;
+}
+
+.trend-weeks-table {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.trend-week-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.trend-week-label {
+  color: #6b7280;
+}
+
+.trend-week-value {
+  font-weight: 600;
+  color: #111827;
+}
+
+.trend-week-count {
+  color: #9ca3af;
+}
+
+/* Responsive : Par compétence en 1 colonne dès 900px pour éviter débordement */
+@media (max-width: 900px) {
+  .trend-indicators {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .trend-pedagogical-section {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .trend-pedagogical-grid {
+    grid-template-columns: 1fr;
+    min-width: 0;
+  }
+
+  .trend-pedago-card {
+    min-width: 0;
+  }
+
+  .trend-pedago-row {
+    min-width: 0;
+    grid-template-columns: 6.5rem minmax(0, 1fr) auto;
+  }
+
+  .trend-pedago-row-label {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .trend-pedago-bar-wrap {
+    min-width: 0;
+  }
+
+  .trend-pedago-row-value {
+    min-width: 2rem;
+    flex-shrink: 0;
+  }
+
+  .trend-pedago-summary {
+    gap: 0.5rem;
+  }
+
+  .trend-pedago-line {
+    line-height: 1.45;
+  }
+}
+
 @media (max-width: 768px) {
+  .trend-indicators {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .trend-pedagogical-section {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .trend-pedagogical-grid {
+    grid-template-columns: 1fr;
+    min-width: 0;
+  }
+
+  .trend-pedago-card {
+    min-width: 0;
+  }
+
+  .trend-pedago-row {
+    min-width: 0;
+    grid-template-columns: 6.5rem minmax(0, 1fr) auto;
+  }
+
+  .trend-pedago-row-label {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .trend-pedago-bar-wrap {
+    min-width: 0;
+  }
+
+  .trend-pedago-row-value {
+    min-width: 2rem;
+    flex-shrink: 0;
+  }
+
+  .trend-pedago-summary {
+    gap: 0.5rem;
+  }
+
+  .trend-pedago-line {
+    line-height: 1.45;
+  }
+
+  .trend-kpi-card {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .trend-kpi-value-wrap {
+    min-width: 0;
+  }
+
+  .trend-kpi-value--best {
+    font-size: 1rem;
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+
+  .trend-kpi-raw {
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+
+  .trend-kpi-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .trend-kpi-value {
+    font-size: 1.25rem;
+  }
+
+  .trend-chart-wrap {
+    padding: 0.25rem;
+  }
+
   .trend-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 0.75rem;

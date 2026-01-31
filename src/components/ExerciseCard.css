@@ -216,7 +216,7 @@
   gap: 0.375rem;
   max-width: 280px;
   z-index: 10;
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 .exercise-card-pills-tooltip .exercise-card-difficulty {
@@ -302,4 +302,71 @@
   background: linear-gradient(135deg, #fecaca 0%, #fca5a5 100%);
   color: #991b1b;
   border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* Variant mini (suggestions, etc.) */
+.exercise-card--mini .exercise-card-body {
+  padding: 0.75rem;
+  gap: 0.5rem;
+}
+
+.exercise-card--mini .exercise-card-title {
+  font-size: 1rem;
+  -webkit-line-clamp: 2;
+}
+
+.exercise-card--mini .exercise-card-composer {
+  font-size: 0.8125rem;
+}
+
+.exercise-card--mini .exercise-card-footer {
+  padding-top: 0.5rem;
+  min-width: 0;
+}
+
+.exercise-card--mini .exercise-card-pills--scroll {
+  min-width: 0;
+}
+
+/* Desktop : pastilles clipées dans la zone visible, tooltip au survol (wrapper sans overflow pour ne pas couper le popover) */
+.exercise-card--mini .exercise-card-pills-wrapper {
+  min-width: 0;
+}
+
+.exercise-card--mini .exercise-card-pills--visible {
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+.exercise-card--mini .exercise-card-pill--notion,
+.exercise-card--mini .exercise-card-difficulty {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.625rem;
+}
+
+.exercise-card--mini .exercise-card-pill--recommended {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.625rem;
+}
+
+/* Pastille recommandée (suggestions) */
+.exercise-card-pill--recommended {
+  padding: 0.3125rem 0.625rem;
+  border-radius: 10px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1.3;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.exercise-card-pill--recommended-priority {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.2);
 }

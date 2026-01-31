@@ -1,0 +1,39 @@
+/* PianoKeyboard – clavier SVG 2 octaves */
+
+.piano-keyboard {
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+.piano-keyboard-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.piano-key {
+  transition: fill 0.15s ease;
+}
+
+.piano-white {
+  fill: #f8fafc;
+  stroke: #cbd5e1;
+  stroke-width: 1;
+}
+
+.piano-white.piano-key--highlighted {
+  fill: #93c5fd;
+  stroke: #3b82f6;
+}
+
+.piano-black {
+  fill: #334155;
+  stroke: #1e293b;
+  stroke-width: 1;
+}
+
+.piano-black.piano-key--highlighted {
+  fill: #3b82f6;
+  stroke: #2563eb;
+}

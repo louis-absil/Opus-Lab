@@ -24,8 +24,8 @@ export function generateAdaptiveObjectives(attempts, currentWeekAttempts) {
   objectives.push({
     id: 'weekly_exercises',
     type: 'weekly',
-    title: 'Exercices cette semaine',
-    description: `Compléter ${targetExercises} exercices cette semaine`,
+    title: 'Exercices d\'analyse cette semaine',
+    description: `Compléter ${targetExercises} exercices d'analyse cette semaine`,
     target: targetExercises,
     current: currentWeekAttempts.length,
     unit: 'exercices',
@@ -43,8 +43,8 @@ export function generateAdaptiveObjectives(attempts, currentWeekAttempts) {
     objectives.push({
       id: 'weekly_score',
       type: 'weekly',
-      title: 'Score moyen',
-      description: `Atteindre ${targetScore}% de score moyen cette semaine`,
+      title: 'Score moyen degrés/cadences',
+      description: `Atteindre ${targetScore}% de score moyen sur les degrés et cadences cette semaine`,
       target: targetScore,
       current: Math.round(currentWeekAvg),
       unit: '%',
@@ -52,6 +52,22 @@ export function generateAdaptiveObjectives(attempts, currentWeekAttempts) {
       category: 'quality'
     })
   }
+
+  // Objectif 3 : Variété (exercices différents cette semaine)
+  const uniqueExerciseIdsThisWeek = new Set(
+    currentWeekAttempts.map(a => a.exerciseId).filter(Boolean)
+  )
+  objectives.push({
+    id: 'weekly_variety',
+    type: 'weekly',
+    title: 'Variété',
+    description: 'Pratiquer 3 exercices différents cette semaine',
+    target: 3,
+    current: uniqueExerciseIdsThisWeek.size,
+    unit: 'exercices',
+    reward: 25,
+    category: 'variety'
+  })
 
   return objectives
 }

@@ -40,6 +40,29 @@ export function getAuthErrorMessage(error) {
   if (error.code === 'auth/popup-blocked') {
     return 'La fenêtre de connexion a été bloquée. Veuillez autoriser les popups pour ce site.'
   }
+
+  // Erreurs Email/Mot de passe
+  if (error.code === 'auth/invalid-email') {
+    return 'Adresse email invalide.'
+  }
+  if (error.code === 'auth/user-not-found') {
+    return 'Aucun compte avec cet email.'
+  }
+  if (error.code === 'auth/wrong-password') {
+    return 'Mot de passe incorrect.'
+  }
+  if (error.code === 'auth/email-already-in-use') {
+    return 'Un compte existe déjà avec cet email.'
+  }
+  if (error.code === 'auth/weak-password') {
+    return 'Le mot de passe doit contenir au moins 6 caractères.'
+  }
+  if (error.code === 'auth/too-many-requests') {
+    return 'Trop de tentatives. Réessayez plus tard.'
+  }
+  if (error.code === 'auth/invalid-credential') {
+    return 'Email ou mot de passe incorrect.'
+  }
   
   // Erreur par défaut
   return error.message || 'Erreur lors de la connexion. Veuillez réessayer.'

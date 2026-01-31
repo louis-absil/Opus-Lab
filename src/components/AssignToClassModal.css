@@ -1,0 +1,116 @@
+.assign-to-class-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.assign-to-class-modal-container {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  width: 100%;
+  max-width: 420px;
+  padding: 1.5rem;
+}
+
+.assign-to-class-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.assign-to-class-modal-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.assign-to-class-modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 0;
+  line-height: 1;
+}
+
+.assign-to-class-modal-close:hover {
+  color: #111;
+}
+
+.assign-to-class-modal-exercise {
+  font-size: 0.9rem;
+  color: #6b7280;
+  margin: 0 0 1.25rem;
+}
+
+.assign-to-class-modal-form label {
+  display: block;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.assign-to-class-modal-form label .required {
+  color: #dc2626;
+}
+
+.assign-to-class-modal-form select,
+.assign-to-class-modal-form input[type="text"],
+.assign-to-class-modal-form input[type="date"] {
+  display: block;
+  width: 100%;
+  margin-top: 0.35rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 1rem;
+}
+
+.assign-to-class-modal-hint {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin: -0.5rem 0 0.75rem;
+}
+
+.assign-to-class-modal-error {
+  color: #dc2626;
+  font-size: 0.9rem;
+  margin: 0 0 0.75rem;
+}
+
+.assign-to-class-modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  margin-top: 1.25rem;
+}
+
+.assign-to-class-modal-actions button {
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.assign-to-class-modal-actions button[type="button"] {
+  background: transparent;
+  border: 1px solid #d1d5db;
+  color: #374151;
+}
+
+.assign-to-class-modal-actions button[type="submit"] {
+  background: #667eea;
+  border: none;
+  color: #fff;
+}
+
+.assign-to-class-modal-actions button[type="submit"]:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

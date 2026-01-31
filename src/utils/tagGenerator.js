@@ -452,6 +452,30 @@ export function generateAutoTags(markers, chordData, composer = null) {
   return [...new Set(tags)]
 }
 
+/** Styles Nouveaux Horizons (non musique classique) — id technique → tag affiché */
+export const HORIZONS_MUSIC_CATEGORIES = {
+  film: { id: 'film', label: 'Musique de film', tagLabel: 'Film' },
+  game: { id: 'game', label: 'Jeu vidéo', tagLabel: 'JeuVideo' },
+  anime: { id: 'anime', label: 'Anime', tagLabel: 'Anime' },
+  variety: { id: 'variety', label: 'Variété', tagLabel: 'Variété' },
+  pop: { id: 'pop', label: 'Pop', tagLabel: 'Pop' }
+}
+
+/** Ordre des styles pour l’affichage (déblocage progressif) */
+export const HORIZONS_STYLE_ORDER = ['film', 'game', 'anime', 'variety', 'pop']
+
+/**
+ * Retourne les tags à ajouter pour un exercice Nouveaux Horizons (section + style).
+ * @param {string} musicCategory - 'film' | 'game' | 'anime' | 'variety' | 'pop'
+ * @returns {string[]} - ex. ['Horizons', 'Film']
+ */
+export function getHorizonsTagsForCategory(musicCategory) {
+  if (!musicCategory) return []
+  const cat = HORIZONS_MUSIC_CATEGORIES[musicCategory]
+  if (!cat) return ['Horizons']
+  return ['Horizons', cat.tagLabel]
+}
+
 /**
  * Parse le titre YouTube pour extraire compositeur et titre
  */

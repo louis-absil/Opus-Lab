@@ -32,6 +32,13 @@
   margin: 0 0 1rem 0;
 }
 
+.objectives-unlocked-message {
+  font-size: 0.8125rem;
+  color: #059669;
+  margin: 0 0 0.75rem 0;
+  font-style: italic;
+}
+
 .objectives-list {
   display: flex;
   flex-direction: column;

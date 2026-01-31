@@ -1,0 +1,66 @@
+/**
+ * Liste exhaustive des établissements (pré-remplie).
+ * Les entrées ajoutées par validation de demandes sont en Firestore (collection establishments).
+ */
+
+export const DEFAULT_ESTABLISHMENTS = [
+  'Autre',
+  // Suisse
+  'Haute école de musique de Genève (HEM Genève)',
+  'HEMU – Haute École de Musique (Lausanne)',
+  'Zürcher Hochschule der Künste (ZHdK Zurich)',
+  'Haute école de musique de Bâle',
+  'Haute école des arts de Berne (HKB)',
+  'Haute école de musique de Lucerne',
+  'Conservatoire de musique de Genève',
+  'Conservatoire populaire de musique de Genève',
+  'Conservatoire de Lausanne',
+  'Conservatoire de musique neuchâtelois',
+  // France
+  'Conservatoire national supérieur de musique et de danse de Paris (CNSMD Paris)',
+  'Conservatoire national supérieur de musique et de danse de Lyon (CNSMD Lyon)',
+  'CRR de Paris',
+  'CRR de Lyon',
+  'CRR de Boulogne-Billancourt',
+  'CRR de Versailles',
+  'CRR de Rueil-Malmaison',
+  'CRR de Saint-Maur',
+  'CRR de Cergy-Pontoise',
+  'CRR de Marseille',
+  'CRR de Toulouse',
+  'CRR de Strasbourg',
+  'CRR de Lille',
+  'CRR de Bordeaux',
+  'CRR de Nantes',
+  'CRR de Montpellier',
+  'CRR de Nice',
+  'CRR de Dijon',
+  'CRR de Reims',
+  'CRR de Rouen',
+  // Royaume-Uni
+  'Royal College of Music (London)',
+  'Royal Academy of Music (London)',
+  'Royal Northern College of Music (Manchester)',
+  'Guildhall School of Music and Drama (London)',
+  'Royal Conservatoire of Scotland (Glasgow)',
+  // États-Unis
+  'The Juilliard School (New York)',
+  'Curtis Institute of Music (Philadelphia)',
+  'Berklee College of Music (Boston)',
+  'New England Conservatory (Boston)',
+  'Eastman School of Music (Rochester)',
+  'Manhattan School of Music (New York)',
+  'Colburn School (Los Angeles)',
+  'Cleveland Institute of Music',
+  'San Francisco Conservatory of Music',
+  // Autres
+  'Universität für Musik und darstellende Kunst Wien (Vienna)',
+  'Hochschule für Musik Hanns Eisler Berlin',
+  'Hochschule für Musik und Theater München',
+  'Conservatorium van Amsterdam',
+  'Royal Conservatoire of The Hague',
+  'Escola Superior de Música de Catalunya (Barcelona)',
+  'Real Conservatorio Superior de Música de Madrid',
+  'Conservatorio di Musica Santa Cecilia (Rome)',
+  'Sibelius Academy (Helsinki)',
+]

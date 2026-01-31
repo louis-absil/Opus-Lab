@@ -59,57 +59,165 @@ function calculateComparisons(attempts) {
   const thisWeek = getThisWeekAttempts(sortedAttempts)
   const lastWeek = getLastWeekAttempts(sortedAttempts)
 
-  if (thisWeek.length > 0 && lastWeek.length > 0) {
+  if (thisWeek.length > 0) {
     const thisWeekAvg = thisWeek.reduce((sum, a) => sum + (a.score || 0), 0) / thisWeek.length
+    const thisWeekBest = Math.max(...thisWeek.map(a => a.score || 0))
+    if (lastWeek.length > 0) {
+      const lastWeekAvg = lastWeek.reduce((sum, a) => sum + (a.score || 0), 0) / lastWeek.length
+      const change = calculateChange(thisWeekAvg, lastWeekAvg)
+      comparisons.push({
+        metric: 'Score moyen',
+        currentLabel: 'Cette semaine',
+        previousLabel: 'Semaine dernière',
+        current: `${Math.round(thisWeekAvg)}%`,
+        previous: `${Math.round(lastWeekAvg)}%`,
+        direction: change.direction,
+        percentage: change.percentage
+      })
+      comparisons.push({
+        metric: 'Nombre d\'exercices',
+        currentLabel: 'Cette semaine',
+        previousLabel: 'Semaine dernière',
+        current: thisWeek.length.toString(),
+        previous: lastWeek.length.toString(),
+        direction: calculateChange(thisWeek.length, lastWeek.length).direction,
+        percentage: calculateChange(thisWeek.length, lastWeek.length).percentage
+      })
+      const lastWeekBest = Math.max(...lastWeek.map(a => a.score || 0))
+      comparisons.push({
+        metric: 'Meilleur score',
+        currentLabel: 'Cette semaine',
+        previousLabel: 'Semaine dernière',
+        current: `${Math.round(thisWeekBest)}%`,
+        previous: `${Math.round(lastWeekBest)}%`,
+        direction: calculateChange(thisWeekBest, lastWeekBest).direction,
+        percentage: calculateChange(thisWeekBest, lastWeekBest).percentage
+      })
+    } else {
+      comparisons.push({
+        metric: 'Score moyen',
+        currentLabel: 'Cette semaine',
+        previousLabel: 'Semaine dernière',
+        current: `${Math.round(thisWeekAvg)}%`,
+        previous: '—',
+        direction: 'stable',
+        percentage: '—'
+      })
+      comparisons.push({
+        metric: 'Nombre d\'exercices',
+        currentLabel: 'Cette semaine',
+        previousLabel: 'Semaine dernière',
+        current: thisWeek.length.toString(),
+        previous: '—',
+        direction: 'stable',
+        percentage: '—'
+      })
+      comparisons.push({
+        metric: 'Meilleur score',
+        currentLabel: 'Cette semaine',
+        previousLabel: 'Semaine dernière',
+        current: `${Math.round(thisWeekBest)}%`,
+        previous: '—',
+        direction: 'stable',
+        percentage: '—'
+      })
+    }
+  } else if (lastWeek.length > 0) {
+    // Aucune activité cette semaine mais des données la semaine dernière : afficher pour ne pas laisser l'onglet vide
     const lastWeekAvg = lastWeek.reduce((sum, a) => sum + (a.score || 0), 0) / lastWeek.length
-    const change = calculateChange(thisWeekAvg, lastWeekAvg)
-
+    const lastWeekBest = Math.max(...lastWeek.map(a => a.score || 0))
     comparisons.push({
       metric: 'Score moyen',
       currentLabel: 'Cette semaine',
       previousLabel: 'Semaine dernière',
-      current: `${Math.round(thisWeekAvg)}%`,
+      current: '—',
       previous: `${Math.round(lastWeekAvg)}%`,
-      direction: change.direction,
-      percentage: change.percentage
+      direction: 'stable',
+      percentage: '—'
     })
-
     comparisons.push({
       metric: 'Nombre d\'exercices',
       currentLabel: 'Cette semaine',
       previousLabel: 'Semaine dernière',
-      current: thisWeek.length.toString(),
+      current: '0',
       previous: lastWeek.length.toString(),
-      direction: calculateChange(thisWeek.length, lastWeek.length).direction,
-      percentage: calculateChange(thisWeek.length, lastWeek.length).percentage
+      direction: 'stable',
+      percentage: '—'
     })
-
-    const thisWeekBest = Math.max(...thisWeek.map(a => a.score || 0))
-    const lastWeekBest = Math.max(...lastWeek.map(a => a.score || 0))
     comparisons.push({
       metric: 'Meilleur score',
       currentLabel: 'Cette semaine',
       previousLabel: 'Semaine dernière',
-      current: `${Math.round(thisWeekBest)}%`,
+      current: '—',
       previous: `${Math.round(lastWeekBest)}%`,
-      direction: calculateChange(thisWeekBest, lastWeekBest).direction,
-      percentage: calculateChange(thisWeekBest, lastWeekBest).percentage
+      direction: 'stable',
+      percentage: '—'
+    })
+  } else {
+    // Aucune activité ni cette semaine ni la précédente : afficher quand même les lignes pour cohérence
+    comparisons.push({
+      metric: 'Score moyen',
+      currentLabel: 'Cette semaine',
+      previousLabel: 'Semaine dernière',
+      current: '—',
+      previous: '—',
+      direction: 'stable',
+      percentage: '—'
+    })
+    comparisons.push({
+      metric: 'Nombre d\'exercices',
+      currentLabel: 'Cette semaine',
+      previousLabel: 'Semaine dernière',
+      current: '0',
+      previous: '—',
+      direction: 'stable',
+      percentage: '—'
+    })
+    comparisons.push({
+      metric: 'Meilleur score',
+      currentLabel: 'Cette semaine',
+      previousLabel: 'Semaine dernière',
+      current: '—',
+      previous: '—',
+      direction: 'stable',
+      percentage: '—'
     })
   }
 
   // Comparaison 2: Ce mois vs mois dernier
   const thisMonth = getThisMonthAttempts(sortedAttempts)
   const lastMonth = getLastMonthAttempts(sortedAttempts)
-
-  if (thisMonth.length > 0 && lastMonth.length > 0) {
+  if (thisMonth.length > 0) {
+    if (lastMonth.length > 0) {
+      comparisons.push({
+        metric: 'Exercices ce mois',
+        currentLabel: 'Ce mois',
+        previousLabel: 'Mois dernier',
+        current: thisMonth.length.toString(),
+        previous: lastMonth.length.toString(),
+        direction: calculateChange(thisMonth.length, lastMonth.length).direction,
+        percentage: calculateChange(thisMonth.length, lastMonth.length).percentage
+      })
+    } else {
+      comparisons.push({
+        metric: 'Exercices ce mois',
+        currentLabel: 'Ce mois',
+        previousLabel: 'Mois dernier',
+        current: thisMonth.length.toString(),
+        previous: '—',
+        direction: 'stable',
+        percentage: '—'
+      })
+    }
+  } else {
     comparisons.push({
       metric: 'Exercices ce mois',
       currentLabel: 'Ce mois',
       previousLabel: 'Mois dernier',
-      current: thisMonth.length.toString(),
-      previous: lastMonth.length.toString(),
-      direction: calculateChange(thisMonth.length, lastMonth.length).direction,
-      percentage: calculateChange(thisMonth.length, lastMonth.length).percentage
+      current: '0',
+      previous: lastMonth.length > 0 ? lastMonth.length.toString() : '—',
+      direction: 'stable',
+      percentage: '—'
     })
   }
 

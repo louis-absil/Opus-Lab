@@ -21,8 +21,9 @@ service cloud.firestore {
     
     // Collection users
     match /users/{userId} {
-      // Lecture : uniquement son propre document
-      allow read: if isOwner(userId);
+      // Lecture : son propre document, ou (si professeur) tout document élève ou professeur (catalogue / annuaire)
+      allow read: if isOwner(userId) 
+                  || (isTeacher() && resource.data.role in ['student', 'teacher']);
       
       // Création : uniquement son propre document avec les champs requis
       allow create: if isOwner(userId) 
@@ -66,11 +67,11 @@ service cloud.firestore {
     
     // Collection attempts
     match /attempts/{attemptId} {
-      // Lecture : uniquement ses propres tentatives
+      // Lecture : ses propres tentatives, ou (si professeur) toutes les tentatives (détail élève)
       allow read: if isAuthenticated() 
-                 && resource.data.userId == request.auth.uid;
+                 && (resource.data.userId == request.auth.uid || isTeacher());
       
-      // Création : un utilisateur authentifié peut créer une tentative avec son propre userId
+      // Création : un utilisateur authentifié peut créer une tentative avec son propre userId (authorId optionnel)
       allow create: if isAuthenticated() 
                    && request.resource.data.userId == request.auth.uid
                    && request.resource.data.keys().hasAll(['userId', 'exerciseId', 'userAnswers', 'correctAnswers', 'score', 'correctCount', 'totalQuestions']);
@@ -167,6 +168,47 @@ service cloud.firestore {
       
       // Suppression : interdite
       allow delete: if false;
+    }
+
+    // Listes de référence (établissements, classes) — lecture par tout utilisateur authentifié
+    match /establishments/{docId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isTeacher();
+    }
+    match /classes/{docId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isTeacher();
+    }
+
+    // Demandes en attente (élèves proposent, profs valident/rejettent/suppriment)
+    match /pendingEstablishmentRequests/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated(); // élève envoie une demande
+      allow update, delete: if isTeacher();
+    }
+    match /pendingClassRequests/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isTeacher();
+    }
+
+    // Classes créées par les professeurs (code partagé aux élèves pour rejoindre)
+    match /teacherClasses/{classId} {
+      allow read: if isAuthenticated();
+      allow create: if isTeacher() && request.resource.data.teacherId == request.auth.uid;
+      allow update, delete: if isTeacher() && resource.data.teacherId == request.auth.uid;
+    }
+
+    // Devoirs (exercices assignés à une classe par le prof)
+    match /assignments/{assignmentId} {
+      allow read: if isAuthenticated()
+        && (resource.data.teacherId == request.auth.uid
+            || (resource.data.teacherClassId != null
+                && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teacherClassId == resource.data.teacherClassId));
+      allow create: if isTeacher()
+        && request.resource.data.teacherId == request.auth.uid
+        && request.resource.data.keys().hasAll(['teacherId', 'teacherClassId', 'exerciseId', 'createdAt']);
+      allow update, delete: if isTeacher() && resource.data.teacherId == request.auth.uid;
     }
   }
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { findExercisesByVideoId } from '../services/exerciseService'
-import { parseYouTubeTitle, generateAutoTags } from '../utils/tagGenerator'
+import { parseYouTubeTitle, generateAutoTags, getHorizonsTagsForCategory, HORIZONS_MUSIC_CATEGORIES, HORIZONS_STYLE_ORDER } from '../utils/tagGenerator'
 import { computeDifficultyFromContent } from '../utils/difficultyFromContent'
 import { filterKnownTags } from '../data/knownTags'
 import './SaveExerciseModal.css'
@@ -15,13 +15,17 @@ function SaveExerciseModal({
   markers,
   chordData,
   isEditMode = false,
-  initialAutoTags = null
+  initialAutoTags = null,
+  initialSection = null,
+  initialMusicCategory = null
 }) {
   const [composer, setComposer] = useState('')
   const [workTitle, setWorkTitle] = useState('')
   const [exerciseTitle, setExerciseTitle] = useState('')
   const [difficulty, setDifficulty] = useState('')
   const [privacy, setPrivacy] = useState('private')
+  const [exerciseType, setExerciseType] = useState('classical')
+  const [musicCategory, setMusicCategory] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [manualTags, setManualTags] = useState([])
   const [newTagInput, setNewTagInput] = useState('')
@@ -37,28 +41,41 @@ function SaveExerciseModal({
     }
   }, [isOpen, videoId])
 
-  // Initialiser manualTags à l'ouverture : initialAutoTags en édition, sinon générés
+  // Initialiser type / style à l'ouverture
+  useEffect(() => {
+    if (!isOpen) return
+    if (isEditMode && (initialSection === 'horizons' || initialMusicCategory)) {
+      setExerciseType('horizons')
+      setMusicCategory(initialMusicCategory || '')
+    } else if (!isEditMode) {
+      setExerciseType('classical')
+      setMusicCategory('')
+    }
+  }, [isOpen, isEditMode, initialSection, initialMusicCategory])
+
+  // Initialiser manualTags à l'ouverture : édition = initialAutoTags, création = générés + tags Horizons si besoin
   useEffect(() => {
     if (!isOpen) return
     if (isEditMode && Array.isArray(initialAutoTags)) {
       setManualTags([...initialAutoTags])
     } else {
       const generated = generateAutoTags(markers || [], chordData || {}, composer.trim() || null)
-      setManualTags(generated)
+      const horizonsTags = (initialSection === 'horizons' && initialMusicCategory) ? getHorizonsTagsForCategory(initialMusicCategory) : []
+      setManualTags([...new Set([...horizonsTags, ...generated])])
     }
-  }, [isOpen, isEditMode, initialAutoTags])
+  }, [isOpen, isEditMode, initialAutoTags, initialSection, initialMusicCategory])
 
-  // Mettre à jour les tags générés quand composer/markers/chordData changent (uniquement en création, pas en édition)
+  // Mettre à jour les tags générés quand composer/markers/chordData/type/category changent (création uniquement)
   useEffect(() => {
     if (!isOpen || isEditMode) return
     const generated = generateAutoTags(markers || [], chordData || {}, composer.trim() || null)
+    const horizonsTags = exerciseType === 'horizons' && musicCategory ? getHorizonsTagsForCategory(musicCategory) : []
     setManualTags(prev => {
-      const prevSet = new Set(prev)
-      const generatedSet = new Set(generated)
-      if (prevSet.size === generatedSet.size && [...prevSet].every(t => generatedSet.has(t))) return prev
-      return generated
+      const merged = [...new Set([...horizonsTags, ...generated])]
+      if (prev.length === merged.length && merged.every(t => prev.includes(t))) return prev
+      return merged
     })
-  }, [isOpen, isEditMode, composer, markers, chordData])
+  }, [isOpen, isEditMode, composer, markers, chordData, exerciseType, musicCategory])
 
   // Suggestions pour l'input "ajouter un tag"
   useEffect(() => {
@@ -158,19 +175,24 @@ function SaveExerciseModal({
 
   const handleResetAutoTags = () => {
     const generated = generateAutoTags(markers || [], chordData || {}, composer.trim() || null)
-    setManualTags(generated)
+    const horizonsTags = exerciseType === 'horizons' && musicCategory ? getHorizonsTagsForCategory(musicCategory) : []
+    setManualTags([...new Set([...horizonsTags, ...generated])])
   }
 
   const handleSubmit = (e) => {
     e.preventDefault()
     if (exerciseTitle.trim()) {
+      const section = exerciseType === 'horizons' ? 'horizons' : null
+      const category = exerciseType === 'horizons' && musicCategory ? musicCategory : null
       onSave({
         composer: composer.trim() || null,
         workTitle: workTitle.trim() || null,
         exerciseTitle: exerciseTitle.trim(),
         difficulty: difficulty.trim() || null,
         privacy: privacy,
-        autoTags: [...manualTags]
+        autoTags: [...manualTags],
+        section,
+        musicCategory: category
       })
       resetForm()
     }
@@ -182,6 +204,8 @@ function SaveExerciseModal({
     setExerciseTitle('')
     setDifficulty('')
     setPrivacy('private')
+    setExerciseType('classical')
+    setMusicCategory('')
     setManualTags([])
     setNewTagInput('')
     setShowTagSuggestions(false)
@@ -280,6 +304,42 @@ function SaveExerciseModal({
             </select>
             <small className="save-modal-hint">Suggestion automatique selon les accords et cadences (modifiable)</small>
           </div>
+
+          <div className="save-modal-field">
+            <label htmlFor="exercise-type">Type d&apos;exercice</label>
+            <select
+              id="exercise-type"
+              value={exerciseType}
+              onChange={(e) => {
+                const v = e.target.value
+                setExerciseType(v)
+                if (v !== 'horizons') setMusicCategory('')
+              }}
+              disabled={isSaving || isLoading}
+            >
+              <option value="classical">Musique classique</option>
+              <option value="horizons">Nouveaux Horizons (non classique)</option>
+            </select>
+            <small className="save-modal-hint">Nouveaux Horizons : film, JV, anime, variété, pop (section déblocable par les élèves)</small>
+          </div>
+
+          {exerciseType === 'horizons' && (
+            <div className="save-modal-field">
+              <label htmlFor="exercise-music-category">Style</label>
+              <select
+                id="exercise-music-category"
+                value={musicCategory}
+                onChange={(e) => setMusicCategory(e.target.value)}
+                disabled={isSaving || isLoading}
+              >
+                <option value="">Sélectionner un style...</option>
+                {HORIZONS_STYLE_ORDER.map((id) => (
+                  <option key={id} value={id}>{HORIZONS_MUSIC_CATEGORIES[id].label}</option>
+                ))}
+              </select>
+              <small className="save-modal-hint">Les tags Horizons et le style seront ajoutés automatiquement</small>
+            </div>
+          )}
 
           <div className="save-modal-field">
             <label htmlFor="exercise-privacy">Confidentialité</label>
