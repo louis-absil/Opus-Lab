@@ -4,6 +4,29 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ---
 
+## [1.1.1] – 2026-02-01
+
+### Amélioré
+
+#### Sélecteur et affichage des accords
+- **ChordSelectorModal** : refonte de l’interface et de la logique de sélection des accords (notation Riemann / académique).
+- **ChordLabel** : amélioration de l’affichage des accords et des styles (CSS).
+
+#### Éditeur et Player
+- **Editor** : ajustements mineurs.
+- **Player** : améliorations de l’affichage et du comportement des accords pendant l’exercice.
+
+#### Utilitaires harmonie et parcours
+- **chordFormatter** : évolution du formatage des accords.
+- **riemannFunctions** : ajouts et corrections pour la notation Riemann.
+- **nodeCriteria** : critères des nœuds du parcours enrichis.
+- **qcmOptions** : options des QCM mises à jour.
+
+#### Styles
+- **index.css** : ajustements globaux.
+
+---
+
 ## [1.1.0] – 2026-01-31
 
 ### Nouveautés
@@ -131,5 +154,6 @@ Cette version introduit un **parcours pédagogique structuré**, un **tableau de
 
 ---
 
+[1.1.1]: https://github.com/louis-absil/Opus-Lab/releases/tag/v1.1.1
 [1.1.0]: https://github.com/louis-absil/Opus-Lab/releases/tag/v1.1.0
 [1.0.0]: https://github.com/louis-absil/Opus-Lab/releases/tag/v1.0.0

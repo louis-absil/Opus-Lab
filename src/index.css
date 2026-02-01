@@ -61,3 +61,12 @@ button {
 
 /* Animations pour ChordSelectorModal - Maintenant gérées par Tailwind */
 /* Les animations sont définies dans tailwind.config.js */
+
+/* Modal QCM/compact : scrollbar cachée sur la zone de contenu (scroll possible, pas de crop) */
+.chord-modal-compact-scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.chord-modal-compact-scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

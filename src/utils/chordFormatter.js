@@ -37,8 +37,8 @@ export function formatChordDetailed(chord, figures = FIGURES) {
     const special = { 'N': 'II♭6', 'It': 'It+6', 'Fr': 'Fr+6', 'Gr': 'Gr+6' }[chord.specialRoot]
     parts.push(special || chord.specialRoot)
   } else if (chord.degree && chord.figure === '64' && chord.sixFourVariant === 'cadential') {
-    // 64 de cadence : chiffrage baroque "cad" + 6/4 superposés
-    parts.push('cad')
+    // 64 de cadence : chiffrage baroque "Cad." + 6/4 superposés
+    parts.push('Cad.')
     parts.push('6/4')
   } else if (chord.degree && chord.figure === '64' && chord.sixFourVariant === 'passing') {
     // 64 de passage entre I et I6 : on note V64
@@ -66,6 +66,12 @@ export function formatChordDetailed(chord, figures = FIGURES) {
   // Fermeture emprunt
   if (chord.isBorrowed) parts.push(')')
   
+  // Note pédale (accord/basse, ex. II/I)
+  if (chord.pedalDegree) {
+    parts.push(' / ')
+    parts.push(chord.pedalDegree)
+  }
+  
   return parts.join('') || 'Non répondu'
 }
 
@@ -76,31 +82,44 @@ export function formatChordDetailed(chord, figures = FIGURES) {
  * @returns {{ leading: string, figure: null | { stacked: true, digits: string[] } | { stacked: false, value: string } }}
  */
 export function parseChordDisplayString(str) {
-  if (!str || typeof str !== 'string') return { leading: '', figure: null }
+  if (!str || typeof str !== 'string') return { leading: '', figure: null, pedalDegree: null }
   const s = str.trim()
-  if (!s) return { leading: '', figure: null }
+  if (!s) return { leading: '', figure: null, pedalDegree: null }
+
+  // Note pédale : "accord / basse" (ex. II2/I, II/I)
+  const pedalMatch = s.match(/^(.+?)\s*\/\s*(I|II|III|IV|V|VI|VII)$/)
+  const baseStr = pedalMatch ? pedalMatch[1].trim() : s
+  const pedalDegree = pedalMatch ? pedalMatch[2] : null
 
   // Racines spéciales : toute la chaîne est le préfixe (pas de figure séparée)
-  if (s === 'It+6' || s === 'Fr+6' || s === 'Gr+6') return { leading: s, figure: null }
+  if (baseStr === 'It+6' || baseStr === 'Fr+6' || baseStr === 'Gr+6') return { leading: baseStr, figure: null, pedalDegree }
+
+  // Sixte napolitaine : II puis ♭6 (b devant 6, pas au-dessus ; pas II♭ puis 6)
+  if (baseStr === 'II♭6' || baseStr === 'IIb6') return { leading: 'II', figure: { stacked: false, value: '♭6' }, pedalDegree }
 
   // Chiffrage empilé en fin (6/4, 6/5, 4/3, 5/4)
-  const stackedMatch = s.match(/(6\/4|6\/5|4\/3|5\/4)$/)
+  const stackedMatch = baseStr.match(/(6\/4|6\/5|4\/3|5\/4)$/)
   if (stackedMatch) {
     const frac = stackedMatch[1]
-    const leading = s.slice(0, -frac.length)
+    let leading = baseStr.slice(0, -frac.length).trim()
+    // Normaliser préfixe cad64 : "cad", "Cad.", "Cad. " (avec espace) → "Cad." pour cohérence affichage
+    if (frac === '6/4') {
+      const n = leading.trim()
+      if (n === 'cad' || n === 'Cad.' || /^Cad\.\s*$/i.test(n)) leading = 'Cad.'
+    }
     const digits = frac.split('/')
-    return { leading, figure: { stacked: true, digits } }
+    return { leading, figure: { stacked: true, digits }, pedalDegree }
   }
 
   // Chiffrage simple en fin (1 ou 2 chiffres : 2, 6, 7, 9, 11, 13)
-  const singleMatch = s.match(/^(.+?)(\d{1,2})$/)
+  const singleMatch = baseStr.match(/^(.+?)(\d{1,2})$/)
   if (singleMatch) {
     const leading = singleMatch[1]
     const value = singleMatch[2]
-    return { leading, figure: { stacked: false, value } }
+    return { leading, figure: { stacked: false, value }, pedalDegree }
   }
 
-  return { leading: s, figure: null }
+  return { leading: baseStr, figure: null, pedalDegree }
 }
 
 /**

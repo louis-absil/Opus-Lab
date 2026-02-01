@@ -37,3 +37,24 @@
 .chord-label-figure-stacked span {
   font-size: 1em;
 }
+
+/* Note pédale : accord / basse (ex. II/I) */
+.chord-label-pedal {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
+.chord-label-pedal-top {
+  display: inline-flex;
+  align-items: baseline;
+}
+.chord-label-pedal-bar {
+  font-size: 0.85em;
+  opacity: 0.9;
+  margin: 0 0.1em;
+}
+.chord-label-pedal-bottom {
+  font-size: 0.9em;
+  opacity: 0.95;
+}

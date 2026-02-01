@@ -2,6 +2,8 @@
 
 **L'entraînement harmonique intelligent**
 
+**Version** : 1.1.1 — Dernières mises à jour : [CHANGELOG.md](./CHANGELOG.md)
+
 Opus Lab est une plateforme web d'entraînement pour les musiciens qui souhaitent perfectionner leur oreille harmonique. Analysez des extraits musicaux depuis YouTube, identifiez les accords avec une notation académique professionnelle, et progressez à votre rythme.
 
 ## ✨ Fonctionnalités principales
@@ -142,9 +144,9 @@ Le projet est configuré pour être déployé automatiquement sur GitHub Pages.
    ```
 
 3. **Le déploiement se fait automatiquement** :
-   - Le workflow GitHub Actions se déclenche à chaque push
-   - Votre site sera accessible à : `https://louis-absil.github.io/Opus-Lab/`
-   - Les mises à jour sont décrites dans [CHANGELOG.md](./CHANGELOG.md).
+   - Le workflow GitHub Actions se déclenche à chaque push sur `main`
+   - Le site est en ligne à : **https://louis-absil.github.io/Opus-Lab/**
+   - Toutes les mises à jour sont détaillées dans [CHANGELOG.md](./CHANGELOG.md)
 
 ### Configuration Firebase pour GitHub Pages
 

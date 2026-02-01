@@ -141,6 +141,46 @@ function normalizeFigure(figure) {
   return normalized === '5' ? '' : normalized
 }
 
+/** Tierce au-dessus du degré (1er renversement) ; quinte au-dessus (2e renversement). */
+const THIRD_ABOVE = { I: 'III', II: 'IV', III: 'V', IV: 'VI', V: 'VII', VI: 'I', VII: 'II' }
+const FIFTH_ABOVE = { I: 'V', II: 'VI', III: 'VII', IV: 'I', V: 'II', VI: 'III', VII: 'IV' }
+
+/**
+ * Degré de la basse pour un accord (degree, figure).
+ * Utilisé pour l'équivalence pédale : II/I (pedalDegree I) ≡ II2 (figure 2 = basse I).
+ */
+function getBassDegreeForChord(degree, figure) {
+  if (!degree) return null
+  const d = degree.toUpperCase()
+  const fig = normalizeFigure(figure) || '5'
+  if (fig === '' || fig === '5') return d
+  if (fig === '6') return THIRD_ABOVE[d] || null
+  if (fig === '64') return FIFTH_ABOVE[d] || null
+  // Figure "2" : convention pédagogique "accord sur basse I" (ex. II2 = II/I)
+  if (fig === '2') return 'I'
+  return d
+}
+
+/**
+ * Vérifie si deux accords sont équivalents par la notation pédale (ex. II/I = II2).
+ */
+function areChordsPedalEquivalent(userAnswer, correctAnswer) {
+  const userRoot = normalizeDegree(userAnswer)
+  const correctRoot = normalizeDegree(correctAnswer)
+  if (!userRoot || !correctRoot || userRoot !== correctRoot) return false
+  const userFig = normalizeFigure(userAnswer.figure)
+  const correctFig = normalizeFigure(correctAnswer.figure)
+  const userPedal = userAnswer.pedalDegree ? userAnswer.pedalDegree.toUpperCase() : null
+  const correctPedal = correctAnswer.pedalDegree ? correctAnswer.pedalDegree.toUpperCase() : null
+  const correctBass = getBassDegreeForChord(correctRoot, correctAnswer.figure)
+  const userBass = getBassDegreeForChord(userRoot, userAnswer.figure)
+  // Même accord avec pédale : user (II, ?, I) vs correct (II, 2) → bass(II,2)=I
+  if (userPedal && !correctPedal && correctBass === userPedal) return true
+  if (!userPedal && correctPedal && userBass === correctPedal) return true
+  if (userPedal && correctPedal && userPedal === correctPedal) return true
+  return false
+}
+
 /**
  * Normalise une cadence pour la comparaison
  * Gère les variations de nommage (ex: 'deceptive' vs 'rompue', 'half' vs 'demi-cadence')
@@ -228,6 +268,18 @@ export function validateAnswerWithFunctions(userAnswer, correctAnswer, selectedF
 
     // Niveau 1 : Réponse parfaite (même degré + même chiffrage + même variante 64 si I64)
     if (userRoot === correctRoot && userFigure === correctFigure && same64Variant) {
+      const samePedal = (userAnswer.pedalDegree || '') === (correctAnswer.pedalDegree || '')
+      if (samePedal) {
+        return {
+          level: 1,
+          score: 100,
+          cadenceBonus: cadenceBonus,
+          feedback: (cadenceBonus > 0 ? 'Parfait ! + Bonus cadence' : 'Parfait !') + cadenceFeedbackSuffix
+        }
+      }
+    }
+    // Équivalence pédale : ex. II/I (pedalDegree I) = II2 (figure 2, basse I)
+    if (userRoot && correctRoot && areChordsPedalEquivalent(userAnswer, correctAnswer)) {
       return {
         level: 1,
         score: 100,

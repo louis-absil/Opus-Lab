@@ -195,7 +195,9 @@ function parseDisplayStringToChordData(displayString, functionKey) {
     } else figValue = figure.value || null
   }
   result.figure = figValue || ''
-  if (leading === 'cad') {
+  // Cad. 6/4 : accepter "Cad.", "Cad. ", "cad", etc. (robustesse si espace ou variante)
+  const leadingNorm = (leading && typeof leading === 'string') ? leading.trim() : ''
+  if (leadingNorm === 'cad' || leadingNorm === 'Cad.') {
     result.degree = 'I'
     result.figure = '64'
     result.sixFourVariant = 'cadential'
@@ -247,7 +249,7 @@ function getEffectiveFunctionForDisplay(data) {
  * size: 'compact' | 'normal' | 'large' pilote la hauteur du conteneur et l'échelle du texte.
  */
 const ChordDisplay = ({ data, degreeMode = 'generic', displayAsFunctions = false, compact = false, size }) => {
-  const { degree, accidental, quality, figure, isBorrowed, specialRoot, selectedFunction, sixFourVariant } = data
+  const { degree, accidental, quality, figure, isBorrowed, specialRoot, selectedFunction, sixFourVariant, pedalDegree } = data
   const effectiveFunc = getEffectiveFunctionForDisplay(data)
   const funcColorClass = effectiveFunc === 'T' ? 'text-blue-400' : effectiveFunc === 'SD' ? 'text-violet-400' : effectiveFunc === 'D' ? 'text-pink-400' : 'text-white'
   const sizeMode = size || (compact ? 'compact' : 'normal')
@@ -351,10 +353,7 @@ const ChordDisplay = ({ data, degreeMode = 'generic', displayAsFunctions = false
           <div className={`flex items-baseline font-chord ${funcColorClass}`}>
             <span className={`${degreeSizeClass} font-bold`}>{degreeWithoutSymbol}</span>
             {hasDiminished && <span className="text-4xl text-zinc-300 ml-1">°</span>}
-            <div className={`flex flex-col -mt-3 ml-1 ${figureSizeClass}`}>
-              <span className="text-amber-400">♭</span>
-              <span>6</span>
-            </div>
+            <span className={`${figureSizeClass} ml-2 relative -top-3`}><span className="text-amber-400">♭</span>6</span>
           </div>
         )
       }
@@ -391,20 +390,21 @@ const ChordDisplay = ({ data, degreeMode = 'generic', displayAsFunctions = false
     const displayDegreeRaw = isI64 && sixFourVariant === 'passing' ? 'V'
       : isI64 && sixFourVariant === 'cadential' ? 'cad'
       : degree
-    const displayDegree = displayDegreeRaw === 'cad' ? 'cad' : getDegreeLabel(displayDegreeRaw, degreeMode)
+    const displayDegree = displayDegreeRaw === 'cad' ? 'Cad.' : getDegreeLabel(displayDegreeRaw, degreeMode)
     const hasDiminished = displayDegree.includes('°')
     const degreeWithoutSymbol = displayDegree.replace('°', '')
+    const isCad64Display = displayDegreeRaw === 'cad'
 
     return (
       <div className={`flex items-baseline gap-1 font-chord ${funcColorClass}`}>
         {isBorrowed && <span className="text-5xl text-zinc-500 font-light">(</span>}
         
-        {accidental && displayDegreeRaw !== 'cad' && <span className="text-4xl text-amber-400 font-light mr-1">{accidental === 'b' ? '♭' : accidental === '#' ? '♯' : '♮'}</span>}
+        {accidental && !isCad64Display && <span className="text-4xl text-amber-400 font-light mr-1">{accidental === 'b' ? '♭' : accidental === '#' ? '♯' : '♮'}</span>}
         
-        <span className={`${degreeSizeClass} font-bold tracking-tight shadow-black drop-shadow-lg`}>{degreeWithoutSymbol}</span>
+        <span className={`${isCad64Display ? 'text-3xl' : degreeSizeClass} font-bold tracking-tight shadow-black drop-shadow-lg`}>{degreeWithoutSymbol}</span>
         
-        {(hasDiminished || (quality === '°' && displayDegreeRaw !== 'cad')) && <span className="text-4xl text-zinc-300 ml-1">°</span>}
-        {quality && quality !== '°' && displayDegreeRaw !== 'cad' && <span className="text-4xl text-zinc-300 ml-1">{quality}</span>}
+        {(hasDiminished || (quality === '°' && !isCad64Display)) && <span className="text-4xl text-zinc-300 ml-1">°</span>}
+        {quality && quality !== '°' && !isCad64Display && <span className="text-4xl text-zinc-300 ml-1">{quality}</span>}
 
         {figObj && figure !== '5' && (
           <ChordLabelFigure
@@ -412,7 +412,12 @@ const ChordDisplay = ({ data, degreeMode = 'generic', displayAsFunctions = false
             className={`ml-2 relative -top-3 font-chord font-medium ${figureSizeClass}`}
           />
         )}
-        
+        {pedalDegree && (
+          <>
+            <span className="text-zinc-500 mx-1 font-light" style={{ fontSize: '0.6em' }}>/</span>
+            <span className={`${figureSizeClass} font-bold opacity-90`}>{pedalDegree}</span>
+          </>
+        )}
         {isBorrowed && <span className="text-5xl text-zinc-500 font-light">)</span>}
       </div>
     )
@@ -514,6 +519,8 @@ function ChordSelectorModal({
   const [cadence, setCadence] = useState(null)
   // I64 dépendant du contexte : 'passing' = V64 (passage I↔I6), 'cadential' = cad64 (résout sur V/V7), null = I64 (harmonies avancées)
   const [sixFourVariant, setSixFourVariant] = useState(null)
+  // Note pédale (accord/basse, ex. II/I) : degré optionnel de la basse
+  const [pedalDegree, setPedalDegree] = useState(null)
   // Initialiser le mode depuis localStorage, avec 'generic' comme défaut
   // En mode élève, utiliser un localStorage séparé et toujours 'generic' par défaut
   const [degreeMode, setDegreeMode] = useState(() => {
@@ -531,6 +538,17 @@ function ChordSelectorModal({
   const [selectedOption, setSelectedOption] = useState(null)
   const validateButtonRef = useRef(null)
 
+  // Viewport court : adapter ChordDisplay et boutons (QCM/compact)
+  const [isShortViewport, setIsShortViewport] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-height: 560px)').matches
+  )
+  useEffect(() => {
+    const mq = window.matchMedia('(max-height: 560px)')
+    const onChange = () => setIsShortViewport(mq.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+
   // --- EFFECTS ---
   // Réinitialiser l'état quand la modale s'ouvre sans initialChord (nouvel accord)
   useEffect(() => {
@@ -544,6 +562,7 @@ function ChordSelectorModal({
       setSelectedFunction(null)
       setCadence(null)
       setSixFourVariant(null)
+      setPedalDegree(null)
       if (isQcmMode) setSelectedOption(null)
       // Charger le mode sauvegardé pour les nouveaux accords
       // En mode élève, utiliser le localStorage séparé
@@ -585,6 +604,7 @@ function ChordSelectorModal({
         setSelectedFunction(initialChord.selectedFunction || null)
         setCadence(initialChord.cadence || null)
         setSixFourVariant(initialChord.sixFourVariant ?? null)
+        setPedalDegree(initialChord.pedalDegree ?? null)
       }
       // En mode élève : 
       // - Si l'accord est déjà rempli (a un degreeMode), utiliser ce mode pour ne pas le modifier
@@ -901,7 +921,8 @@ function ChordSelectorModal({
         // Construire les données de l'accord
         const chordData = {
           degree, accidental, quality, figure, isBorrowed, specialRoot, selectedFunction, cadence,
-          sixFourVariant: (degree === 'I' && figure === '64') ? sixFourVariant : null
+          sixFourVariant: (degree === 'I' && figure === '64') ? sixFourVariant : null,
+          pedalDegree: pedalDegree || undefined
         }
         
         // En mode élève : toujours sauvegarder le mode dans la réponse de l'élève
@@ -936,6 +957,7 @@ function ChordSelectorModal({
     accidental,
     cadence,
     sixFourVariant,
+    pedalDegree,
     isValid,
     degreeMode,
     studentMode,
@@ -1003,7 +1025,8 @@ function ChordSelectorModal({
     // Construire les données de l'accord
     const chordData = {
       degree, accidental, quality, figure, isBorrowed, specialRoot, selectedFunction, cadence,
-      sixFourVariant: (degree === 'I' && figure === '64') ? sixFourVariant : null
+      sixFourVariant: (degree === 'I' && figure === '64') ? sixFourVariant : null,
+      pedalDegree: pedalDegree || undefined
     }
     
     // En mode élève : toujours sauvegarder le mode dans la réponse de l'élève
@@ -1199,9 +1222,16 @@ function ChordSelectorModal({
     'D': ['It', 'Fr', 'Gr']  // Sixtes augmentées = D parallèles
   }
 
-  const highlightedDegrees = useMemo(() => 
-    selectedFunction ? FUNCTION_TO_DEGREES[selectedFunction] || [] : []
-  , [selectedFunction])
+  const chordDataForHighlight = useMemo(() => ({
+    degree, accidental, quality, figure, isBorrowed, specialRoot, selectedFunction, degreeMode, sixFourVariant, pedalDegree: pedalDegree || undefined
+  }), [degree, accidental, quality, figure, isBorrowed, specialRoot, selectedFunction, degreeMode, sixFourVariant, pedalDegree])
+  const effectiveDisplayFunction = useMemo(() =>
+    selectedFunction || getEffectiveFunctionForDisplay(chordDataForHighlight)
+  , [selectedFunction, chordDataForHighlight])
+
+  const highlightedDegrees = useMemo(() =>
+    effectiveDisplayFunction ? FUNCTION_TO_DEGREES[effectiveDisplayFunction] || [] : []
+  , [effectiveDisplayFunction])
 
   // Degrés principaux vs parallèles pour une fonction donnée
   const getDegreeType = (deg, func) => {
@@ -1251,33 +1281,40 @@ function ChordSelectorModal({
     return null
   }, [specialRoot, selectedFunction, degree])
 
-  // Racines spéciales à illuminer selon la fonction sélectionnée
-  const highlightedSpecialRoots = useMemo(() => {
-    if (selectedFunction) {
-      return FUNCTION_TO_SPECIAL_ROOTS[selectedFunction] || []
-    }
-    return []
-  }, [selectedFunction])
+  // Racines spéciales à illuminer selon la fonction effective (sélectionnée ou déduite de l'accord, ex. Cad. 6/4 → D)
+  const highlightedSpecialRoots = useMemo(() =>
+    effectiveDisplayFunction ? FUNCTION_TO_SPECIAL_ROOTS[effectiveDisplayFunction] || [] : []
+  , [effectiveDisplayFunction])
 
-  // Quand un accord (degré ou racine) est sélectionné : degrés/racines de la même fonction ne sont pas grisés
+  // #region agent log
+  if (degree === 'I' && figure === '64' && sixFourVariant === 'cadential') {
+    fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'ChordSelectorModal.jsx:displayFunc', message: 'Frame color function', data: { displayFuncComputed: effectiveDisplayFunction, highlightedDegrees, runId: 'post-fix' }, timestamp: Date.now(), sessionId: 'debug-session' }) }).catch(() => {})
+  }
+  // #endregion
+
+  // Quand un accord (degré ou racine) est sélectionné : degrés/racines de la même fonction ne sont pas grisés (fonction effective = D pour Cad. 6/4)
   const { allowedDegreesWhenAccordSelected, allowedSpecialRootsWhenAccordSelected } = useMemo(() => {
     if (selectedFunction || (!degree && !specialRoot)) {
       return { allowedDegreesWhenAccordSelected: [], allowedSpecialRootsWhenAccordSelected: [] }
     }
-    const funcs = degree ? degreeFunctions : (specialRoot ? [specialRootFunction] : [])
+    const funcs = effectiveDisplayFunction ? [effectiveDisplayFunction] : (degree ? degreeFunctions : (specialRoot ? [specialRootFunction] : []))
     const degSet = new Set()
     const rootSet = new Set()
     for (const f of funcs) {
-      if (FUNCTION_TO_DEGREES[f]) FUNCTION_TO_DEGREES[f].forEach(d => degSet.add(d))
-      if (FUNCTION_TO_SPECIAL_ROOTS[f]) FUNCTION_TO_SPECIAL_ROOTS[f].forEach(r => rootSet.add(r))
+      if (f && FUNCTION_TO_DEGREES[f]) FUNCTION_TO_DEGREES[f].forEach(d => degSet.add(d))
+      if (f && FUNCTION_TO_SPECIAL_ROOTS[f]) FUNCTION_TO_SPECIAL_ROOTS[f].forEach(r => rootSet.add(r))
     }
+    // Le degré/racine actuellement sélectionné ne doit jamais être grisé, sauf pour Cad. 6/4 (I reste grisé car fonction réelle = D)
+    const isCad64Chord = degree === 'I' && figure === '64' && sixFourVariant === 'cadential'
+    if (degree && !isCad64Chord) degSet.add(degree)
+    if (specialRoot) rootSet.add(specialRoot)
     return {
       allowedDegreesWhenAccordSelected: Array.from(degSet),
       allowedSpecialRootsWhenAccordSelected: Array.from(rootSet)
     }
-  }, [selectedFunction, degree, specialRoot, degreeFunctions, specialRootFunction])
+  }, [selectedFunction, degree, figure, sixFourVariant, specialRoot, degreeFunctions, specialRootFunction, effectiveDisplayFunction])
 
-  const chordData = { degree, accidental, quality, figure, isBorrowed, specialRoot, selectedFunction, degreeMode, sixFourVariant }
+  const chordData = chordDataForHighlight
   const chordDataForVisualizer = useMemo(() => {
     if (!isQcmMode) return {}
     if (selectedOption != null) {
@@ -1298,7 +1335,7 @@ function ChordSelectorModal({
 
   // --- JSX STRUCTURE ---
   const modalContent = (
-    <div className={`flex flex-col w-full bg-zinc-900 md:rounded-3xl shadow-2xl overflow-hidden border border-zinc-800 animate-zoom-in ${isCompactLayout ? 'max-w-lg h-auto' : 'h-full max-w-4xl'}`}>
+    <div className={`flex flex-col w-full bg-zinc-900 md:rounded-3xl shadow-2xl overflow-hidden border border-zinc-800 animate-zoom-in ${isCompactLayout ? 'max-w-lg h-full max-h-full min-h-0' : 'h-full max-w-4xl'}`}>
       
       {/* HEADER: Toolbar */}
       <div className="flex items-center justify-between px-6 py-4 bg-zinc-950 border-b border-zinc-800">
@@ -1346,15 +1383,15 @@ function ChordSelectorModal({
         </button>
       </div>
 
-      <div className={`${isCompactLayout ? 'flex-none overflow-visible' : 'flex-1 overflow-y-auto'} bg-[#18181b]`}>
+      <div className={`${isCompactLayout ? 'flex-1 min-h-0 overflow-auto chord-modal-compact-scrollbar-hide' : 'flex-1 overflow-y-auto'} bg-[#18181b]`}>
         {/* QCM MODE: layout choix multiples */}
         {isQcmMode && qcmCorrectChord && qcmOptions.length > 0 ? (
-        <div className="p-4 md:p-6">
-          <div className="grid grid-cols-1 gap-4 md:gap-6">
+        <div className="flex-1 min-h-0 flex flex-col p-[min(1rem,2vh)] md:p-[min(1.5rem,2.5vh)]">
+          <div className="grid grid-cols-1 flex-1 min-h-0 gap-[min(0.75rem,2vh)] md:gap-[min(1rem,2.5vh)]">
             {/* Colonne: prévisualisation + cadence + valider (empilés en mode compact) */}
-            <div className="flex flex-col gap-4 md:gap-6">
-              <div className="sticky top-4 z-10">
-                <ChordDisplay data={chordDataForVisualizer} degreeMode={degreeMode} displayAsFunctions={false} size="normal" />
+            <div className="flex flex-col gap-[min(0.75rem,2vh)] md:gap-[min(1rem,2.5vh)] min-h-0">
+              <div className="flex-shrink-0 z-10">
+                <ChordDisplay data={chordDataForVisualizer} degreeMode={degreeMode} displayAsFunctions={false} size={isShortViewport ? 'compact' : 'normal'} />
               </div>
               {effectiveExpectedCadence && cadencesToShow.length > 0 && (
                 <div className="bg-zinc-950/50 p-4 rounded-xl border border-white/5">
@@ -1379,7 +1416,7 @@ function ChordSelectorModal({
                 ref={validateButtonRef}
                 onClick={handleValidate}
                 disabled={!isValidForMode}
-                className={`w-full h-16 rounded-xl font-bold text-lg flex items-center justify-center gap-3 transition-all duration-200 ${
+                className={`w-full ${isShortViewport ? 'h-14' : 'h-16'} rounded-xl font-bold text-lg flex items-center justify-center gap-3 transition-all duration-200 ${
                   isValidForMode ? 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-xl shadow-indigo-500/40 transform hover:-translate-y-1 hover:scale-[1.02] ring-2 ring-indigo-400/30' : 'bg-zinc-800 text-zinc-500 cursor-not-allowed opacity-50'
                 }`}
               >
@@ -1388,7 +1425,7 @@ function ChordSelectorModal({
               </button>
             </div>
             {/* T/SD/D + options QCM — même logique couleur / grisonnement / association que le sélecteur complet */}
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-[min(0.75rem,2vh)] md:gap-[min(1rem,2.5vh)] min-h-0">
               {(() => {
                 const qcmDisplayFunc = selectedFunction || (selectedOption ? getFunctionForOptionLabel(selectedOption, qcmCorrectChord, qcmCorrectStr) : null)
                 const qcmFunctionBorder = qcmDisplayFunc === 'T' ? 'border-blue-500/50 bg-blue-950/20' : qcmDisplayFunc === 'SD' ? 'border-violet-500/50 bg-violet-950/20' : qcmDisplayFunc === 'D' ? 'border-pink-500/50 bg-pink-950/20' : 'border-white/5'
@@ -1422,7 +1459,7 @@ function ChordSelectorModal({
                             setSelectedOption(null)
                           }
                         }}
-                        className={`h-14 md:h-16 text-xl ${isHighlighted ? f.value === 'T' ? 'ring-2 ring-blue-400/60 shadow-[0_0_10px_rgba(59,130,246,0.4)] border border-blue-400/50' : f.value === 'SD' ? 'ring-2 ring-violet-400/60 shadow-[0_0_10px_rgba(139,92,246,0.4)] border border-violet-400/50' : 'ring-2 ring-pink-400/60 shadow-[0_0_10px_rgba(236,72,153,0.4)] border border-pink-400/50' : ''}`}
+                        className={`${isShortViewport ? 'h-12' : 'h-14 md:h-16'} text-xl ${isHighlighted ? f.value === 'T' ? 'ring-2 ring-blue-400/60 shadow-[0_0_10px_rgba(59,130,246,0.4)] border border-blue-400/50' : f.value === 'SD' ? 'ring-2 ring-violet-400/60 shadow-[0_0_10px_rgba(139,92,246,0.4)] border border-violet-400/50' : 'ring-2 ring-pink-400/60 shadow-[0_0_10px_rgba(236,72,153,0.4)] border border-pink-400/50' : ''}`}
                       />
                     )
                   })}
@@ -1430,7 +1467,7 @@ function ChordSelectorModal({
               </div>
               <div className={`bg-zinc-950/50 p-3 md:p-4 rounded-xl border transition-all duration-300 ${qcmFunctionBorder}`}>
                 <label className="text-xs font-bold text-zinc-500 uppercase mb-2 block">Choisissez l&apos;accord correct</label>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                   {qcmOptions.map((option, index) => {
                     const functionKey = getFunctionForOptionLabel(option, qcmCorrectChord, qcmCorrectStr)
                     const isActive = selectedOption === option
@@ -1460,7 +1497,7 @@ function ChordSelectorModal({
                           setSelectedOption(prev => prev === option ? null : option)
                           setSelectedFunction(null)
                         }}
-                        className={`relative flex flex-col items-center justify-center rounded-lg transition-all duration-150 select-none h-14 md:h-16 ${activeClass} ${isDimmed ? 'opacity-45' : ''} ${ringByFunction}`}
+                        className={`relative flex flex-col items-center justify-center rounded-lg transition-all duration-150 select-none ${isShortViewport ? 'h-12' : 'h-14 md:h-16'} ${activeClass} ${isDimmed ? 'opacity-45' : ''} ${ringByFunction}`}
                       >
                         <ChordLabel displayString={option} ariaLabel={option} className="text-lg font-semibold" />
                       </button>
@@ -1565,19 +1602,16 @@ function ChordSelectorModal({
           {/* RIGHT COLUMN: CONTROLS (9 cols) - Par ordre d'importance - masqué en mode functions (T/SD/D dans la colonne gauche) */}
           <div className={`flex flex-col gap-4 md:gap-6 ${isFunctionsOnly ? '' : 'md:col-span-9'}`}>
             
-            {/* 1. FONCTIONS TONALES - Le plus important (mode full + intuition : cadre couleur selon fonction sélectionnée) */}
+            {/* 1. FONCTIONS TONALES - Le plus important (cadre et surlignage selon fonction effective, ex. Cad. 6/4 → D) */}
             <div className={`bg-zinc-950/50 p-3 md:p-4 rounded-xl border transition-all duration-300 ${
-              selectedFunction === 'T' ? 'border-blue-500/50 bg-blue-950/20' : selectedFunction === 'SD' ? 'border-violet-500/50 bg-violet-950/20' : selectedFunction === 'D' ? 'border-pink-500/50 bg-pink-950/20' : 'border-white/5'
+              (selectedFunction || effectiveDisplayFunction) === 'T' ? 'border-blue-500/50 bg-blue-950/20' : (selectedFunction || effectiveDisplayFunction) === 'SD' ? 'border-violet-500/50 bg-violet-950/20' : (selectedFunction || effectiveDisplayFunction) === 'D' ? 'border-pink-500/50 bg-pink-950/20' : 'border-white/5'
             }`}>
               <label className="text-xs font-bold text-zinc-500 uppercase mb-2 block">Fonction Tonale</label>
               <div className="grid grid-cols-3 gap-2 md:gap-3">
                 {FUNCTIONS.map(f => {
                   const isEnabled = enabledFunctions.includes(f.value)
-                  const isHighlighted = isEnabled && (degreeFunctions.includes(f.value) || specialRootFunction === f.value) && !selectedFunction
-                  // Griser les fonctions non concernées quand un accord (degré ou racine spéciale) est sélectionné
-                  const isDimmed = (degree || specialRoot) && !selectedFunction && (
-                    (degree && !degreeFunctions.includes(f.value)) || (specialRoot && specialRootFunction !== f.value)
-                  )
+                  const isHighlighted = isEnabled && effectiveDisplayFunction === f.value && !selectedFunction
+                  const isDimmed = (degree || specialRoot) && !selectedFunction && effectiveDisplayFunction !== f.value
                   return (
                     <Pad 
                       key={f.value} 
@@ -1623,8 +1657,8 @@ function ChordSelectorModal({
             {progressionMode !== 'functions' && (
             <div className={`bg-zinc-950/50 p-3 md:p-4 rounded-xl border transition-all duration-300 ${
               (() => {
-                // Couleur du cadre : fonction sélectionnée, ou fonction principale du degré/racine (VI = T = bleu)
-                const displayFunc = selectedFunction || (degree ? getPrimaryFunctionForDegree(degree) : null) || specialRootFunction
+                // Couleur du cadre : fonction effective (sélectionnée ou déduite de l'accord, ex. Cad. 6/4 → D)
+                const displayFunc = effectiveDisplayFunction
                 if (displayFunc === 'T') return 'border-blue-500/50 bg-blue-950/20'
                 if (displayFunc === 'SD') return 'border-violet-500/50 bg-violet-950/20'
                 if (displayFunc === 'D') return 'border-pink-500/50 bg-pink-950/20'
@@ -1640,29 +1674,30 @@ function ChordSelectorModal({
                   // Les fonctions sont déjà correctement définies dans DEGREE_TO_FUNCTIONS
                   const allDegFunctions = degFunctions
                   
-                  // Couleur basée sur selectedFunction, ou fonction principale du degré (VI = T en premier), ou specialRootFunction
-                  const activeFunction = selectedFunction || (degree === deg ? (getPrimaryFunctionForDegree(deg) || allDegFunctions[0]) : null) || specialRootFunction
+                  // Couleur basée sur fonction effective (sélectionnée ou déduite, ex. Cad. 6/4 → D)
+                  const activeFunction = effectiveDisplayFunction || (degree === deg ? (getPrimaryFunctionForDegree(deg) || allDegFunctions[0]) : null)
                   const funcColor = activeFunction ? FUNCTIONS.find(f => f.value === activeFunction)?.color : null
-                  // Highlight uniquement si une fonction est sélectionnée (pas si juste un degré)
-                  const isFunctionDegree = selectedFunction ? highlightedDegrees.includes(deg) : false
+                  // Highlight quand la fonction effective inclut ce degré (ex. D → V, VII, III)
+                  const isFunctionDegree = effectiveDisplayFunction ? highlightedDegrees.includes(deg) : false
                   // Type de degré (principal ou parallèle) pour chaque fonction
-                  const isPrimaryForT = selectedFunction === 'T' && PRIMARY_DEGREES['T']?.includes(deg)
-                  const isParallelForT = selectedFunction === 'T' && PARALLEL_DEGREES['T']?.includes(deg)
-                  const isPrimaryForSD = selectedFunction === 'SD' && PRIMARY_DEGREES['SD']?.includes(deg)
-                  const isParallelForSD = selectedFunction === 'SD' && PARALLEL_DEGREES['SD']?.includes(deg)
-                  const isPrimaryForD = selectedFunction === 'D' && PRIMARY_DEGREES['D']?.includes(deg)
-                  const isParallelForD = selectedFunction === 'D' && PARALLEL_DEGREES['D']?.includes(deg)
+                  const isPrimaryForT = effectiveDisplayFunction === 'T' && PRIMARY_DEGREES['T']?.includes(deg)
+                  const isParallelForT = effectiveDisplayFunction === 'T' && PARALLEL_DEGREES['T']?.includes(deg)
+                  const isPrimaryForSD = effectiveDisplayFunction === 'SD' && PRIMARY_DEGREES['SD']?.includes(deg)
+                  const isParallelForSD = effectiveDisplayFunction === 'SD' && PARALLEL_DEGREES['SD']?.includes(deg)
+                  const isPrimaryForD = effectiveDisplayFunction === 'D' && PRIMARY_DEGREES['D']?.includes(deg)
+                  const isParallelForD = effectiveDisplayFunction === 'D' && PARALLEL_DEGREES['D']?.includes(deg)
                   
-                  // Si le degré appartient à plusieurs fonctions (sans fonction sélectionnée)
-                  const isMultiFunction = !selectedFunction && degree === deg && degHasMultipleFunctions
+                  // Si le degré appartient à plusieurs fonctions (sans fonction effective dérivée d'un accord)
+                  const isMultiFunction = !effectiveDisplayFunction && degree === deg && degHasMultipleFunctions
                   
-                  // Griser (désactiver) les degrés non concernés quand une fonction est sélectionnée
-                  const degreeDisabledByFunction = selectedFunction && !highlightedDegrees.includes(deg)
+                  // Griser (désactiver) les degrés non concernés quand une fonction effective est en vigueur
+                  const degreeDisabledByFunction = effectiveDisplayFunction && !highlightedDegrees.includes(deg)
                   // Griser visuellement uniquement les degrés d'une autre fonction (garder les accords de la même fonction lisibles)
                   const degreeDimmed = allowedDegreesWhenAccordSelected.length > 0 && !allowedDegreesWhenAccordSelected.includes(deg)
                   
                   const degreeLabel = getDegreeLabel(deg, degreeMode)
                   const degreeNature = getDegreeNature(deg, degreeMode)
+                  const isCad64BassDegree = (degree === 'I' && figure === '64' && sixFourVariant === 'cadential') && deg === 'I'
                   
                   return (
                     <Pad 
@@ -1674,20 +1709,20 @@ function ChordSelectorModal({
                       color={funcColor || 'indigo'}
                       disabled={degreeDisabledByFunction}
                       dimmed={degreeDimmed}
-                      suppressDefaultHighlight={!!(isFunctionDegree && selectedFunction)}
+                      suppressDefaultHighlight={!!(isFunctionDegree && effectiveDisplayFunction)}
                       onClick={() => handleDegreeClick(deg)}
-                      className={`h-14 md:h-16 text-xl font-serif ${
-                        isFunctionDegree && selectedFunction 
+                      className={`h-14 md:h-16 text-xl font-serif ${isCad64BassDegree ? 'ring-1 ring-pink-400/25' : ''} ${
+                        isFunctionDegree && effectiveDisplayFunction 
                           ? isPrimaryForT || isPrimaryForSD || isPrimaryForD
-                            ? selectedFunction === 'T' 
+                            ? effectiveDisplayFunction === 'T' 
                               ? 'ring-2 ring-blue-400/80 shadow-[0_0_30px_rgba(59,130,246,0.8),0_0_60px_rgba(59,130,246,0.4),inset_0_0_30px_rgba(59,130,246,0.2)] border-2 border-blue-400/60 bg-gradient-to-br from-blue-400/45 via-blue-400/25 to-blue-400/10' 
-                              : selectedFunction === 'SD' 
+                              : effectiveDisplayFunction === 'SD' 
                               ? 'ring-2 ring-violet-400/80 shadow-[0_0_30px_rgba(139,92,246,0.8),0_0_60px_rgba(139,92,246,0.4),inset_0_0_30px_rgba(139,92,246,0.2)] border-2 border-violet-400/60 bg-gradient-to-br from-violet-400/45 via-violet-400/25 to-violet-400/10' 
                               : 'ring-2 ring-pink-400/80 shadow-[0_0_30px_rgba(236,72,153,0.8),0_0_60px_rgba(236,72,153,0.4),inset_0_0_30px_rgba(236,72,153,0.2)] border-2 border-pink-400/60 bg-gradient-to-br from-pink-400/45 via-pink-400/25 to-pink-400/10'
                             : isParallelForT || isParallelForSD || isParallelForD
-                            ? selectedFunction === 'T' 
+                            ? effectiveDisplayFunction === 'T' 
                               ? 'ring-2 ring-blue-400/60 shadow-[0_0_12px_rgba(59,130,246,0.4)] border border-blue-400/40' 
-                              : selectedFunction === 'SD' 
+                              : effectiveDisplayFunction === 'SD' 
                               ? 'ring-2 ring-violet-400/60 shadow-[0_0_12px_rgba(139,92,246,0.4)] border border-violet-400/40' 
                               : 'ring-2 ring-pink-400/60 shadow-[0_0_12px_rgba(236,72,153,0.4)] border border-pink-400/40'
                             : ''
@@ -1706,16 +1741,16 @@ function ChordSelectorModal({
                 })}
               </div>
               
-              {/* SPECIAL ROOTS */}
-              <div className="grid grid-cols-4 gap-2 mt-2 pt-2 border-t border-white/5">
+              {/* SPECIAL ROOTS + Cad. 6/4 (à côté des sixtes augmentées et napolitaine) */}
+              <div className="grid grid-cols-4 sm:grid-cols-5 gap-2 mt-2 pt-2 border-t border-white/5">
                 {SPECIAL_ROOTS.map(spec => {
                   const specFunction = SPECIAL_ROOT_TO_FUNCTION[spec.value]
                   const funcColor = specFunction ? FUNCTIONS.find(f => f.value === specFunction)?.color : null
                   const isHighlighted = highlightedSpecialRoots.includes(spec.value)
                   // Toutes les racines spéciales sont parallèles (pas de principales)
-                  const isParallel = isHighlighted && selectedFunction
-                  // Griser (désactiver) les racines spéciales non concernées quand une fonction est sélectionnée
-                  const specDisabledByFunction = selectedFunction && !highlightedSpecialRoots.includes(spec.value)
+                  const isParallel = isHighlighted && effectiveDisplayFunction
+                  // Griser (désactiver) les racines spéciales non concernées quand une fonction effective est en vigueur
+                  const specDisabledByFunction = effectiveDisplayFunction && !highlightedSpecialRoots.includes(spec.value)
                   // Griser visuellement uniquement les racines d'une autre fonction (quand un degré est sélectionné, aucune racine n'est de la même fonction sauf si on avait sélectionné une racine)
                   const specDimmed = allowedSpecialRootsWhenAccordSelected.length > 0 ? !allowedSpecialRootsWhenAccordSelected.includes(spec.value) : (degree ? true : (specialRoot && specialRoot !== spec.value))
                   
@@ -1729,11 +1764,11 @@ function ChordSelectorModal({
                       highlighted={isHighlighted}
                       disabled={specDisabledByFunction}
                       dimmed={specDimmed}
-                      suppressDefaultHighlight={!!(isHighlighted && selectedFunction)}
+                      suppressDefaultHighlight={!!(isHighlighted && effectiveDisplayFunction)}
                       onClick={() => handleSpecialRootClick(spec.value)}
                       className={`h-12 font-serif ${
                         isParallel
-                          ? selectedFunction === 'SD'
+                          ? effectiveDisplayFunction === 'SD'
                             ? 'ring-2 ring-violet-400/60 shadow-[0_0_12px_rgba(139,92,246,0.4)] border-2 border-violet-400/50'
                             : 'ring-2 ring-pink-400/60 shadow-[0_0_12px_rgba(236,72,153,0.4)] border-2 border-pink-400/50'
                           : ''
@@ -1742,6 +1777,47 @@ function ChordSelectorModal({
                     />
                   )
                 })}
+                {/* Bouton dédié 64 de cadence (Cad. 6/4) : fonction D, à côté des racines spéciales */}
+                {(() => {
+                  const isCad64Selected = degree === 'I' && figure === '64' && sixFourVariant === 'cadential'
+                  const cad64Dimmed = (degree || specialRoot) && effectiveDisplayFunction && effectiveDisplayFunction !== 'D'
+                  const isCad64Highlighted = effectiveDisplayFunction === 'D' && !isCad64Selected
+                  return (
+                <button
+                  type="button"
+                  title="64 de cadence (fonction Dominante)"
+                  onClick={() => {
+                    if (isCad64Selected) {
+                      setDegree('')
+                      setFigure('')
+                      setSixFourVariant(null)
+                      setSpecialRoot(null)
+                    } else {
+                      setDegree('I')
+                      setFigure('64')
+                      setSixFourVariant('cadential')
+                      setSpecialRoot(null)
+                    }
+                  }}
+                  disabled={selectedFunction != null && selectedFunction !== 'D'}
+                  className={`
+                    relative flex flex-row items-center justify-center gap-1.5 rounded-lg transition-all duration-150 h-12 font-sans
+                    disabled:opacity-20 disabled:cursor-not-allowed select-none !p-0 !m-0
+                    ${cad64Dimmed ? 'opacity-45 pointer-events-auto border border-zinc-700 bg-zinc-800 text-zinc-500' : ''}
+                    ${isCad64Highlighted && !cad64Dimmed ? 'ring-2 ring-pink-400/60 shadow-[0_0_12px_rgba(236,72,153,0.4)] border-2 border-pink-400/50 bg-zinc-800 text-zinc-400' : ''}
+                    ${!cad64Dimmed && !isCad64Highlighted ? (isCad64Selected
+                      ? 'bg-pink-500 text-white scale-[0.98] border-2 border-pink-400 shadow-[0_0_15px_rgba(236,72,153,0.5)]'
+                      : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200 border border-zinc-700') : ''}
+                  `}
+                >
+                  <span className="text-xs font-bold opacity-90">Cad.</span>
+                  <div className="flex flex-col items-center leading-none">
+                    <span className="text-base font-bold opacity-90">6</span>
+                    <span className="text-base font-bold opacity-90 -mt-1">4</span>
+                  </div>
+                </button>
+                )
+                })()}
               </div>
             </div>
             )}
@@ -1836,6 +1912,29 @@ function ChordSelectorModal({
                     <Pad label="o" active={quality === '°'} disabled={!!specialRoot || !!selectedFunction} onClick={() => setQuality(quality === '°' ? '' : '°')} className="h-12 text-2xl" />
                     <Pad label="+" active={quality === '+'} disabled={!!specialRoot || !!selectedFunction} onClick={() => setQuality(quality === '+' ? '' : '+')} className="h-12" />
                 </div>
+                {/* Note pédale (accord/basse, ex. II/I) */}
+                <div className="mt-3 pt-3 border-t border-white/10">
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase mb-1.5 block">Note pédale</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setPedalDegree(null)}
+                      className={`px-2 py-1.5 rounded text-xs font-bold transition-all ${pedalDegree === null ? 'bg-zinc-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}
+                    >
+                      —
+                    </button>
+                    {DEGREES.map(d => (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => setPedalDegree(pedalDegree === d ? null : d)}
+                        className={`px-2 py-1.5 rounded text-xs font-bold transition-all ${pedalDegree === d ? 'bg-amber-500 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}
+                      >
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
             )}
@@ -1926,7 +2025,7 @@ function ChordSelectorModal({
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in"
       onClick={onClose}
     >
-      <div onClick={e => e.stopPropagation()} className={`w-full ${isCompactLayout ? 'max-w-lg h-auto max-h-[90vh] overflow-auto' : 'max-w-4xl h-[90vh]'}`}>
+      <div onClick={e => e.stopPropagation()} className={`w-full ${isCompactLayout ? 'max-w-lg max-h-[90dvh] h-[90dvh] flex flex-col min-h-0' : 'max-w-4xl h-[90vh]'}`}>
         {modalContent}
       </div>
     </div>

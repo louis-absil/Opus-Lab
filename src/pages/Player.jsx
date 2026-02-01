@@ -828,19 +828,7 @@ function Player() {
         } else if (progressionMode === 'qcm' && 'qcmAnswer' in userAnswer) {
           const correctStr = formatChordStringQcm(correctAnswer)
           const isCorrectChord = userAnswer.qcmAnswer === correctStr
-          const correctFunction = (() => {
-            if (!correctAnswer) return null
-            if (correctAnswer.selectedFunction) return correctAnswer.selectedFunction
-            if (correctAnswer.specialRoot) {
-              const map = { 'N': 'SD', 'It': 'D', 'Fr': 'D', 'Gr': 'D' }
-              return map[correctAnswer.specialRoot] || null
-            }
-            if (correctAnswer.degree) {
-              const funcs = DEGREE_TO_FUNCTIONS[correctAnswer.degree] || []
-              return funcs.length > 0 ? funcs[0] : null
-            }
-            return null
-          })()
+          const correctFunction = getChordFunction(correctAnswer)
           const userFunction = userAnswer.function ?? null
           const isCorrectFunction = Boolean(userFunction && correctFunction && userFunction === correctFunction)
           const userFunctionFromChord = userAnswer.qcmAnswer ? getFunctionFromQcmAnswer(userAnswer.qcmAnswer) : null
@@ -1582,7 +1570,7 @@ function Player() {
     const s = qcmAnswer.trim()
     if (s.startsWith('It+6') || s.startsWith('Fr+6') || s.startsWith('Gr+6')) return 'D'
     if (s.startsWith('II♭') || s.startsWith('IIb')) return 'SD'
-    if (s.startsWith('cad')) return 'T'
+    if (s.startsWith('cad') || s.startsWith('Cad.')) return 'D' // 64 de cadence = fonction dominante
     const degreeMatch = s.match(/^(III|VII|II|IV|VI|I|V)(♭|♯|b|#)?/)
     const degree = degreeMatch ? degreeMatch[1] : null
     if (degree) {
@@ -1611,13 +1599,17 @@ function Player() {
       return SPECIAL_ROOT_TO_FUNCTION[specialRoot] || null
     }
     
-    // 4. Si c'est un degré, utiliser le mapping (prendre la première fonction si plusieurs)
+    // 4. I64 de passage ou cadence (V64 / cad64) → D
+    if (degree === 'I' && chord.figure === '64' && (chord.sixFourVariant === 'passing' || chord.sixFourVariant === 'cadential')) {
+      return 'D'
+    }
+    // 5. Si c'est un degré, utiliser le mapping (prendre la première fonction si plusieurs)
     if (degree) {
       const functions = DEGREE_TO_FUNCTIONS[degree] || []
       return functions.length > 0 ? functions[0] : null
     }
     
-    // 5. Réponse QCM avec accord (qcmAnswer) : dériver la fonction depuis la chaîne (ex. "I5" → T)
+    // 6. Réponse QCM avec accord (qcmAnswer) : dériver la fonction depuis la chaîne (ex. "I5" → T, "cad6/4" → D)
     if (qcmAnswer) {
       return getFunctionFromQcmAnswer(qcmAnswer)
     }
@@ -1707,7 +1699,7 @@ function Player() {
     // I64 dépendant du contexte : V64 (passage), cad64 (cadence), I64 (avancé)
     const isI64 = degree === 'I' && figure === '64'
     const displayDegreeRaw = isI64 && sixFourVariant === 'passing' ? 'V' : isI64 && sixFourVariant === 'cadential' ? 'cad' : degree
-    const displayDegree = displayDegreeRaw === 'cad' ? 'cad' : getDegreeLabel(displayDegreeRaw, degreeMode)
+    const displayDegree = displayDegreeRaw === 'cad' ? 'Cad.' : getDegreeLabel(displayDegreeRaw, degreeMode)
     const hasDiminished = displayDegree.includes('°')
     const degreeWithoutSymbol = displayDegree.replace('°', '').trim()
     

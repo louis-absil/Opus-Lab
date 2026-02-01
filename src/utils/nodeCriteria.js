@@ -198,9 +198,34 @@ export function exerciseCadencesAllowedForNode(exercise, nodeId) {
   return true
 }
 
+function getChord(marker) {
+  return typeof marker === 'object' && marker.chord ? marker.chord : null
+}
+
+/**
+ * Vérifie que l'exercice contient au moins une fois la séquence cad64 → V (ou V7) → I
+ * (cadence parfaite composée).
+ */
+function exerciseHasCad64VISequence(exercise) {
+  if (!exercise?.markers || exercise.markers.length < 3) return false
+  const markers = exercise.markers
+  for (let i = 0; i <= markers.length - 3; i++) {
+    const c1 = getChord(markers[i])
+    const c2 = getChord(markers[i + 1])
+    const c3 = getChord(markers[i + 2])
+    if (!c1 || !c2 || !c3) continue
+    const isCad64 = c1.degree === 'I' && (c1.figure === '64' || c1.inversion === '64') && c1.sixFourVariant === 'cadential'
+    const isV = c2.degree === 'V' && (c2.figure === '5' || c2.figure === '7' || c2.figure === '65' || c2.figure === '43' || c2.figure === '2' || !c2.figure)
+    const isI = c3.degree === 'I' && c3.figure !== '64'
+    if (isCad64 && isV && isI) return true
+  }
+  return false
+}
+
 /**
  * Vérifie que l'exercice contient au moins un élément requis pour le nœud (cadence ou accord précis).
  * Les nœuds de révision (type 'revision' ou id commençant par 'revision-') n'ont pas de contenu requis.
+ * Pour cadence-parfaite-composee, l'exercice doit contenir la séquence cad64 → V → I (comme pour les autres nœuds cadence qui exigent la cadence en question).
  * @param {Object} exercise - Exercice avec markers
  * @param {string} nodeId - ID du nœud
  * @returns {boolean}
@@ -210,10 +235,15 @@ export function exerciseHasRequiredContent(exercise, nodeId) {
   const def = getNodeDef(nodeId)
   if (def?.type === NODE_TYPE_REVISION) return true
 
+  // Cadence parfaite composée : l'exercice doit contenir la séquence cad64 → V (ou V7) → I
+  if (nodeId === 'cadence-parfaite-composee') {
+    return exerciseHasCad64VISequence(exercise)
+  }
+
   const requiredCadences = getRequiredCadenceValues(nodeId)
   if (requiredCadences.length > 0) {
     for (const marker of exercise.markers) {
-      const chord = typeof marker === 'object' && marker.chord ? marker.chord : null
+      const chord = getChord(marker)
       const cadence = chord?.cadence
       if (cadence) {
         const norm = normalizeCadence(cadence)

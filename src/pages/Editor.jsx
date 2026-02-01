@@ -1093,7 +1093,7 @@ function Editor() {
     // I64 dépendant du contexte : V64 (passage), cad64 (cadence), I64 (avancé)
     const isI64 = degree === 'I' && figure === '64'
     const displayDegreeRaw = isI64 && sixFourVariant === 'passing' ? 'V' : isI64 && sixFourVariant === 'cadential' ? 'cad' : degree
-    const displayDegree = displayDegreeRaw === 'cad' ? 'cad' : getDegreeLabel(displayDegreeRaw, degreeMode)
+    const displayDegree = displayDegreeRaw === 'cad' ? 'Cad.' : getDegreeLabel(displayDegreeRaw, degreeMode)
     const hasDiminished = displayDegree.includes('°')
     const degreeWithoutSymbol = displayDegree.replace('°', '').trim()
     

@@ -31,38 +31,39 @@ export function ChordLabelFigure({ figure, className = '' }) {
  * Respecte chord.degreeMode (generic/major/minor) pour la casse majeur/mineur comme le visualiseur élève.
  */
 function buildLeadingFromChord(chord) {
-  const { degree, accidental, quality, figure, isBorrowed, specialRoot, sixFourVariant, degreeMode } = chord
+  const { degree, accidental, quality, figure, isBorrowed, specialRoot, sixFourVariant, degreeMode, pedalDegree } = chord
 
   if (specialRoot) {
-    if (specialRoot === 'N') return { leading: 'II♭', figure: { stacked: false, value: '6' } }
+    if (specialRoot === 'N') return { leading: 'II', figure: { stacked: false, value: '♭6' }, pedalDegree: pedalDegree || null }
     const labels = { It: 'It+6', Fr: 'Fr+6', Gr: 'Gr+6' }
-    return { leading: labels[specialRoot] || specialRoot, figure: null }
+    return { leading: labels[specialRoot] || specialRoot, figure: null, pedalDegree: pedalDegree || null }
   }
 
   const isI64 = degree === 'I' && figure === '64'
-  const degreePartRaw = isI64 && sixFourVariant === 'passing' ? 'V'
-    : isI64 && sixFourVariant === 'cadential' ? 'cad'
+  const degreePartRaw = (degree === 'cad' || degree === 'Cad.') ? 'Cad.'
+    : isI64 && sixFourVariant === 'passing' ? 'V'
+    : isI64 && sixFourVariant === 'cadential' ? 'Cad.'
     : degree
   // Appliquer la casse majeur/mineur selon degreeMode (comme ChordDisplay mode élève)
-  const degreePart = degreePartRaw === 'cad' ? 'cad' : (degreePartRaw && degreeMode)
+  const degreePart = degreePartRaw === 'Cad.' ? 'Cad.' : (degreePartRaw && degreeMode)
     ? getDegreeDisplayLabel(degreePartRaw, degreeMode)
     : degreePartRaw
 
   let leading = ''
   if (isBorrowed) leading += '('
-  if (accidental && degreePart !== 'cad') {
+  if (accidental && degreePart !== 'Cad.') {
     leading += accidental === 'b' ? '♭' : accidental === '#' ? '♯' : '♮'
   }
   leading += degreePart || ''
-  if (quality && degreePart !== 'cad') leading += quality
+  if (quality && degreePart !== 'Cad.') leading += quality
   if (isBorrowed) leading += ')'
 
-  if (!figure || figure === '5') return { leading, figure: null }
+  if (!figure || figure === '5') return { leading, figure: null, pedalDegree: pedalDegree || null }
   const figObj = FIGURES.find(f => f.value === figure)
   const fig = figObj?.isStacked && figObj?.displayArray
     ? { stacked: true, digits: figObj.displayArray }
     : { stacked: false, value: figObj?.display ?? figure }
-  return { leading, figure: fig }
+  return { leading, figure: fig, pedalDegree: pedalDegree || null }
 }
 
 /**
@@ -73,27 +74,24 @@ export default function ChordLabel({ chord, displayString, className = '', ariaL
   let leading = ''
   let figure = null
 
+  let pedalDegree = null
   if (displayString != null && displayString !== '') {
     const parsed = parseChordDisplayString(displayString)
     leading = parsed.leading
     figure = parsed.figure
+    pedalDegree = parsed.pedalDegree ?? null
   } else if (chord) {
     const built = buildLeadingFromChord(chord)
     leading = built.leading
     figure = built.figure
+    pedalDegree = built.pedalDegree ?? null
   }
 
-  if (!leading && !figure) return null
+  if (!leading && !figure && !pedalDegree) return null
 
   const title = ariaLabel ?? (typeof displayString === 'string' ? displayString : undefined)
-
-  return (
-    <span
-      className={`baroque-chord-label ${className}`.trim()}
-      title={title}
-      aria-label={title}
-      role={title ? 'text' : undefined}
-    >
+  const chordPart = (
+    <>
       {leading && <span className="chord-label-degree">{leading}</span>}
       {figure && (
         <span className="chord-label-figure">
@@ -107,6 +105,25 @@ export default function ChordLabel({ chord, displayString, className = '', ariaL
             <span>{figure.value}</span>
           )}
         </span>
+      )}
+    </>
+  )
+
+  return (
+    <span
+      className={`baroque-chord-label ${className}`.trim()}
+      title={title}
+      aria-label={title}
+      role={title ? 'text' : undefined}
+    >
+      {pedalDegree ? (
+        <span className="chord-label-pedal">
+          <span className="chord-label-pedal-top">{chordPart}</span>
+          <span className="chord-label-pedal-bar">/</span>
+          <span className="chord-label-pedal-bottom">{pedalDegree}</span>
+        </span>
+      ) : (
+        chordPart
       )}
     </span>
   )

@@ -18,6 +18,10 @@ export function getChordFunction(chord) {
   if (!chord) return null
   if (chord.selectedFunction) return chord.selectedFunction
   if (chord.specialRoot) return SPECIAL_ROOT_TO_FUNCTION[chord.specialRoot] || null
+  // I64 de passage ou cadence (V64 / cad64) → fonction D
+  if (chord.degree === 'I' && chord.figure === '64' && (chord.sixFourVariant === 'passing' || chord.sixFourVariant === 'cadential')) {
+    return 'D'
+  }
   if (chord.degree) {
     const functions = DEGREE_TO_FUNCTIONS[chord.degree] || []
     return functions.length > 0 ? functions[0] : null
@@ -37,10 +41,10 @@ export function formatChordString(chord) {
     return specialLabels[chord.specialRoot] || chord.specialRoot
   }
   const isI64 = chord.degree === 'I' && chord.figure === '64'
-  const degreePart = isI64 && chord.sixFourVariant === 'passing' ? 'V' : isI64 && chord.sixFourVariant === 'cadential' ? 'cad' : chord.degree
+  const degreePart = isI64 && chord.sixFourVariant === 'passing' ? 'V' : isI64 && chord.sixFourVariant === 'cadential' ? 'Cad.' : chord.degree
   if (degreePart) {
     result += degreePart
-    if (degreePart !== 'cad' && chord.accidental) {
+    if (degreePart !== 'Cad.' && chord.accidental) {
       if (chord.accidental === 'b') result += '♭'
       else if (chord.accidental === '#') result += '♯'
     }
@@ -52,6 +56,7 @@ export function formatChordString(chord) {
     else if (chord.figure === '54') result += '5/4'
     else result += chord.figure
   }
+  if (chord.pedalDegree) result += ' / ' + chord.pedalDegree
   return result
 }
 
@@ -64,7 +69,7 @@ export function getFunctionForOptionLabel(optionStr, correctChord, correctStr) {
     const fn = getChordFunction(correctChord)
     return fn || 'T'
   }
-  if (optionStr.startsWith('cad')) return 'D'
+  if (optionStr.startsWith('cad') || optionStr.startsWith('Cad.')) return 'D'
   if (optionStr.startsWith('It+6') || optionStr.startsWith('Fr+6') || optionStr.startsWith('Gr+6')) return 'D'
   if (optionStr.startsWith('II♭') || optionStr === 'II♭6') return 'SD'
   const m = optionStr.match(/^([♭#])?(VII|VI|IV|III|II|I|V)/)
@@ -126,6 +131,7 @@ function generateDistractors(correctChord, allChords, useCloseLures = false, see
     })
   }
 
+  const correctStr = formatChordString(correctChord)
   const DEGREES = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII']
   const FIGURES = ['5', '6', '64', '7', '65', '43', '2']
 
@@ -134,7 +140,7 @@ function generateDistractors(correctChord, allChords, useCloseLures = false, see
     const randomFigure = otherFigures[Math.floor(rng() * otherFigures.length)]
     const closeChord = { degree: correctDegree, figure: randomFigure }
     const closeStr = formatChordString(closeChord)
-    if (!closeChords.some((c) => formatChordString(c) === closeStr)) closeChords.push(closeChord)
+    if (closeStr !== correctStr && !closeChords.some((c) => formatChordString(c) === closeStr)) closeChords.push(closeChord)
   }
 
   while (farChords.length < 2) {
@@ -144,6 +150,7 @@ function generateDistractors(correctChord, allChords, useCloseLures = false, see
       const farChord = { degree: randomDegree, figure: randomFigure }
       const farStr = formatChordString(farChord)
       if (
+        farStr !== correctStr &&
         !farChords.some((c) => formatChordString(c) === farStr) &&
         !closeChords.some((c) => formatChordString(c) === farStr)
       )
@@ -176,6 +183,7 @@ export function getQcmOptions(correctChord, allChords, useCloseLures = false, qu
       ? Number(questionId)
       : correctStr.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
   const distractors = generateDistractors(correctChord, allChords, useCloseLures, seed)
-  const allOptions = [correctStr, ...distractors]
+  const uniqueDistractors = [...new Set(distractors)].filter((s) => s !== correctStr).slice(0, 4)
+  const allOptions = [correctStr, ...uniqueDistractors]
   return seededShuffle(allOptions, seed + 2)
 }
