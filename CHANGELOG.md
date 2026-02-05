@@ -4,6 +4,39 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ---
 
+## [1.2.0] – 2026-02-05
+
+### Ajouté
+
+#### Éditeur d’images du parcours
+- **ParcoursImagesEditor** : page dédiée pour gérer les illustrations des nœuds du parcours (route `/parcours-images`, accès admin).
+- **ParcoursImagesContext** : chargement et mise à jour des images (Firestore / Storage).
+- **parcoursImagesService** : lecture/écriture des métadonnées et URLs des images.
+- **cropBackgroundStyle** : utilitaire pour l’aperçu des images (ratio, zoom, recadrage).
+- **CampaignMap** et **HorizonsMap** : affichage des images gérées via le contexte (aperçu, ratio, mobile).
+
+#### Données et configuration
+- **chordDifficulties.js** : référentiel des difficultés par type d’accord.
+- **formations.js** : données des formations pour catalogues et établissements.
+- **tagCategories.js** : catégorisation des tags pour filtres et affichage.
+- **adminAllowlist.js** : liste des emails autorisés pour l’accès admin.
+- **exerciseDisplay.js** : helpers pour l’affichage des exercices (cartés, listes).
+
+### Modifié
+
+- **firestore.rules** : règles pour les images du parcours et droits par rôle.
+- **AppRouter** : route `/parcours-images` ; **main.jsx** : provider ParcoursImagesContext.
+- **Dashboard** : accès à l’éditeur d’images du parcours pour les admins.
+- **Composants** : ChordLabel, ExerciseCard, ExerciseSummary, SaveExerciseModal, ReviewDetailPanel, AssignToClassModal, EditTagsModal, ProfileModal ; styles CampaignMap, HorizonsMap.
+- **Pages** : Editor, FreeMode, Player (affichage, filtres, feedback).
+- **Données** : parcoursTree, parcoursIllustrations, knownTags.
+- **Services** : exerciseService.
+- **Utils** : difficultyFromContent, nodeCriteria, previewScenarios, qcmOptions, tagGenerator.
+
+Détail complet : [UPDATE_v1.2.0.md](./UPDATE_v1.2.0.md).
+
+---
+
 ## [1.1.1] – 2026-02-01
 
 ### Amélioré
@@ -154,6 +187,7 @@ Cette version introduit un **parcours pédagogique structuré**, un **tableau de
 
 ---
 
+[1.2.0]: https://github.com/louis-absil/Opus-Lab/releases/tag/v1.2.0
 [1.1.1]: https://github.com/louis-absil/Opus-Lab/releases/tag/v1.1.1
 [1.1.0]: https://github.com/louis-absil/Opus-Lab/releases/tag/v1.1.0
 [1.0.0]: https://github.com/louis-absil/Opus-Lab/releases/tag/v1.0.0

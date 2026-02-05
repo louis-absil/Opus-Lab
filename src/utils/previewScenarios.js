@@ -100,11 +100,11 @@ export const PREVIEW_SCENARIOS = [
   {
     id: 'stage2',
     label: 'Étape 2',
-    description: 'Parcours jusqu\'à 2.2 / 2.3, précision I vs I6',
+    description: 'Phase 2 (Densité dominante, Stabilité, Sixte-quarte, Cadence composée)',
     xp: 380,
     streak: 5,
     getProgress: () => {
-      const nodes = ['1.1', 'cadence-demi', 'cadence-parfaite', '1.2', 'cadence-plagale', '2.1', '2.2', 'cadence-parfaite-composee', '2.3']
+      const nodes = PARCOURS_NODE_ORDER.slice(0, PARCOURS_NODE_ORDER.indexOf('revision-etage-2'))
       const stats = {}
       nodes.forEach((id, i) => {
         const isLast = i === nodes.length - 1
@@ -123,7 +123,7 @@ export const PREVIEW_SCENARIOS = [
     streak: 7,
     getProgress: () => {
       const nodes = PARCOURS_NODE_ORDER.filter((id) =>
-        ['4.1', '4.2', '4.3', '4.4'].indexOf(id) === -1
+        ['4.1', '4.2', '4.3', '4.4', '4.5', '4.6'].indexOf(id) === -1
       )
       const stats = {}
       nodes.forEach((id, i) => {

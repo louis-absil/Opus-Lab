@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { updateExercise } from '../services/exerciseService'
 import { filterKnownTags } from '../data/knownTags'
+import { getExerciseDisplayTitle } from '../utils/exerciseDisplay'
 import './EditTagsModal.css'
 
 function EditTagsModal({ isOpen, onClose, exercise, onSave }) {
@@ -66,11 +67,7 @@ function EditTagsModal({ isOpen, onClose, exercise, onSave }) {
 
   if (!isOpen) return null
 
-  const title = exercise?.metadata?.exerciseTitle
-    || exercise?.metadata?.title
-    || (exercise?.metadata?.composer && exercise?.metadata?.workTitle
-      ? `${exercise.metadata.composer} - ${exercise.metadata.workTitle}`
-      : 'Exercice')
+  const title = exercise ? (getExerciseDisplayTitle(exercise, []) || 'Exercice') : 'Exercice'
 
   return (
     <div className="edit-tags-modal-backdrop" onClick={handleBackdropClick}>

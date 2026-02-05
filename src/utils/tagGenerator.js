@@ -476,12 +476,44 @@ export function getHorizonsTagsForCategory(musicCategory) {
   return ['Horizons', cat.tagLabel]
 }
 
+/** Tempos courants pour valider "I. Allegro" / "II. Andante" */
+const TEMPO_WORDS = new Set(['allegro', 'andante', 'adagio', 'largo', 'presto', 'scherzo', 'menuet', 'menuetto', 'rondo', 'molto', 'allegretto', 'andantino', 'larghetto', 'largamente', 'vivace', 'grave', 'lento', 'moderato', 'adagietto', 'finale', 'introduction', 'introduzione'])
+
+function looksLikeMovement(s) {
+  if (!s || s.length > 50) return false
+  const t = s.trim()
+  // Chiffre romain + optionnel point + optionnel tempo : "II. Adagio", "III", "IV. Scherzo"
+  const romanTempo = /^\s*[IVXLCDM]+\s*\.?\s*[A-Za-zÀ-ÿ]*\s*$/i
+  if (romanTempo.test(t)) {
+    const rest = t.replace(/^\s*[IVXLCDM]+\s*\.?\s*/i, '').trim()
+    if (!rest || TEMPO_WORDS.has(rest.toLowerCase())) return true
+    return true
+  }
+  // "2nd movement", "Movement 2", "Mov. 2", "2e mouvement", "1er mvt"
+  if (/(?:\d(?:st|nd|rd|th)?\s+)?(?:movement|mov\.?|mouvement|mvt)\s*\.?\s*\d?$/i.test(t)) return true
+  if (/^(?:movement|mov\.?|mouvement|mvt)\s+\d\s*$/i.test(t)) return true
+  return false
+}
+
 /**
- * Parse le titre YouTube pour extraire compositeur et titre
+ * Extrait un éventuel segment "mouvement" à la fin du titre (après dernier " - " ou " – ")
+ */
+function extractMovementFromWorkTitle(workTitle) {
+  if (!workTitle) return { workTitle: workTitle || '', movementTitle: null }
+  const sep = workTitle.match(/\s+[-–—]\s+([^-–—]+)$/)
+  if (!sep) return { workTitle: workTitle.trim(), movementTitle: null }
+  const candidate = sep[1].trim()
+  if (!looksLikeMovement(candidate)) return { workTitle: workTitle.trim(), movementTitle: null }
+  const main = workTitle.slice(0, sep.index).trim()
+  return { workTitle: main || workTitle.trim(), movementTitle: candidate }
+}
+
+/**
+ * Parse le titre YouTube pour extraire compositeur, titre de l'œuvre et éventuel mouvement
  */
 export function parseYouTubeTitle(youtubeTitle) {
   if (!youtubeTitle) {
-    return { composer: null, workTitle: null }
+    return { composer: null, workTitle: null, movementTitle: null }
   }
 
   // Patterns communs : "Compositeur - Titre" ou "Compositeur: Titre"
@@ -496,25 +528,25 @@ export function parseYouTubeTitle(youtubeTitle) {
     const match = youtubeTitle.match(pattern)
     if (match) {
       let workTitle = match[2].trim()
-      
-      // Nettoyer le titre de l'œuvre : arrêter au "/" ou "·" pour enlever les infos supplémentaires
-      // Ex: "Symphony No. 40 / Rattle · Berliner Philharmoniker" -> "Symphony No. 40"
+      // Nettoyer : arrêter au "/" ou "·" pour enlever orchestre, chef, etc.
       const cleanMatch = workTitle.match(/^([^/·]+?)(?:\s*[\/·].*)?$/)
       if (cleanMatch) {
         workTitle = cleanMatch[1].trim()
       }
-      
+      const { workTitle: finalWorkTitle, movementTitle } = extractMovementFromWorkTitle(workTitle)
       return {
         composer: match[1].trim(),
-        workTitle: workTitle
+        workTitle: finalWorkTitle,
+        movementTitle: movementTitle || null,
       }
     }
   }
 
-  // Si aucun pattern ne correspond, retourner le titre complet comme workTitle
+  const { workTitle: finalWorkTitle, movementTitle } = extractMovementFromWorkTitle(youtubeTitle.trim())
   return {
     composer: null,
-    workTitle: youtubeTitle.trim()
+    workTitle: finalWorkTitle || youtubeTitle.trim(),
+    movementTitle: movementTitle || null,
   }
 }
 

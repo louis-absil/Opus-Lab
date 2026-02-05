@@ -33,12 +33,17 @@ export const NODE_CRITERIA = {
   '2.2': { functions: ['T', 'SD', 'D'], degrees: ['I', 'IV', 'II', 'V'], figures: ['5', '6', '64', '65'], cad64AsD: true },
   '2.3': { functions: ['T', 'SD', 'D'], degrees: ['I', 'IV', 'II', 'V', 'VII'], figures: ['5', '6', '64', '7', '65'] },
   '3.1': { functions: ['T', 'SD', 'D'], degrees: ['I', 'IV', 'II', 'V', 'VII'], figures: ['5', '6', '64', '7', '65', '43', '2'] },
+  '3.5': { functions: ['T', 'SD', 'D'], degrees: ['I', 'IV', 'II', 'V', 'VII'], figures: ['5', '6', '64', '7', '65', '43', '2'] },
   '3.2': { functions: ['T', 'SD', 'D'], degrees: ['I', 'IV', 'II', 'V', 'VII'], figures: ['5', '6', '64', '7', '65', '43', '2'] },
+  '3.2-vii7': { functions: ['T', 'SD', 'D'], degrees: ['I', 'IV', 'II', 'V', 'VII'], figures: ['5', '6', '64', '7', '65', '43', '2'] },
   '3.3': { functions: ['T', 'SD', 'D'], degrees: ['I', 'IV', 'II', 'V', 'VI', 'VII'], figures: ['5', '6', '64', '7', '65', '43', '2'] },
+  '3.4': { functions: ['T', 'SD', 'D'], degrees: ['I', 'IV', 'II', 'V', 'VI', 'VII'], figures: ['5', '6', '64', '7', '65', '43', '2'] },
   '4.1': { functions: ['T', 'SD', 'D'], degrees: ['I', 'IV', 'II', 'V', 'VI', 'VII'], figures: ['5', '6', '64', '7', '65', '43', '2'], specialRoots: ['N'] },
   '4.2': { functions: ['T', 'SD', 'D'], degrees: ['I', 'IV', 'II', 'V', 'VI', 'VII'], figures: ['5', '6', '64', '7', '65', '43', '2'], specialRoots: ['N'], secondaryDominants: true },
   '4.3': { functions: ['T', 'SD', 'D'], degrees: ['I', 'IV', 'II', 'V', 'VI', 'VII'], figures: ['5', '6', '64', '7', '65', '43', '2'], specialRoots: ['N'], secondaryDominants: true },
-  '4.4': { functions: ['T', 'SD', 'D'], degrees: ['I', 'IV', 'II', 'V', 'VI', 'VII'], figures: ['5', '6', '64', '7', '65', '43', '2'], specialRoots: ['N', 'It', 'Fr', 'Gr'], secondaryDominants: true }
+  '4.4': { functions: ['T', 'SD', 'D'], degrees: ['I', 'IV', 'II', 'V', 'VI', 'VII'], figures: ['5', '6', '64', '7', '65', '43', '2'], specialRoots: ['N'], secondaryDominants: true },
+  '4.5': { functions: ['T', 'SD', 'D'], degrees: ['I', 'IV', 'II', 'V', 'VI', 'VII'], figures: ['5', '6', '64', '7', '65', '43', '2'], specialRoots: ['N', 'It', 'Fr', 'Gr'], secondaryDominants: true },
+  '4.6': { functions: ['T', 'SD', 'D'], degrees: ['I', 'IV', 'II', 'III', 'V', 'VI', 'VII'], figures: ['5', '6', '64', '7', '65', '43', '2'], specialRoots: ['N', 'It', 'Fr', 'Gr'], secondaryDominants: true }
 }
 
 const SPECIAL_ROOT_TO_FUNCTION = {
@@ -151,12 +156,17 @@ const FORBIDDEN_CONCEPTS = {
   '2.2': { borrowed: true, specialRoots: true, extensions: true },
   '2.3': { borrowed: true, specialRoots: true, extensions: true },
   '3.1': { borrowed: true, specialRoots: true },
+  '3.5': { borrowed: true, specialRoots: true },
   '3.2': { borrowed: true, specialRoots: true },
+  '3.2-vii7': { borrowed: true, specialRoots: true },
   '3.3': { borrowed: true, specialRoots: true },
+  '3.4': { borrowed: true, specialRoots: true },
   '4.1': { borrowed: true },
   '4.2': { borrowed: true },
   '4.3': {},
-  '4.4': {}
+  '4.4': {},
+  '4.5': {},
+  '4.6': {}
 }
 
 function hasForbiddenConcepts(chord, forbidden) {
@@ -271,7 +281,7 @@ export function exerciseHasRequiredContent(exercise, nodeId) {
     })
   }
 
-  if (nodeId === '4.2' || nodeId === '4.3' || nodeId === '4.4') {
+  if (nodeId === '4.2' || nodeId === '4.3' || nodeId === '4.4' || nodeId === '4.5' || nodeId === '4.6') {
     const autoTags = exercise.autoTags || []
     if (autoTags.includes('DominanteSecondaire')) return true
     return true

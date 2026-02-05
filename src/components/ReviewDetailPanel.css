@@ -159,11 +159,11 @@
   }
 }
 
-/* Partiellement bon : orange (feedback universel rouge / orange / vert) */
+/* Partiellement bon : jaune-orange (distinct du rouge) */
 .review-chord-partial {
-  background: rgba(234, 88, 12, 0.15);
-  border: 2px solid rgba(234, 88, 12, 0.4);
-  color: #ea580c;
+  background: rgba(234, 179, 8, 0.15);
+  border: 2px solid rgba(234, 179, 8, 0.4);
+  color: #eab308;
 }
 
 /* Faux : rouge */

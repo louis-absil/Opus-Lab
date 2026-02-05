@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { validateAnswerWithFunctions } from '../utils/riemannFunctions'
+import { getExerciseDisplayTitle } from '../utils/exerciseDisplay'
 import './ExerciseSummary.css'
 
 function ExerciseSummary({ exercise, userAnswers, answerValidations = {}, onReplay, isGuest = false }) {
@@ -70,10 +71,11 @@ function ExerciseSummary({ exercise, userAnswers, answerValidations = {}, onRepl
       <div className="summary-container">
         <div className="summary-header">
           <h1>Résultats de l'exercice</h1>
-          <h2>{exercise.metadata?.exerciseTitle || 'Exercice d\'analyse harmonique'}</h2>
-          {exercise.metadata?.composer && exercise.metadata?.workTitle && (
+          <h2>{getExerciseDisplayTitle(exercise, []) || 'Exercice d\'analyse harmonique'}</h2>
+          {(exercise.metadata?.composer || exercise.metadata?.workTitle) && (
             <p className="summary-meta">
-              {exercise.metadata.composer} - {exercise.metadata.workTitle}
+              {[exercise.metadata.composer, exercise.metadata.workTitle].filter(Boolean).join(' - ')}
+              {exercise.metadata?.movementTitle ? ` – ${exercise.metadata.movementTitle}` : ''}
             </p>
           )}
         </div>

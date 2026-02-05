@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { getGlobalNotionsFromAutoTags, getTagForNotionLabel } from '../utils/globalNotions'
+import { getExerciseDisplayTitle } from '../utils/exerciseDisplay'
 import './ExerciseCard.css'
 
 const MOBILE_BREAKPOINT = 768
@@ -25,7 +26,7 @@ function useIsMobile() {
 
 const TOOLTIP_HIDE_DELAY_MS = 180
 
-function ExerciseCard({ exercise, onClick, onPillClick, recommendedLabel, recommendedPillPayload, variant }) {
+function ExerciseCard({ exercise, onClick, onPillClick, recommendedLabel, recommendedPillPayload, variant, allExercises }) {
   const isMobile = useIsMobile()
   const [showTooltip, setShowTooltip] = useState(false)
   const hideTooltipTimeoutRef = useRef(null)
@@ -55,7 +56,9 @@ function ExerciseCard({ exercise, onClick, onPillClick, recommendedLabel, recomm
 
   const videoId = exercise.video?.id
   const thumbnailUrl = getYouTubeThumbnail(videoId)
-  const title = exercise.metadata?.workTitle || exercise.metadata?.exerciseTitle || exercise.metadata?.title || 'Sans titre'
+  const title = Array.isArray(allExercises) && allExercises.length > 0
+    ? getExerciseDisplayTitle(exercise, allExercises)
+    : (exercise.metadata?.workTitle || exercise.metadata?.exerciseTitle || exercise.metadata?.title || 'Sans titre')
   const difficulty = exercise.metadata?.difficulty || null
   const notions = getGlobalNotionsFromAutoTags(exercise.autoTags)
   const allPills = difficulty ? [difficulty, ...notions] : notions

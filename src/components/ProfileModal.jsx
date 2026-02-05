@@ -7,6 +7,7 @@ import { uploadAvatar, validateAvatarFile } from '../services/avatarService'
 import { getEstablishments, getPendingEstablishmentRequests, getPendingClassRequests } from '../services/referenceDataService'
 import { validateAnswerWithFunctions } from '../utils/riemannFunctions'
 import { getFigureKeyLabel } from '../utils/tagFormatter'
+import { getExerciseDisplayTitle } from '../utils/exerciseDisplay'
 import { TEACHER_SUBJECTS } from '../data/teacherSubjects'
 import './ProfileModal.css'
 
@@ -891,7 +892,7 @@ function ProfileModal({ isOpen, onClose, userRole, isPreviewMode = false, onNavi
                             }}
                           >
                             <span className="profile-recent-exercise-title">
-                              {ex.metadata?.workTitle || ex.metadata?.exerciseTitle || ex.metadata?.title || 'Sans titre'}
+                              {getExerciseDisplayTitle(ex, teacherStats.recentExercises)}
                             </span>
                             <span className={`profile-recent-exercise-status profile-recent-exercise-status--${ex.status || 'draft'}`}>
                               {ex.status === 'published' ? 'Publié' : 'Brouillon'}

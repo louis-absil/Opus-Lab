@@ -50,9 +50,15 @@
   align-items: baseline;
 }
 .chord-label-pedal-bar {
-  font-size: 0.85em;
-  opacity: 0.9;
-  margin: 0 0.1em;
+  display: block;
+  width: 100%;
+  min-width: 1.2em;
+  height: 2px;
+  background: currentColor;
+  opacity: 0.85;
+  margin: 0.15em 0;
+  border: none;
+  border-radius: 0;
 }
 .chord-label-pedal-bottom {
   font-size: 0.9em;

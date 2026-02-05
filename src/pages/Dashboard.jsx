@@ -1,14 +1,23 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import EmailLoginModal from '../components/EmailLoginModal'
 import { getExercisesByAuthor, getAllExercisesForTeachers, deleteExercise, duplicateExercise } from '../services/exerciseService'
 import { getPendingEstablishmentRequests, getPendingClassRequests } from '../services/referenceDataService'
 import { getAuthErrorMessage } from '../utils/errorHandler'
+import { getExerciseDisplayTitle } from '../utils/exerciseDisplay'
+import { formatTagForDisplay } from '../utils/tagFormatter'
+import { categorizeTags, TAG_CATEGORY_LABELS } from '../utils/tagCategories'
+import { CLASSICAL_FORMATIONS, CLASSICAL_GENRES, inferFormationsFromWorkTitle, inferGenreFromWorkTitle } from '../data/formations'
 import ProfileModal from '../components/ProfileModal'
 import EditTagsModal from '../components/EditTagsModal'
 import AssignToClassModal from '../components/AssignToClassModal'
+import { Eye } from 'lucide-react'
+import { canAccessParcoursImagesEditor } from '../config/adminAllowlist'
 import './Dashboard.css'
+
+const DIFFICULTIES = ['débutant', 'intermédiaire', 'avancé', 'expert']
+const TAG_CATEGORY_KEYS = Object.keys(TAG_CATEGORY_LABELS)
 
 function Dashboard() {
   const { user, userData, loading: authLoading, signInWithGoogle, logout } = useAuth()
@@ -29,15 +38,35 @@ function Dashboard() {
   const menuRefs = useRef({})
   const userMenuRef = useRef(null)
 
+  // Filtres
+  const [searchText, setSearchText] = useState('')
+  const [debouncedSearchText, setDebouncedSearchText] = useState('')
+  const [selectedDifficulty, setSelectedDifficulty] = useState('')
+  const [selectedComposer, setSelectedComposer] = useState('')
+  const [selectedTags, setSelectedTags] = useState([])
+  const [selectedGenre, setSelectedGenre] = useState('')
+  const [selectedFormations, setSelectedFormations] = useState([])
+  const [selectedAuthorId, setSelectedAuthorId] = useState('')
+  const [selectedStatus, setSelectedStatus] = useState('all') // 'all' | 'draft' | 'published'
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false)
+  const [expandedTagSections, setExpandedTagSections] = useState(() => new Set())
+
   useEffect(() => {
     if (authLoading) return
-    
-    if (!user) {
-      return
-    }
-    
+    if (!user) return
     loadExercises()
   }, [user, authLoading, exerciseFilter])
+
+  // Réinitialiser les filtres "prof" quand on change d'onglet
+  useEffect(() => {
+    setSelectedAuthorId('')
+  }, [exerciseFilter])
+
+  // Debounce recherche
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearchText(searchText), 300)
+    return () => clearTimeout(t)
+  }, [searchText])
 
   useEffect(() => {
     if (!user || userData?.role !== 'teacher') return
@@ -87,6 +116,147 @@ function Dashboard() {
       setLoading(false)
     }
   }
+
+  // Dérivés pour les filtres
+  const availableTags = useMemo(() => {
+    const set = new Set()
+    exercises.forEach((ex) => {
+      (ex.autoTags || []).forEach((tag) => set.add(tag))
+    })
+    return [...set].sort()
+  }, [exercises])
+
+  const tagCategories = useMemo(() => categorizeTags(availableTags), [availableTags])
+
+  const composers = useMemo(() => {
+    const set = new Set()
+    exercises.forEach((ex) => {
+      const c = ex.metadata?.composer
+      if (c) set.add(c)
+    })
+    return [...set].sort()
+  }, [exercises])
+
+  const authors = useMemo(() => {
+    if (exerciseFilter !== 'all') return []
+    const byId = new Map()
+    exercises.forEach((ex) => {
+      const id = ex.authorId || ''
+      if (!id) return
+      const name = ex.authorId === user?.uid ? 'Vous' : (ex.authorName || 'Professeur')
+      if (!byId.has(id)) byId.set(id, { authorId: id, displayName: name })
+    })
+    return [...byId.values()].sort((a, b) => a.displayName.localeCompare(b.displayName))
+  }, [exercises, exerciseFilter, user?.uid])
+
+  const formationIds = useMemo(() => {
+    const set = new Set()
+    exercises.forEach((ex) => {
+      if (ex.metadata?.section === 'horizons') return
+      const raw = ex.metadata?.formation
+      const arr = Array.isArray(raw) ? raw : raw ? [raw] : inferFormationsFromWorkTitle(ex.metadata?.workTitle || '', null)
+      arr.forEach((id) => set.add(id))
+    })
+    return set
+  }, [exercises])
+
+  const genreIds = useMemo(() => {
+    const set = new Set()
+    exercises.forEach((ex) => {
+      if (ex.metadata?.section === 'horizons') return
+      const id = ex.metadata?.genre || inferGenreFromWorkTitle(ex.metadata?.workTitle || '')
+      if (id) set.add(id)
+    })
+    return set
+  }, [exercises])
+
+  const genreOptions = useMemo(() => CLASSICAL_GENRES.filter((g) => genreIds.has(g.id)), [genreIds])
+  const formationOptions = useMemo(() => CLASSICAL_FORMATIONS.filter((f) => formationIds.has(f.id)), [formationIds])
+
+  const filteredExercises = useMemo(() => {
+    let list = [...exercises]
+    if (debouncedSearchText.trim()) {
+      const q = debouncedSearchText.toLowerCase().trim()
+      list = list.filter(
+        (ex) =>
+          (ex.metadata?.workTitle || '').toLowerCase().includes(q) ||
+          (ex.metadata?.exerciseTitle || '').toLowerCase().includes(q) ||
+          (ex.metadata?.composer || '').toLowerCase().includes(q)
+      )
+    }
+    if (selectedDifficulty) list = list.filter((ex) => ex.metadata?.difficulty === selectedDifficulty)
+    if (selectedComposer) list = list.filter((ex) => ex.metadata?.composer === selectedComposer)
+    if (selectedGenre) {
+      list = list.filter((ex) => {
+        const g = ex.metadata?.genre || inferGenreFromWorkTitle(ex.metadata?.workTitle || '')
+        return g === selectedGenre
+      })
+    }
+    if (selectedFormations.length > 0) {
+      list = list.filter((ex) => {
+        const raw = ex.metadata?.formation
+        const exFormations = Array.isArray(raw) ? raw : raw ? [raw] : inferFormationsFromWorkTitle(ex.metadata?.workTitle || '', null)
+        return selectedFormations.every((s) => exFormations.includes(s))
+      })
+    }
+    if (selectedTags.length > 0) {
+      list = list.filter((ex) => {
+        const tags = ex.autoTags || []
+        return selectedTags.some((tag) => tags.includes(tag))
+      })
+    }
+    if (selectedAuthorId) list = list.filter((ex) => ex.authorId === selectedAuthorId)
+    if (selectedStatus !== 'all') list = list.filter((ex) => (ex.status || 'draft') === selectedStatus)
+    return list
+  }, [
+    exercises,
+    debouncedSearchText,
+    selectedDifficulty,
+    selectedComposer,
+    selectedGenre,
+    selectedFormations,
+    selectedTags,
+    selectedAuthorId,
+    selectedStatus
+  ])
+
+  const hasActiveFilters =
+    searchText ||
+    selectedDifficulty ||
+    selectedComposer ||
+    selectedTags.length > 0 ||
+    selectedGenre ||
+    selectedFormations.length > 0 ||
+    selectedAuthorId ||
+    selectedStatus !== 'all'
+
+  const clearAllFilters = useCallback(() => {
+    setSearchText('')
+    setSelectedDifficulty('')
+    setSelectedComposer('')
+    setSelectedTags([])
+    setSelectedGenre('')
+    setSelectedFormations([])
+    setSelectedAuthorId('')
+    setSelectedStatus('all')
+  }, [])
+
+  const toggleTag = useCallback((tag) => {
+    setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]))
+  }, [])
+
+  const toggleFormation = useCallback((formationId) => {
+    setSelectedFormations((prev) => (prev.includes(formationId) ? prev.filter((id) => id !== formationId) : [...prev, formationId]))
+  }, [])
+
+  const toggleTagSection = useCallback((key) => {
+    setExpandedTagSections((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }, [])
 
   const handleDelete = async (exerciseId, authorId, authorName) => {
     const isOwn = authorId === user.uid
@@ -318,6 +488,22 @@ function Dashboard() {
                 </svg>
                 <span>Annuaire des professeurs</span>
               </button>
+              {canAccessParcoursImagesEditor(user?.email) && (
+              <button
+                  className="dashboard-user-menu-item"
+                  onClick={() => {
+                    navigate('/dashboard/parcours-images')
+                    setIsUserMenuOpen(false)
+                  }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                  <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                  <polyline points="21 15 16 10 5 21"></polyline>
+                </svg>
+                <span>Images parcours</span>
+              </button>
+              )}
               <button 
                   className="dashboard-user-menu-item"
                   onClick={() => {
@@ -376,22 +562,277 @@ function Dashboard() {
         </button>
       </div>
 
-      {/* Contenu principal */}
-      <main className="dashboard-content">
-        {loading ? (
-          <div className="dashboard-loading">
-            <div className="spinner"></div>
-            <p>Chargement des exercices...</p>
+      {/* Barre de recherche + bouton Filtres (mobile) */}
+      <div className="dashboard-search-row">
+        <div className="dashboard-search-input-wrapper">
+          <svg className="dashboard-search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input
+            type="text"
+            className="dashboard-search-input"
+            placeholder="Rechercher (titre, compositeur, œuvre…)"
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+          />
+          {searchText && (
+            <button type="button" className="dashboard-search-clear" onClick={() => setSearchText('')} aria-label="Effacer">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          )}
+        </div>
+        <button
+          type="button"
+          className="dashboard-filter-btn"
+          onClick={() => setIsFilterDrawerOpen(true)}
+          aria-label="Filtrer"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+          </svg>
+          <span>Filtrer</span>
+          {hasActiveFilters && (
+            <span className="dashboard-filter-badge">
+              {(searchText ? 1 : 0) +
+                (selectedDifficulty ? 1 : 0) +
+                (selectedComposer ? 1 : 0) +
+                (selectedTags.length ? 1 : 0) +
+                (selectedGenre ? 1 : 0) +
+                (selectedFormations.length ? 1 : 0) +
+                (selectedAuthorId ? 1 : 0) +
+                (selectedStatus !== 'all' ? 1 : 0)}
+            </span>
+          )}
+        </button>
       </div>
-        ) : exercises.length === 0 ? (
-          <div className="dashboard-empty">
-            <div className="dashboard-empty-icon">📚</div>
-            <h2>{exerciseFilter === 'mine' ? 'Aucun exercice pour le moment' : 'Aucun exercice'}</h2>
-            <p>{exerciseFilter === 'mine' ? "Créez votre premier exercice d'analyse harmonique" : 'Aucun exercice créé par les professeurs.'}</p>
+
+      {/* Contenu principal : sidebar filtres + grille */}
+      <main className="dashboard-content dashboard-content-with-filters">
+        {/* Panneau filtres (desktop) */}
+        <aside className="dashboard-filters">
+          <div className="dashboard-filters-header">
+            <h3>Filtres</h3>
+            {hasActiveFilters && (
+              <button type="button" className="dashboard-clear-filters" onClick={clearAllFilters}>
+                Réinitialiser
+              </button>
+            )}
           </div>
-        ) : (
-          <div className="dashboard-grid">
-            {exercises.map((exercise) => {
+
+          {/* Statut publication (prof) */}
+          <div className="dashboard-filter-block">
+            <h4 className="dashboard-filter-block-title">Statut</h4>
+            <div className="dashboard-statut-chips">
+              <button
+                type="button"
+                className={`dashboard-statut-chip ${selectedStatus === 'all' ? 'active' : ''}`}
+                onClick={() => setSelectedStatus('all')}
+              >
+                Tous
+              </button>
+              <button
+                type="button"
+                className={`dashboard-statut-chip ${selectedStatus === 'published' ? 'active' : ''}`}
+                onClick={() => setSelectedStatus('published')}
+              >
+                Publié
+              </button>
+              <button
+                type="button"
+                className={`dashboard-statut-chip ${selectedStatus === 'draft' ? 'active' : ''}`}
+                onClick={() => setSelectedStatus('draft')}
+              >
+                Brouillon
+              </button>
+            </div>
+          </div>
+
+          {/* Créateur (uniquement pour "Tous les exercices") */}
+          {exerciseFilter === 'all' && authors.length > 0 && (
+            <div className="dashboard-filter-block">
+              <h4 className="dashboard-filter-block-title">Créateur</h4>
+              <div className="dashboard-chips-container">
+                <button
+                  type="button"
+                  className={`dashboard-chip ${selectedAuthorId === '' ? 'active' : ''}`}
+                  onClick={() => setSelectedAuthorId('')}
+                >
+                  Tous
+                </button>
+                {authors.map((a) => (
+                  <button
+                    key={a.authorId}
+                    type="button"
+                    className={`dashboard-chip ${selectedAuthorId === a.authorId ? 'active' : ''}`}
+                    onClick={() => setSelectedAuthorId(selectedAuthorId === a.authorId ? '' : a.authorId)}
+                  >
+                    {a.displayName}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Niveau */}
+          <div className="dashboard-filter-block">
+            <h4 className="dashboard-filter-block-title">Niveau</h4>
+            <div className="dashboard-difficulty-cards">
+              {DIFFICULTIES.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  className={`dashboard-difficulty-card ${selectedDifficulty === d ? 'active' : ''}`}
+                  onClick={() => setSelectedDifficulty(selectedDifficulty === d ? '' : d)}
+                >
+                  <span className="dashboard-difficulty-icon">
+                    {d === 'débutant' && '🌱'}
+                    {d === 'intermédiaire' && '⭐'}
+                    {d === 'avancé' && '🔥'}
+                    {d === 'expert' && '💎'}
+                  </span>
+                  <span className="dashboard-difficulty-label">{d}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Compositeur */}
+          {composers.length > 0 && (
+            <div className="dashboard-filter-block">
+              <h4 className="dashboard-filter-block-title">Compositeur</h4>
+              <div className="dashboard-chips-container">
+                <button type="button" className={`dashboard-chip ${selectedComposer === '' ? 'active' : ''}`} onClick={() => setSelectedComposer('')}>
+                  Tous
+                </button>
+                {composers.slice(0, 12).map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    className={`dashboard-chip ${selectedComposer === c ? 'active' : ''}`}
+                    onClick={() => setSelectedComposer(selectedComposer === c ? '' : c)}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Genre */}
+          {genreOptions.length > 0 && (
+            <div className="dashboard-filter-block">
+              <h4 className="dashboard-filter-block-title">Genre (type d&apos;œuvre)</h4>
+              <div className="dashboard-chips-container">
+                <button type="button" className={`dashboard-chip ${selectedGenre === '' ? 'active' : ''}`} onClick={() => setSelectedGenre('')}>
+                  Tous
+                </button>
+                {genreOptions.map((g) => (
+                  <button
+                    key={g.id}
+                    type="button"
+                    className={`dashboard-chip ${selectedGenre === g.id ? 'active' : ''}`}
+                    onClick={() => setSelectedGenre(selectedGenre === g.id ? '' : g.id)}
+                  >
+                    {g.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Formation */}
+          {formationOptions.length > 0 && (
+            <div className="dashboard-filter-block">
+              <h4 className="dashboard-filter-block-title">Formation (instrumentation)</h4>
+              <div className="dashboard-chips-container">
+                <button type="button" className={`dashboard-chip ${selectedFormations.length === 0 ? 'active' : ''}`} onClick={() => setSelectedFormations([])}>
+                  Toutes
+                </button>
+                {formationOptions.map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    className={`dashboard-chip ${selectedFormations.includes(f.id) ? 'active' : ''}`}
+                    onClick={() => toggleFormation(f.id)}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Tags : accordéon avec cases à cocher */}
+          {TAG_CATEGORY_KEYS.map((key) => {
+            const tagsInCategory = tagCategories[key] || []
+            if (tagsInCategory.length === 0) return null
+            const isExpanded = expandedTagSections.has(key)
+            const label = TAG_CATEGORY_LABELS[key]
+            return (
+              <div key={key} className="dashboard-filter-block dashboard-filter-block-tags">
+                <button
+                  type="button"
+                  className="dashboard-filter-accordion-header"
+                  onClick={() => toggleTagSection(key)}
+                  aria-expanded={isExpanded}
+                >
+                  <span>{label}</span>
+                  <span className="dashboard-filter-accordion-icon">{isExpanded ? '▼' : '▶'}</span>
+                </button>
+                {isExpanded && (
+                  <div className="dashboard-filter-tag-checkboxes">
+                    {tagsInCategory.map((tag) => (
+                      <label key={tag} className="dashboard-filter-tag-checkbox">
+                        <input
+                          type="checkbox"
+                          checked={selectedTags.includes(tag)}
+                          onChange={() => toggleTag(tag)}
+                        />
+                        <span>{formatTagForDisplay(tag)}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </aside>
+
+        {/* Zone résultats */}
+        <div className="dashboard-results">
+          {loading ? (
+            <div className="dashboard-loading">
+              <div className="spinner"></div>
+              <p>Chargement des exercices...</p>
+            </div>
+          ) : exercises.length === 0 ? (
+            <div className="dashboard-empty">
+              <div className="dashboard-empty-icon">📚</div>
+              <h2>{exerciseFilter === 'mine' ? 'Aucun exercice pour le moment' : 'Aucun exercice'}</h2>
+              <p>{exerciseFilter === 'mine' ? "Créez votre premier exercice d'analyse harmonique" : 'Aucun exercice créé par les professeurs.'}</p>
+            </div>
+          ) : filteredExercises.length === 0 ? (
+            <div className="dashboard-empty">
+              <div className="dashboard-empty-icon">🔍</div>
+              <h2>Aucun exercice trouvé</h2>
+              <p>Modifiez les critères de recherche ou réinitialisez les filtres.</p>
+              {hasActiveFilters && (
+                <button type="button" className="dashboard-empty-cta" onClick={clearAllFilters}>
+                  Réinitialiser les filtres
+                </button>
+              )}
+            </div>
+          ) : (
+            <>
+              <p className="dashboard-results-count">
+                {filteredExercises.length} exercice{filteredExercises.length !== 1 ? 's' : ''} trouvé{filteredExercises.length !== 1 ? 's' : ''}
+              </p>
+              <div className="dashboard-grid">
+                {filteredExercises.map((exercise) => {
               const videoId = exercise.video?.id
               const thumbnailUrl = getYouTubeThumbnail(videoId)
               const isMenuOpen = openMenuId === exercise.id
@@ -407,7 +848,7 @@ function Dashboard() {
                     {thumbnailUrl ? (
                       <img 
                         src={thumbnailUrl} 
-                        alt={exercise.metadata?.workTitle || exercise.video?.title || 'Vidéo'}
+                        alt={getExerciseDisplayTitle(exercise, exercises) || exercise.video?.title || 'Vidéo'}
                         className="dashboard-card-thumbnail-img"
                         onError={(e) => {
                           e.target.style.display = 'none'
@@ -426,9 +867,23 @@ function Dashboard() {
                       </svg>
               </div>
 
-                    {/* Badge de statut */}
-                    <div className={`dashboard-card-status-badge ${exercise.status || 'draft'}`}>
-                      {exercise.status === 'published' ? 'Publié' : 'Brouillon'}
+                    {/* Actions overlay : prévisualisation (œil) à gauche, badge statut à droite */}
+                    <div className="dashboard-card-thumbnail-actions">
+                      <button
+                        type="button"
+                        className="dashboard-card-preview-btn"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          navigate(`/play/${exercise.id}`, { state: { returnTo: '/dashboard' } })
+                        }}
+                        aria-label="Voir en mode élève"
+                        title="Voir en mode élève"
+                      >
+                        <Eye className="dashboard-card-preview-icon" size={18} strokeWidth={2} />
+                      </button>
+                      <div className={`dashboard-card-status-badge ${exercise.status || 'draft'}`}>
+                        {exercise.status === 'published' ? 'Publié' : 'Brouillon'}
+                      </div>
                     </div>
                   </div>
 
@@ -436,7 +891,7 @@ function Dashboard() {
                   <div className="dashboard-card-body">
                     <div className="dashboard-card-header">
                       <h3 className="dashboard-card-title">
-                        {exercise.metadata?.workTitle || exercise.metadata?.exerciseTitle || exercise.metadata?.title || 'Sans titre'}
+                        {getExerciseDisplayTitle(exercise, exercises)}
                       </h3>
                       <button
                         className="dashboard-card-menu-btn"
@@ -605,9 +1060,125 @@ function Dashboard() {
                 </div>
               )
             })}
-          </div>
-        )}
+              </div>
+            </>
+          )}
+        </div>
       </main>
+
+      {/* Drawer filtres (mobile) */}
+      {isFilterDrawerOpen && (
+        <>
+          <div className="dashboard-filter-drawer-overlay" onClick={() => setIsFilterDrawerOpen(false)} aria-hidden />
+          <div className="dashboard-filter-drawer">
+            <div className="dashboard-filter-drawer-header">
+              <h3>Filtres</h3>
+              <button type="button" className="dashboard-filter-drawer-close" onClick={() => setIsFilterDrawerOpen(false)} aria-label="Fermer">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+            <div className="dashboard-filter-drawer-content">
+              <div className="dashboard-filter-block">
+                <h4 className="dashboard-filter-block-title">Statut</h4>
+                <div className="dashboard-statut-chips">
+                  <button type="button" className={`dashboard-statut-chip ${selectedStatus === 'all' ? 'active' : ''}`} onClick={() => setSelectedStatus('all')}>Tous</button>
+                  <button type="button" className={`dashboard-statut-chip ${selectedStatus === 'published' ? 'active' : ''}`} onClick={() => setSelectedStatus('published')}>Publié</button>
+                  <button type="button" className={`dashboard-statut-chip ${selectedStatus === 'draft' ? 'active' : ''}`} onClick={() => setSelectedStatus('draft')}>Brouillon</button>
+                </div>
+              </div>
+              {exerciseFilter === 'all' && authors.length > 0 && (
+                <div className="dashboard-filter-block">
+                  <h4 className="dashboard-filter-block-title">Créateur</h4>
+                  <div className="dashboard-chips-container">
+                    <button type="button" className={`dashboard-chip ${selectedAuthorId === '' ? 'active' : ''}`} onClick={() => setSelectedAuthorId('')}>Tous</button>
+                    {authors.map((a) => (
+                      <button key={a.authorId} type="button" className={`dashboard-chip ${selectedAuthorId === a.authorId ? 'active' : ''}`} onClick={() => setSelectedAuthorId(selectedAuthorId === a.authorId ? '' : a.authorId)}>{a.displayName}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="dashboard-filter-block">
+                <h4 className="dashboard-filter-block-title">Niveau</h4>
+                <div className="dashboard-difficulty-cards">
+                  {DIFFICULTIES.map((d) => (
+                    <button key={d} type="button" className={`dashboard-difficulty-card ${selectedDifficulty === d ? 'active' : ''}`} onClick={() => setSelectedDifficulty(selectedDifficulty === d ? '' : d)}>
+                      <span className="dashboard-difficulty-icon">{d === 'débutant' && '🌱'}{d === 'intermédiaire' && '⭐'}{d === 'avancé' && '🔥'}{d === 'expert' && '💎'}</span>
+                      <span className="dashboard-difficulty-label">{d}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {composers.length > 0 && (
+                <div className="dashboard-filter-block">
+                  <h4 className="dashboard-filter-block-title">Compositeur</h4>
+                  <div className="dashboard-chips-container">
+                    <button type="button" className={`dashboard-chip ${selectedComposer === '' ? 'active' : ''}`} onClick={() => setSelectedComposer('')}>Tous</button>
+                    {composers.slice(0, 12).map((c) => (
+                      <button key={c} type="button" className={`dashboard-chip ${selectedComposer === c ? 'active' : ''}`} onClick={() => setSelectedComposer(selectedComposer === c ? '' : c)}>{c}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {genreOptions.length > 0 && (
+                <div className="dashboard-filter-block">
+                  <h4 className="dashboard-filter-block-title">Genre</h4>
+                  <div className="dashboard-chips-container">
+                    <button type="button" className={`dashboard-chip ${selectedGenre === '' ? 'active' : ''}`} onClick={() => setSelectedGenre('')}>Tous</button>
+                    {genreOptions.map((g) => (
+                      <button key={g.id} type="button" className={`dashboard-chip ${selectedGenre === g.id ? 'active' : ''}`} onClick={() => setSelectedGenre(selectedGenre === g.id ? '' : g.id)}>{g.label}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {formationOptions.length > 0 && (
+                <div className="dashboard-filter-block">
+                  <h4 className="dashboard-filter-block-title">Formation</h4>
+                  <div className="dashboard-chips-container">
+                    <button type="button" className={`dashboard-chip ${selectedFormations.length === 0 ? 'active' : ''}`} onClick={() => setSelectedFormations([])}>Toutes</button>
+                    {formationOptions.map((f) => (
+                      <button key={f.id} type="button" className={`dashboard-chip ${selectedFormations.includes(f.id) ? 'active' : ''}`} onClick={() => toggleFormation(f.id)}>{f.label}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {TAG_CATEGORY_KEYS.map((key) => {
+                const tagsInCategory = tagCategories[key] || []
+                if (tagsInCategory.length === 0) return null
+                const isExpanded = expandedTagSections.has(key)
+                const label = TAG_CATEGORY_LABELS[key]
+                return (
+                  <div key={key} className="dashboard-filter-block dashboard-filter-block-tags">
+                    <button type="button" className="dashboard-filter-accordion-header" onClick={() => toggleTagSection(key)} aria-expanded={isExpanded}>
+                      <span>{label}</span>
+                      <span className="dashboard-filter-accordion-icon">{isExpanded ? '▼' : '▶'}</span>
+                    </button>
+                    {isExpanded && (
+                      <div className="dashboard-filter-tag-checkboxes">
+                        {tagsInCategory.map((tag) => (
+                          <label key={tag} className="dashboard-filter-tag-checkbox">
+                            <input type="checkbox" checked={selectedTags.includes(tag)} onChange={() => toggleTag(tag)} />
+                            <span>{formatTagForDisplay(tag)}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            {hasActiveFilters && (
+              <div className="dashboard-filter-drawer-footer">
+                <button type="button" className="dashboard-clear-filters" onClick={() => { clearAllFilters(); setIsFilterDrawerOpen(false) }}>
+                  Réinitialiser les filtres
+                </button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       {/* Floating Action Button */}
       {userData?.role === 'teacher' && (

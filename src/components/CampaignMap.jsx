@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getUserProgress } from '../services/progressionService'
-import { getExercisesForNode } from '../services/exerciseService'
+import { getExercisesForNode, getExerciseDominantMode, PARCOURS_LAST_MODE_KEY } from '../services/exerciseService'
 import { getNodeShortLabel, getNodeSubtitle, getNodeDescription } from '../utils/nodeCriteria'
 import { PARCOURS_NODE_ORDER, getNodeDef, isCadenceNode, isRevisionNode, getNodePhase, PHASE_INTUITION, PHASE_PRECISION, PHASE_MAITRISE, STAGE_LABELS } from '../data/parcoursTree'
-import { PARCOURS_IMAGE_URLS } from '../data/parcoursIllustrations'
+import { NODE_ILLUSTRATIONS, getImageUrlAndCrop } from '../data/parcoursIllustrations'
+import { useParcoursImages } from '../contexts/ParcoursImagesContext'
+import { getCropBackgroundStyle } from '../utils/cropBackgroundStyle'
 import './CampaignMap.css'
 
 /**
@@ -16,38 +18,9 @@ function getVisibleNodeIds(progress) {
   return new Set(progress.unlockedNodes)
 }
 
-/**
- * Illustration / ambiance par nœud (fondation, roc, maison, chemin, sommet…).
- * Chaque clé correspond à une classe CSS .campaign-card-illustration-{theme}
- * et à un dégradé par défaut. Vous pouvez ajouter des images dans public/images/parcours/
- */
-export const NODE_ILLUSTRATIONS = {
-  '1.1': 'foundation',           // T·D — première pierre / roc
-  'cadence-demi': 'path',        // ½ Cad. — passage
-  'cadence-parfaite': 'home',    // Cad. V→I — arrivée / maison
-  'cadence-demi-et-parfaite': 'path',  // ½ Cad. / Cad. V→I — réuni
-  '1.2': 'trinity',              // T-SD-D — triangle / trois (clé CSS conservée)
-  'cadence-plagale': 'calm',     // Cad. IV→I
-  '2.1': 'landmark',             // I vs I6 — état des lieux
-  '2.2': 'steps',                // Cad. 6/4 — quarte et sixte
-  'cadence-parfaite-composee': 'road',  // Cad. 6/4→V→I
-  '2.3': 'nuance',               // V vs V7
-  '3.1': 'color',                // IV vs ii — nuances SD
-  '3.2': 'virtuosity',           // D virtuose
-  '3.3': 'detour',               // vi — fausse tonique
-  'cadence-rompue': 'suspense',  // V→vi
-  '4.1': 'napoli',               // N6 — sixte napolitaine
-  '4.2': 'dominant',             // V/V
-  '4.3': 'secondary',            // V/V renv.
-  '4.4': 'summit',                // Domin. sec. — sommet
-  'revision-etage-1': 'path',     // Révision étage 1
-  'revision-etage-2': 'road',     // Révision étage 2
-  'revision-etage-3': 'path',    // Révision étage 3
-  'revision-etage-4': 'summit',   // Révision parcours complet
-}
-
 function CampaignMap({ userId, isPreviewMode = false, previewProgress = null, onOpenCodex = null }) {
   const navigate = useNavigate()
+  const { imageEntries } = useParcoursImages()
   const [progress, setProgress] = useState(null)
   const [loading, setLoading] = useState(true)
   const [loadingNode, setLoadingNode] = useState(null)
@@ -157,8 +130,13 @@ function CampaignMap({ userId, isPreviewMode = false, previewProgress = null, on
     if (!nodeId || !progress?.unlockedNodes?.includes(nodeId)) return
     try {
       setLoadingNode(nodeId)
-      const exercise = await getExercisesForNode(nodeId)
+      const lastMode = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(PARCOURS_LAST_MODE_KEY) : null
+      const exercise = await getExercisesForNode(nodeId, { lastMode: lastMode || undefined })
       if (exercise?.id) {
+        const dominantMode = getExerciseDominantMode(exercise)
+        if (typeof sessionStorage !== 'undefined' && dominantMode) {
+          sessionStorage.setItem(PARCOURS_LAST_MODE_KEY, dominantMode)
+        }
         setSelectedNodeId(null)
         navigate(`/play/${exercise.id}?mode=parcours&node=${nodeId}`)
       } else {
@@ -210,15 +188,32 @@ function CampaignMap({ userId, isPreviewMode = false, previewProgress = null, on
                   const cadence = isCadenceNode(nodeId)
                   const revision = isRevisionNode(nodeId)
                   const illustration = NODE_ILLUSTRATIONS[nodeId] || 'default'
-                  const imageUrl = PARCOURS_IMAGE_URLS[nodeId] ?? PARCOURS_IMAGE_URLS['1.1']
+                  const rawEntry = imageEntries[nodeId] ?? imageEntries['1.1']
+                  const { url: imageUrl, crop } = getImageUrlAndCrop(rawEntry)
                   const bgPosition = nodeId === '4.1' ? '50% 30%' : 'center'
-                  const cardStyle = imageUrl
-                    ? {
-                        backgroundImage: `linear-gradient(135deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.08) 60%), url(${imageUrl})`,
+                  let cardStyle
+                  if (imageUrl) {
+                    const base = {
+                      backgroundImage: `linear-gradient(135deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.08) 60%), url(${imageUrl})`,
+                    }
+                    if (crop && crop.w > 0 && crop.h > 0) {
+                      const imageAspect = rawEntry?.imageAspectRatio ?? 1.6
+                      const { backgroundSize, backgroundPosition } = getCropBackgroundStyle(crop, imageAspect, 3)
+                      cardStyle = {
+                        ...base,
+                        backgroundSize,
+                        backgroundPosition,
+                      }
+                    } else {
+                      cardStyle = {
+                        ...base,
                         backgroundSize: 'cover',
                         backgroundPosition: bgPosition,
                       }
-                    : undefined
+                    }
+                  } else {
+                    cardStyle = undefined
+                  }
                   return (
                     <button
                       key={nodeId}

@@ -115,7 +115,7 @@ export async function searchPublicExercises(filters = {}) {
     // Note: Firestore ne supporte pas les requêtes "array-contains-any" directement
     // On va récupérer tous les exercices publics et filtrer côté client
     const querySnapshot = await getDocs(q)
-    const exercises = []
+    let exercises = []
     
     querySnapshot.forEach((doc) => {
       exercises.push({
@@ -169,11 +169,24 @@ export async function searchPublicExercises(filters = {}) {
       })
     }
     
-    // Filtre par genre (inféré depuis workTitle)
+    // Filtre par genre (metadata.genre ou mot-clé dans workTitle)
     if (filters.genre) {
-      return exercises.filter(exercise => {
-        const workTitle = exercise.metadata?.workTitle || ''
-        return workTitle.toLowerCase().includes(filters.genre.toLowerCase())
+      const genreLower = filters.genre.toLowerCase()
+      exercises = exercises.filter(exercise => {
+        const metaGenre = exercise.metadata?.genre
+        if (metaGenre && metaGenre.toLowerCase() === genreLower) return true
+        const workTitle = (exercise.metadata?.workTitle || '').toLowerCase()
+        return workTitle.includes(genreLower)
+      })
+    }
+
+    // Filtre par formation (metadata.formation = array) : l'exercice doit contenir toutes les formations sélectionnées
+    if (filters.formation && (Array.isArray(filters.formation) ? filters.formation.length > 0 : filters.formation)) {
+      const wanted = Array.isArray(filters.formation) ? filters.formation : [filters.formation]
+      exercises = exercises.filter(exercise => {
+        const exFormation = exercise.metadata?.formation
+        const exArr = Array.isArray(exFormation) ? exFormation : (exFormation ? [exFormation] : [])
+        return wanted.every(f => exArr.includes(f))
       })
     }
     
@@ -324,33 +337,87 @@ export async function findExercisesByVideoId(videoId) {
   }
 }
 
+const PARCOURS_LAST_MODE_KEY = 'parcoursLastMode'
+
+/**
+ * Détermine le mode dominant d'un exercice (majeur / mineur) pour le biais anti-alternance.
+ * Utilise autoTags (Majeur / Mineur) si présents, sinon compte des degreeMode des accords.
+ * @param {Object} exercise - Exercice avec autoTags et/ou markers[].chord.degreeMode
+ * @returns {'major'|'minor'|null} - null = mixte ou indéterminé
+ */
+export function getExerciseDominantMode(exercise) {
+  if (!exercise) return null
+  const tags = exercise.autoTags || []
+  if (tags.includes('Majeur')) return 'major'
+  if (tags.includes('Mineur')) return 'minor'
+  if (!exercise.markers || !exercise.markers.length) return null
+  let major = 0
+  let minor = 0
+  for (const marker of exercise.markers) {
+    const chord = typeof marker === 'object' && marker.chord ? marker.chord : null
+    if (!chord?.degreeMode) continue
+    if (chord.degreeMode === 'major') major++
+    else if (chord.degreeMode === 'minor') minor++
+  }
+  const total = major + minor
+  if (total === 0) return null
+  if (major > minor) return 'major'
+  if (minor > major) return 'minor'
+  return null
+}
+
 /**
  * Récupère un exercice adapté pour un nœud de progression
- * Sélectionne un exercice qui contient au moins 2-3 accords pertinents pour le nœud
+ * Option A : biais anti-alternance majeur/mineur (55 % vers l’opposé du dernier mode).
+ * @param {string} nodeId - ID du nœud parcours
+ * @param {{ lastMode?: 'major'|'minor'|null }} [options] - lastMode = mode dominant du dernier exercice joué (session)
  */
-export async function getExercisesForNode(nodeId) {
+export async function getExercisesForNode(nodeId, options = {}) {
   try {
-    // Récupérer tous les exercices publics
+    const { lastMode } = options
     const allExercises = await searchPublicExercises({})
-    
-    // Filtrer les exercices qui conviennent pour le nœud
-    // (assez d'accords pertinents ET pas de concepts avancés interdits)
+
     const suitableExercises = allExercises.filter(exercise => {
       return isExerciseSuitableForNode(exercise, nodeId, 2)
     })
-    
+
     if (suitableExercises.length === 0) {
       console.warn(`Aucun exercice trouvé pour le nœud ${nodeId}`)
       return null
     }
-    
-    // Sélectionner un exercice aléatoire parmi ceux qui conviennent
-    const randomIndex = Math.floor(Math.random() * suitableExercises.length)
-    const exercise = suitableExercises[randomIndex]
-    return exercise
+
+    if (suitableExercises.length === 1 || !lastMode) {
+      const randomIndex = Math.floor(Math.random() * suitableExercises.length)
+      return suitableExercises[randomIndex]
+    }
+
+    const majorList = []
+    const minorList = []
+    const otherList = []
+    for (const ex of suitableExercises) {
+      const mode = getExerciseDominantMode(ex)
+      if (mode === 'major') majorList.push(ex)
+      else if (mode === 'minor') minorList.push(ex)
+      else otherList.push(ex)
+    }
+
+    const preferOpposite = lastMode === 'major' ? 'minor' : 'major'
+    const oppositeList = preferOpposite === 'major' ? majorList : minorList
+    const sameList = preferOpposite === 'minor' ? majorList : minorList
+    const poolOpposite = oppositeList.length > 0 ? oppositeList : otherList
+    const poolSame = sameList.length > 0 ? sameList : otherList
+    const useOpposite = Math.random() < 0.55
+    const pool = useOpposite ? poolOpposite : poolSame
+    const fallback = pool === poolOpposite ? poolSame : poolOpposite
+    const list = pool.length > 0 ? pool : fallback
+    const randomIndex = Math.floor(Math.random() * list.length)
+    return list[randomIndex]
   } catch (error) {
     console.error('Erreur lors de la récupération d\'un exercice pour le nœud:', error)
     return null
   }
 }
+
+/** Clé sessionStorage pour le dernier mode (parcours). Export pour usage dans CampaignMap. */
+export { PARCOURS_LAST_MODE_KEY }
 

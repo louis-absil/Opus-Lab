@@ -1,7 +1,16 @@
 /**
  * Liste des tags connus pour l'autocomplete lors de l'édition manuelle des tags.
- * Alignée sur les tags générés par tagGenerator (generateAutoTags).
+ * Alignée sur les tags générés par tagGenerator (generateAutoTags) et formations (getFormationTag).
  */
+
+import { CLASSICAL_FORMATIONS, HORIZONS_FORMATIONS, CLASSICAL_GENRES, getFormationTag, getGenreTag } from './formations'
+
+const formationTags = [
+  ...CLASSICAL_FORMATIONS.map(f => getFormationTag(f.id)).filter(Boolean),
+  ...HORIZONS_FORMATIONS.map(f => getFormationTag(f.id)).filter(Boolean)
+]
+const formationTagsUnique = [...new Set(formationTags)]
+const genreTags = CLASSICAL_GENRES.map(g => getGenreTag(g.id)).filter(Boolean)
 
 export const KNOWN_TAGS = [
   // Fonctions
@@ -71,7 +80,10 @@ export const KNOWN_TAGS = [
   'Degré 4',
   'Degré 5',
   'Degré 6',
-  'Degré 7'
+  'Degré 7',
+  // Formations (instrumentation) et Genres (type d'œuvre)
+  ...formationTagsUnique,
+  ...genreTags
 ]
 
 /**

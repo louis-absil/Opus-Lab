@@ -15,10 +15,10 @@ export const NODE_TYPE_REVISION = 'revision'
 
 /** Titres des sections pour l'affichage regroupé (CampaignMap, etc.) */
 export const STAGE_LABELS = {
-  1: "Étage 1 – L'intuition",
-  2: 'Étage 2 – La précision',
-  3: 'Étage 3 – Couleur SD',
-  4: 'Étage 4 – Chromatisme'
+  1: 'Phase 1 – Logique tonale',
+  2: 'Phase 2 – Architecture & Précision',
+  3: 'Phase 3 – Nuances diatoniques',
+  4: 'Phase 4 – Chromatisme & Tensions'
 }
 
 /**
@@ -46,10 +46,10 @@ export const PARCOURS_NODES = {
     prereqs: [],
     phase: PHASE_INTUITION,
     enabledFunctions: ['T', 'D'],
-    unlockedChordKeys: ['I', 'V', 'I6', 'V6', 'V64'], // fondamentaux + renversés de base pour écoute
-    shortLabel: 'T·D',
-    subtitle: 'Polarité (T vs D)',
-    description: 'Distinguer la fonction Tonique de la Dominante. Mélange de I et V (fondamentaux et renversés). La Cadence 6/4 compte comme D.'
+    unlockedChordKeys: ['I', 'V', 'I6', 'V6'], // fondamentaux + renversés de base pour écoute (V64 débloqué en 2.2)
+    shortLabel: 'Tonique / Dominante',
+    subtitle: 'Axe tonal (T, D)',
+    description: 'Identifier les deux pôles magnétiques de la tonalité : la stabilité (T) et la tension (D).'
   },
   'cadence-demi': {
     id: 'cadence-demi',
@@ -58,9 +58,9 @@ export const PARCOURS_NODES = {
     prereqs: ['1.1'],
     phase: PHASE_INTUITION,
     enabledFunctions: ['T', 'D'],
-    shortLabel: '½ Cad.',
+    shortLabel: 'Demi-cadence',
     subtitle: 'Demi-cadence',
-    description: 'Phrase suspensive (fin sur V).'
+    description: 'Phrase suspensive (fin sur D).'
   },
   'cadence-parfaite': {
     id: 'cadence-parfaite',
@@ -69,9 +69,9 @@ export const PARCOURS_NODES = {
     prereqs: ['1.1'],
     phase: PHASE_INTUITION,
     enabledFunctions: ['T', 'D'],
-    shortLabel: 'Cad. V→I',
+    shortLabel: 'Cadence parfaite',
     subtitle: 'Cadence parfaite',
-    description: 'Phrase conclusive (V → I).'
+    description: 'Phrase conclusive (D→T).'
   },
   /** Nœud unifié : demi-cadence + cadence parfaite (choix entre les deux) */
   'cadence-demi-et-parfaite': {
@@ -81,9 +81,9 @@ export const PARCOURS_NODES = {
     prereqs: ['1.1'],
     phase: PHASE_INTUITION,
     enabledFunctions: ['T', 'D'],
-    shortLabel: '½ Cad. / Cad. V→I',
-    subtitle: 'Demi-cadence ou cadence parfaite',
-    description: 'Distinguer la demi-cadence (fin sur V) de la cadence parfaite (V → I).'
+    shortLabel: 'Demi-cadence / Cadence parfaite',
+    subtitle: '½ Cad. & Cad. D→T',
+    description: 'Distinguer l\'ouverture (suspens sur D) de la fermeture (résolution sur T).'
   },
   '1.2': {
     id: '1.2',
@@ -93,9 +93,9 @@ export const PARCOURS_NODES = {
     phase: PHASE_INTUITION,
     enabledFunctions: ['T', 'SD', 'D'],
     unlockedChordKeys: ['I', 'IV', 'II', 'V', 'I6', 'V6', 'II6'],
-    shortLabel: 'La SD',
-    subtitle: 'Ajout de la Sous-Dominante',
-    description: 'Ajout de la Sous-Dominante. Valider IV, ii, ii6… comme SD.'
+    shortLabel: 'Préparation de la Dominante',
+    subtitle: 'Ouverture du champ (SD)',
+    description: 'Perception de l\'éloignement tonal (Sous-Dominante) préparant la mise en tension.'
   },
   'cadence-plagale': {
     id: 'cadence-plagale',
@@ -104,24 +104,37 @@ export const PARCOURS_NODES = {
     prereqs: ['1.2'],
     phase: PHASE_INTUITION,
     enabledFunctions: ['T', 'SD', 'D'],
-    shortLabel: 'Cad. IV→I',
-    subtitle: 'Cadence plagale',
-    description: 'IV → I (couleur conclusive).'
+    shortLabel: 'Cadence plagale',
+    subtitle: 'Résolution douce (SD→T)',
+    description: 'Reconnaître la conclusion sans sensible, par opposition à la cadence parfaite.'
   },
 
-  // --- ÉTAGE 2 : La Précision T & D (Phase 2) ---
-  '2.1': {
-    id: '2.1',
+  // --- ÉTAGE 2 : Architecture & Précision (Phase 2) ---
+  '2.3': {
+    id: '2.3',
     type: NODE_TYPE_LEARNING,
     stage: 2,
     prereqs: ['1.2'],
     phase: PHASE_PRECISION,
     enabledFunctions: ['T', 'SD', 'D'],
+    precisionFunctions: ['T', 'D'],
+    unlockedChordKeys: ['I', 'I6', 'IV', 'II', 'V', 'V7', 'V6', 'V65', 'V64', 'II6'],
+    shortLabel: 'Densité de la Dominante',
+    subtitle: 'Triade vs 7e (V, V7, V6/5)',
+    description: 'Percevoir le degré de friction : V (pur), V7 (triton attractif) et son premier renversement V6/5.'
+  },
+  '2.1': {
+    id: '2.1',
+    type: NODE_TYPE_LEARNING,
+    stage: 2,
+    prereqs: ['2.3'],
+    phase: PHASE_PRECISION,
+    enabledFunctions: ['T', 'SD', 'D'],
     precisionFunctions: ['T'],
-    unlockedChordKeys: ['I', 'I6', 'IV', 'II', 'V', 'V6', 'V65', 'II6'],
-    shortLabel: 'I vs I6',
-    subtitle: 'État des lieux (T)',
-    description: 'Préciser pour la Tonique : I (fondamental) ou I6 (renversement). SD et D restent en validation fonction simple.'
+    unlockedChordKeys: ['I', 'I6', 'IV', 'II', 'V', 'V7', 'V6', 'V65', 'II6'],
+    shortLabel: 'Stabilité & Renversement',
+    subtitle: 'Fondamental vs 6 (I, I6)',
+    description: 'Discriminer la solidité d\'une basse fondamentale vs la mobilité d\'un premier renversement.'
   },
   '2.2': {
     id: '2.2',
@@ -131,9 +144,9 @@ export const PARCOURS_NODES = {
     phase: PHASE_PRECISION,
     enabledFunctions: ['T', 'SD', 'D'],
     unlockedChordKeys: ['I', 'I6', 'IV', 'II', 'V', 'V6', 'V64', 'cad64', 'V65', 'II6'],
-    shortLabel: 'Cad. 6/4',
-    subtitle: 'Quarte et Sixte',
-    description: 'L’accord Cadence 6/4 (I6/4) doit être classé en fonction D (tension vers V).'
+    shortLabel: 'Accord de sixte et quarte',
+    subtitle: '6/4 de cadence et 6/4 de passage',
+    description: 'Identifier la double appogiature 6/4 (de cadence ou de passage) et son rôle de dominante.'
   },
   'cadence-parfaite-composee': {
     id: 'cadence-parfaite-composee',
@@ -142,60 +155,71 @@ export const PARCOURS_NODES = {
     prereqs: ['2.2'],
     phase: PHASE_PRECISION,
     enabledFunctions: ['T', 'SD', 'D'],
-    shortLabel: 'Cad. 6/4→V→I',
-    subtitle: 'Cadence parfaite composée',
-    description: 'Cadence 6/4 → V → I.'
-  },
-  '2.3': {
-    id: '2.3',
-    type: NODE_TYPE_LEARNING,
-    stage: 2,
-    prereqs: ['2.2'],
-    phase: PHASE_PRECISION,
-    enabledFunctions: ['T', 'SD', 'D'],
-    precisionFunctions: ['T', 'D'],
-    unlockedChordKeys: ['I', 'I6', 'IV', 'II', 'V', 'V7', 'V6', 'V65', 'V64', 'II6'],
-    shortLabel: 'V vs V7',
-    subtitle: 'Nuances de D',
-    description: 'Préciser pour la Dominante : V (triade) ou V7, et renversements V6, V6/5. SD reste en validation fonction simple.'
+    shortLabel: 'Cadence parfaite composée',
+    subtitle: 'Syntaxe complète — Sixte et quarte de cadence → V → I',
+    description: 'Reconnaître la Cadence Parfaite Composée : Préparation (Cad. 6/4) → Tension (V) → Résolution (I).'
   },
 
-  // --- ÉTAGE 3 : Couleur SD & Enrichissement (Phase 2 → 3) ---
+  // --- ÉTAGE 3 : Nuances diatoniques (Phase 3) ---
   '3.1': {
     id: '3.1',
     type: NODE_TYPE_LEARNING,
     stage: 3,
-    prereqs: ['2.3'],
+    prereqs: ['cadence-parfaite-composee'],
     phase: PHASE_PRECISION,
     enabledFunctions: ['T', 'SD', 'D'],
     unlockedChordKeys: ['I', 'I6', 'IV', 'II', 'II6', 'II65', 'V', 'V7', 'V6', 'V65', 'V43', 'V2', 'II6'],
-    shortLabel: 'IV vs ii',
-    subtitle: 'Nuances de SD',
-    description: 'Distinguer SD majeur (IV) et mineur (ii, ii6, ii6/5).'
+    shortLabel: 'Couleurs de Sous-Dominante',
+    subtitle: 'IV, II, II6, II65',
+    description: 'Nature des accords de sous-dominante, différentes selon le mode — Majeur, mineur, diminué.'
   },
-  '3.2': {
-    id: '3.2',
+  '3.5': {
+    id: '3.5',
     type: NODE_TYPE_LEARNING,
     stage: 3,
     prereqs: ['3.1'],
     phase: PHASE_PRECISION,
     enabledFunctions: ['T', 'SD', 'D'],
-    unlockedChordKeys: ['I', 'I6', 'IV', 'II', 'II6', 'II65', 'V', 'V7', 'V6', 'V65', 'V43', 'V2', 'VII', 'VII6', 'VII7', 'II6'],
-    shortLabel: 'D virtuose',
-    subtitle: 'Virtuosité D',
-    description: 'Renversements complexes de D (V4/3, V2) et accords de sensible (vii°, vii°6, vii°7).'
+    unlockedChordKeys: ['I', 'I6', 'IV', 'II', 'II6', 'II65', 'II7', 'II43', 'II2', 'V', 'V7', 'V6', 'V65', 'V43', 'V2', 'II6'],
+    shortLabel: 'Couleurs du deuxième degré',
+    subtitle: 'II avec septième (II7, II4/3, II2)',
+    description: 'Affiner la couleur sous-dominante du II grâce à la septième et à ses renversements (basses mobiles).'
   },
-  '3.3': {
-    id: '3.3',
+  '3.2': {
+    id: '3.2',
+    type: NODE_TYPE_LEARNING,
+    stage: 3,
+    prereqs: ['3.5'],
+    phase: PHASE_PRECISION,
+    enabledFunctions: ['T', 'SD', 'D'],
+    unlockedChordKeys: ['I', 'I6', 'IV', 'II', 'II6', 'II65', 'II7', 'II43', 'II2', 'V', 'V7', 'V6', 'V64', 'V65', 'V43', 'V2', 'VII', 'VII6', 'VII64', 'II6'],
+    shortLabel: 'Dominantes complexes',
+    subtitle: 'Renversements & VII (V4/3, V2)',
+    description: 'Identification des basses mobiles de dominante et de l\'accord diminué (sensible).'
+  },
+  '3.2-vii7': {
+    id: '3.2-vii7',
     type: NODE_TYPE_LEARNING,
     stage: 3,
     prereqs: ['3.2'],
     phase: PHASE_PRECISION,
     enabledFunctions: ['T', 'SD', 'D'],
-    unlockedChordKeys: ['I', 'I6', 'IV', 'II', 'II6', 'II65', 'V', 'V7', 'V6', 'V65', 'V43', 'V2', 'VI', 'VI6', 'VII', 'VII6', 'VII7', 'II6'],
-    shortLabel: 'vi',
-    subtitle: 'Fausse Tonique',
-    description: 'Introduction du VI (tonique parallèle et SD). vi6. Cadence rompue V → vi.'
+    unlockedChordKeys: ['I', 'I6', 'IV', 'II', 'II6', 'II65', 'II7', 'II43', 'II2', 'V', 'V7', 'V6', 'V64', 'V65', 'V43', 'V2', 'VII', 'VII6', 'VII64', 'VII7', 'VII65', 'VII43', 'VII2', 'II6'],
+    shortLabel: 'Septième de sensible (7e dim. / semi-dim.)',
+    subtitle: 'VII7 et renversements (VII6/5, VII4/3, VII2)',
+    description: 'Identifier l\'accord de sensible avec septième (diminuée ou semi-diminuée) et ses positions comme variantes de la fonction dominante.'
+  },
+  '3.3': {
+    id: '3.3',
+    type: NODE_TYPE_LEARNING,
+    stage: 3,
+    prereqs: ['3.2-vii7'],
+    phase: PHASE_PRECISION,
+    enabledFunctions: ['T', 'SD', 'D'],
+    unlockedChordKeys: ['I', 'I6', 'IV', 'II', 'II6', 'II65', 'II7', 'II43', 'II2', 'V', 'V7', 'V6', 'V64', 'V65', 'V43', 'V2', 'VI', 'VI6', 'VII', 'VII6', 'VII64', 'VII7', 'VII65', 'VII43', 'VII2', 'II6'],
+    shortLabel: 'Substitutions',
+    subtitle: 'Le VI et le IV6',
+    description: 'Repérer l\'ambiguïté fonctionnelle du VI (Tonique relative / Sous-Dominante), le IV au premier renversement (IV6) comme variante de couleur SD sur la même basse, et les enchaînements par tierces.'
   },
   'cadence-rompue': {
     id: 'cadence-rompue',
@@ -204,23 +228,35 @@ export const PARCOURS_NODES = {
     prereqs: ['3.3'],
     phase: PHASE_PRECISION,
     enabledFunctions: ['T', 'SD', 'D'],
-    shortLabel: 'V→vi',
-    subtitle: 'Cadence rompue',
-    description: 'V → vi (suspens).'
+    shortLabel: 'La Rupture',
+    subtitle: 'Cadence rompue (V→VI)',
+    description: 'Identifier la résolution évitée (V → VI) et l\'effet de surprise harmonique.'
+  },
+  '3.4': {
+    id: '3.4',
+    type: NODE_TYPE_LEARNING,
+    stage: 3,
+    prereqs: ['cadence-rompue'],
+    phase: PHASE_PRECISION,
+    enabledFunctions: ['T', 'SD', 'D'],
+    unlockedChordKeys: ['I', 'I6', 'IV', 'II', 'II6', 'II65', 'II7', 'II43', 'II2', 'V', 'V7', 'V6', 'V64', 'V65', 'V43', 'V2', 'VI', 'VI6', 'VII', 'VII6', 'VII64', 'VII7', 'VII65', 'VII43', 'VII2', 'II6', 'IV6', 'IV64'],
+    shortLabel: 'Quatrième degré au premier renversement',
+    subtitle: 'IV6 et VI — même basse, couleur différente (SD)',
+    description: 'Distinguer le IV au premier renversement (IV6) du VI : même note à la basse, couleur différente, même rôle de sous-dominante (analogie IV vs II6).'
   },
 
-  // --- ÉTAGE 4 : Chromatisme ---
+  // --- ÉTAGE 4 : Chromatisme & Tensions (Phase 4) ---
   '4.1': {
     id: '4.1',
     type: NODE_TYPE_LEARNING,
     stage: 4,
-    prereqs: ['3.3'],
+    prereqs: ['3.4'],
     phase: PHASE_PRECISION,
     enabledFunctions: ['T', 'SD', 'D'],
-    unlockedChordKeys: ['I', 'I6', 'IV', 'II', 'II6', 'II65', 'N6', 'V', 'V7', 'V6', 'V65', 'V43', 'V2', 'VI', 'VI6', 'VII', 'VII6', 'VII7', 'II6'],
-    shortLabel: 'N6',
-    subtitle: 'Sixte napolitaine',
-    description: 'L’accord N6 (II♭6) dans le menu SD. Ne pas confondre avec IV ou ii6.'
+    unlockedChordKeys: ['I', 'I6', 'IV', 'II', 'II6', 'II65', 'II7', 'II43', 'II2', 'N6', 'V', 'V7', 'V6', 'V64', 'V65', 'V43', 'V2', 'VI', 'VI6', 'VII', 'VII6', 'VII64', 'VII7', 'VII65', 'VII43', 'VII2', 'II6', 'IV6', 'IV64'],
+    shortLabel: 'Accord napolitain',
+    subtitle: 'Sixte napolitaine N6 IIb6 (Phrygien)',
+    description: 'Reconnaître la couleur dramatique du II♭ et sa fonction SD.'
   },
   '4.2': {
     id: '4.2',
@@ -229,10 +265,10 @@ export const PARCOURS_NODES = {
     prereqs: ['4.1'],
     phase: PHASE_MAITRISE,
     enabledFunctions: ['T', 'SD', 'D'],
-    unlockedChordKeys: ['I', 'I6', 'IV', 'II', 'II6', 'II65', 'N6', 'V', 'V7', 'V65', 'V43', 'V2', 'V/V', 'VI', 'VI6', 'VII', 'VII6', 'VII7', 'II6'],
-    shortLabel: 'V/V',
-    subtitle: 'Dominante de Dominante',
-    description: 'V7/V (dominante de la dominante). Distinguer V7/V et V/V.'
+    unlockedChordKeys: ['I', 'I6', 'IV', 'II', 'II6', 'II65', 'II7', 'II43', 'II2', 'N6', 'V', 'V7', 'V6', 'V64', 'V65', 'V43', 'V2', 'V/V', 'VI', 'VI6', 'VII', 'VII6', 'VII64', 'VII7', 'VII65', 'VII43', 'VII2', 'II6', 'IV6', 'IV64'],
+    shortLabel: 'Tonicisation du V',
+    subtitle: 'Dominante de la Dominante (V/V)',
+    description: 'Entendre la sensible temporaire (#IV) créant un appel vers le V.'
   },
   '4.3': {
     id: '4.3',
@@ -241,10 +277,10 @@ export const PARCOURS_NODES = {
     prereqs: ['4.2'],
     phase: PHASE_MAITRISE,
     enabledFunctions: ['T', 'SD', 'D'],
-    unlockedChordKeys: ['I', 'I6', 'IV', 'II', 'II6', 'II65', 'N6', 'V', 'V7', 'V6', 'V65', 'V43', 'V2', 'V/V', 'V65/V', 'V43/V', 'V2/V', 'VI', 'VI6', 'VII', 'VII6', 'VII7', 'II6'],
-    shortLabel: 'V/V renv.',
-    subtitle: 'Renversements V/V',
-    description: 'V6/5 de V, V4/3 de V, V2 de V.'
+    unlockedChordKeys: ['I', 'I6', 'IV', 'II', 'II6', 'II65', 'II7', 'II43', 'II2', 'N6', 'V', 'V7', 'V6', 'V64', 'V65', 'V43', 'V2', 'V/V', 'V65/V', 'V43/V', 'V2/V', 'VI', 'VI6', 'VII', 'VII6', 'VII64', 'VII7', 'VII65', 'VII43', 'VII2', 'II6', 'IV6', 'IV64'],
+    shortLabel: 'Renversements du V/V',
+    subtitle: 'Renversements V/V (V6/5, V4/3, V2)',
+    description: 'Percevoir la ligne de basse (fondamentale, 6/5, 4/3, 2) de la dominante secondaire et son rôle dans la tonicisation.'
   },
   '4.4': {
     id: '4.4',
@@ -253,10 +289,34 @@ export const PARCOURS_NODES = {
     prereqs: ['4.3'],
     phase: PHASE_MAITRISE,
     enabledFunctions: ['T', 'SD', 'D'],
-    unlockedChordKeys: ['I', 'I6', 'IV', 'II', 'II6', 'II65', 'N6', 'V', 'V7', 'V6', 'V65', 'V43', 'V2', 'V/V', 'V65/V', 'V43/V', 'V2/V', 'V/VI', 'V/IV', 'VI', 'VI6', 'VII', 'VII6', 'VII7', 'II6'],
-    shortLabel: 'Domin. sec.',
-    subtitle: 'Dominantes secondaires',
-    description: 'Généralisation : V/vi, V/IV, etc.'
+    unlockedChordKeys: ['I', 'I6', 'IV', 'II', 'II6', 'II65', 'II7', 'II43', 'II2', 'N6', 'V', 'V7', 'V6', 'V64', 'V65', 'V43', 'V2', 'V/V', 'V65/V', 'V43/V', 'V2/V', 'V/VI', 'V/IV', 'VI', 'VI6', 'VII', 'VII6', 'VII64', 'VII7', 'VII65', 'VII43', 'VII2', 'II6', 'IV6', 'IV64'],
+    shortLabel: 'Dominantes secondaires',
+    subtitle: 'Dominantes secondaires (V/II, V/IV, V/VI)',
+    description: 'Généralisation du principe de tonicisation (V/II, V/IV, V/VI).'
+  },
+  '4.5': {
+    id: '4.5',
+    type: NODE_TYPE_LEARNING,
+    stage: 4,
+    prereqs: ['4.4'],
+    phase: PHASE_MAITRISE,
+    enabledFunctions: ['T', 'SD', 'D'],
+    unlockedChordKeys: ['I', 'I6', 'IV', 'II', 'II6', 'II65', 'II7', 'II43', 'II2', 'N6', 'V', 'V7', 'V6', 'V64', 'V65', 'V43', 'V2', 'V/V', 'V65/V', 'V43/V', 'V2/V', 'V/VI', 'V/IV', 'VI', 'VI6', 'VII', 'VII6', 'VII64', 'VII7', 'VII65', 'VII43', 'VII2', 'II6', 'IV6', 'IV64', 'It', 'Fr', 'Gr'],
+    shortLabel: 'Sixtes augmentées',
+    subtitle: 'Italienne, Française, Allemande (It+6, Fr+6, Gr+6)',
+    description: 'Identifier les trois types de sixte augmentée et leur fonction de dominante (résolution vers V ou I6/4).'
+  },
+  '4.6': {
+    id: '4.6',
+    type: NODE_TYPE_LEARNING,
+    stage: 4,
+    prereqs: ['4.5'],
+    phase: PHASE_MAITRISE,
+    enabledFunctions: ['T', 'SD', 'D'],
+    unlockedChordKeys: ['I', 'I6', 'IV', 'II', 'II6', 'II65', 'II7', 'II43', 'II2', 'N6', 'V', 'V7', 'V6', 'V64', 'V65', 'V43', 'V2', 'V/V', 'V65/V', 'V43/V', 'V2/V', 'V/VI', 'V/IV', 'VI', 'VI6', 'VII', 'VII6', 'VII64', 'VII7', 'VII65', 'VII43', 'VII2', 'II6', 'IV6', 'IV64', 'It', 'Fr', 'Gr', 'I64', 'II64', 'III64', 'VI64'],
+    shortLabel: 'Sixte et quarte non fonctionnel',
+    subtitle: 'Sensation de suspension',
+    description: 'Percevoir le 6/4 comme position suspendue (appoggiature, pédale, couleur) en dehors du 6/4 de cadence.'
   },
 
   // --- Nœuds de révision (bilan, tout ce qui a été vu jusqu'à ce point) ---
@@ -268,41 +328,41 @@ export const PARCOURS_NODES = {
     phase: PHASE_INTUITION,
     enabledFunctions: ['T', 'SD', 'D'],
     shortLabel: 'Révision',
-    subtitle: 'Bilan T, SD & D',
-    description: 'Révision de tout l\'étage 1 : polarité T/D, SD, demi-cadence, parfaite, plagale.'
+    subtitle: 'Bilan : Fondations',
+    description: 'Validation des réflexes sur les fonctions primaires (T, SD, D).'
   },
   'revision-etage-2': {
     id: 'revision-etage-2',
     type: NODE_TYPE_REVISION,
     stage: 2,
-    prereqs: ['2.3'],
+    prereqs: ['cadence-parfaite-composee'],
     phase: PHASE_PRECISION,
     enabledFunctions: ['T', 'SD', 'D'],
     shortLabel: 'Révision',
-    subtitle: 'Bilan précision',
-    description: 'Révision de l\'étage 2 : I vs I6, Cad. 6/4, V vs V7, cadence parfaite composée.'
+    subtitle: 'Bilan : Précision harmonique',
+    description: 'Maîtrise de la conduite des voix et des renversements usuels.'
   },
   'revision-etage-3': {
     id: 'revision-etage-3',
     type: NODE_TYPE_REVISION,
     stage: 3,
-    prereqs: ['cadence-rompue'],
+    prereqs: ['3.4'],
     phase: PHASE_PRECISION,
     enabledFunctions: ['T', 'SD', 'D'],
     shortLabel: 'Révision',
-    subtitle: 'Bilan couleurs & cadences',
-    description: 'Révision de l\'étage 3 : IV/ii, D virtuose, vi, cadence rompue.'
+    subtitle: 'Bilan : Nuances',
+    description: 'Validation de l\'écoute des degrés secondaires et des modes relatifs.'
   },
   'revision-etage-4': {
     id: 'revision-etage-4',
     type: NODE_TYPE_REVISION,
     stage: 4,
-    prereqs: ['4.4'],
+    prereqs: ['4.6'],
     phase: PHASE_MAITRISE,
     enabledFunctions: ['T', 'SD', 'D'],
     shortLabel: 'Révision',
-    subtitle: 'Parcours complet',
-    description: 'Révision de tout le parcours : N6, V/V, dominantes secondaires.'
+    subtitle: 'Bilan final',
+    description: 'Évaluation finale intégrant diatonisme et chromatisme en contexte réel.'
   }
 }
 
@@ -313,20 +373,25 @@ export const PARCOURS_NODE_ORDER = [
   '1.2',
   'cadence-plagale',
   'revision-etage-1',
+  '2.3',
   '2.1',
   '2.2',
   'cadence-parfaite-composee',
-  '2.3',
   'revision-etage-2',
   '3.1',
+  '3.5',
   '3.2',
+  '3.2-vii7',
   '3.3',
   'cadence-rompue',
+  '3.4',
   'revision-etage-3',
   '4.1',
   '4.2',
   '4.3',
   '4.4',
+  '4.5',
+  '4.6',
   'revision-etage-4'
 ]
 

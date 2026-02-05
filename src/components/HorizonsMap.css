@@ -196,6 +196,52 @@
   cursor: not-allowed;
 }
 
+.horizons-map-formation-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.horizons-map-formation-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary, #475569);
+}
+
+.horizons-map-formation-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.horizons-map-formation-chip {
+  padding: 0.35rem 0.75rem;
+  border-radius: 9999px;
+  border: 1px solid var(--border, #e2e8f0);
+  background: var(--surface, #f8fafc);
+  color: var(--text-primary, #1e293b);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.horizons-map-formation-chip:hover {
+  background: var(--surface-hover, #f1f5f9);
+  border-color: var(--border-hover, #cbd5e1);
+}
+
+.horizons-map-formation-chip-active {
+  background: var(--accent, #6366f1);
+  border-color: var(--accent, #6366f1);
+  color: #fff;
+}
+
+.horizons-map-formation-chip-active:hover {
+  filter: brightness(1.05);
+}
+
 .horizons-map-loading {
   display: flex;
   justify-content: center;

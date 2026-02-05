@@ -8,6 +8,7 @@ import TeacherCatalogue from './pages/TeacherCatalogue'
 import TeacherClasses from './pages/TeacherClasses'
 import TeacherAssignments from './pages/TeacherAssignments'
 import Editor from './pages/Editor'
+import ParcoursImagesEditor from './pages/ParcoursImagesEditor'
 import Player from './pages/Player'
 
 function PrivateRoute({ children, requiredRole = null }) {
@@ -96,6 +97,7 @@ function AppRouter() {
         <Route path="/dashboard/teachers" element={<PrivateRoute requiredRole="teacher"><TeacherCatalogue /></PrivateRoute>} />
         <Route path="/editor" element={<PrivateRoute requiredRole="teacher"><Editor /></PrivateRoute>} />
         <Route path="/editor/:id" element={<PrivateRoute requiredRole="teacher"><Editor /></PrivateRoute>} />
+        <Route path="/dashboard/parcours-images" element={<PrivateRoute requiredRole="teacher"><ParcoursImagesEditor /></PrivateRoute>} />
         
         {/* Routes élève */}
         <Route path="/student-dashboard" element={<PrivateRoute><StudentDashboard /></PrivateRoute>} />

@@ -210,6 +210,13 @@ service cloud.firestore {
         && request.resource.data.keys().hasAll(['teacherId', 'teacherClassId', 'exerciseId', 'createdAt']);
       allow update, delete: if isTeacher() && resource.data.teacherId == request.auth.uid;
     }
+
+    // Config parcours (images par nœud) — lecture par tous, écriture par les profs
+    match /config/{docId} {
+      allow read: if true;
+      allow create, update: if isTeacher();
+      allow delete: if isTeacher();
+    }
   }
 }
 

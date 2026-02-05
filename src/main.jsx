@@ -4,14 +4,17 @@ import './index.css'
 import AppRouter from './AppRouter.jsx'
 import { AuthProvider } from './contexts/AuthContext'
 import { NetworkProvider } from './contexts/NetworkContext'
+import { ParcoursImagesProvider } from './contexts/ParcoursImagesContext'
 import NetworkStatus from './components/NetworkStatus'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <NetworkProvider>
     <AuthProvider>
+      <ParcoursImagesProvider>
         <NetworkStatus />
-      <AppRouter />
+        <AppRouter />
+      </ParcoursImagesProvider>
     </AuthProvider>
     </NetworkProvider>
   </StrictMode>,

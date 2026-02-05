@@ -4,6 +4,25 @@
  */
 import { DEGREE_TO_FUNCTIONS } from './riemannFunctions'
 
+/**
+ * Convertit un accord en clé parcours (ex. I, I6, V7, N6, V64, cad64).
+ * Cohérent avec difficultyFromContent et Player (verrou parcours, options génériques).
+ */
+export function chordToParcoursKey(chord) {
+  if (!chord) return null
+  if (chord.specialRoot === 'N') return 'N6'
+  if (chord.specialRoot === 'It' || chord.specialRoot === 'Fr' || chord.specialRoot === 'Gr') return chord.specialRoot
+  const degree = (chord.degree || '').toUpperCase()
+  if (!degree) return null
+  const fig = chord.figure && chord.figure !== '5' ? chord.figure : ''
+  if (degree === 'I' && fig === '64') {
+    if (chord.sixFourVariant === 'passing') return 'V64'
+    if (chord.sixFourVariant === 'cadential') return 'cad64'
+    return 'I64'
+  }
+  return degree + fig
+}
+
 const SPECIAL_ROOT_TO_FUNCTION = {
   N: 'SD',
   It: 'D',

@@ -119,7 +119,7 @@ export default function ChordLabel({ chord, displayString, className = '', ariaL
       {pedalDegree ? (
         <span className="chord-label-pedal">
           <span className="chord-label-pedal-top">{chordPart}</span>
-          <span className="chord-label-pedal-bar">/</span>
+          <span className="chord-label-pedal-bar" aria-hidden="true" />
           <span className="chord-label-pedal-bottom">{pedalDegree}</span>
         </span>
       ) : (

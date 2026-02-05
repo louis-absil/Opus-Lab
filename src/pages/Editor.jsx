@@ -19,6 +19,7 @@ import {
   Save,
   LogIn,
   ArrowLeft,
+  Eye,
   Flag,
   RotateCcw
 } from 'lucide-react'
@@ -58,7 +59,14 @@ function Editor() {
   const [loadedAutoTags, setLoadedAutoTags] = useState([])
   const [loadedSection, setLoadedSection] = useState(null)
   const [loadedMusicCategory, setLoadedMusicCategory] = useState(null)
-  
+  const [loadedFormation, setLoadedFormation] = useState(null) // array of formation ids
+  const [loadedGenre, setLoadedGenre] = useState(null)
+  const [loadedComposer, setLoadedComposer] = useState('')
+  const [loadedWorkTitle, setLoadedWorkTitle] = useState('')
+  const [loadedMovementTitle, setLoadedMovementTitle] = useState('')
+  const [loadedExerciseTitle, setLoadedExerciseTitle] = useState('')
+  const [loadedDifficulty, setLoadedDifficulty] = useState('')
+
   const playerRef = useRef(null)
   const intervalRef = useRef(null)
   const currentTimeRef = useRef(0)
@@ -155,6 +163,14 @@ function Editor() {
       setLoadedAutoTags(exercise.autoTags && Array.isArray(exercise.autoTags) ? [...exercise.autoTags] : [])
       setLoadedSection(exercise.metadata?.section ?? null)
       setLoadedMusicCategory(exercise.metadata?.musicCategory ?? null)
+      const formation = exercise.metadata?.formation
+      setLoadedFormation(Array.isArray(formation) ? formation : (formation ? [formation] : null))
+      setLoadedGenre(exercise.metadata?.genre ?? null)
+      setLoadedComposer(exercise.metadata?.composer ?? '')
+      setLoadedWorkTitle(exercise.metadata?.workTitle ?? '')
+      setLoadedMovementTitle(exercise.metadata?.movementTitle ?? '')
+      setLoadedExerciseTitle(exercise.metadata?.exerciseTitle ?? '')
+      setLoadedDifficulty(exercise.metadata?.difficulty ?? '')
       setIsEditingUrl(false)
       setShowVideoSearch(false)
       
@@ -834,10 +850,13 @@ function Editor() {
         metadata: {
           composer: metadata.composer,
           workTitle: metadata.workTitle,
+          movementTitle: metadata.movementTitle || null,
           exerciseTitle: metadata.exerciseTitle,
           difficulty: metadata.difficulty || null,
           ...(metadata.section != null && { section: metadata.section }),
-          ...(metadata.musicCategory != null && { musicCategory: metadata.musicCategory })
+          ...(metadata.musicCategory != null && { musicCategory: metadata.musicCategory }),
+          ...(metadata.formation != null && { formation: Array.isArray(metadata.formation) ? metadata.formation : (metadata.formation ? [metadata.formation] : null) }),
+          ...(metadata.genre != null && { genre: metadata.genre })
         },
         autoTags: metadata.autoTags || []
       }
@@ -1223,6 +1242,16 @@ function Editor() {
                   <span className="hidden sm:inline px-3 py-1.5 rounded-lg bg-white/5 backdrop-blur-md text-sm text-white/70 truncate max-w-[120px] md:max-w-none">
                     {user.displayName || user.email}
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/play/${exerciseId}`, { state: { returnTo: `/editor/${exerciseId}` } })}
+                    disabled={!exerciseId}
+                    title={exerciseId ? 'Voir en mode élève' : "Sauvegarder l'exercice pour le prévisualiser"}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors border border-white/10"
+                  >
+                    <Eye className="w-4 h-4" />
+                    <span className="text-sm font-medium">Preview</span>
+                  </button>
                   <button
                     onClick={handleSaveClick}
                     disabled={!extractedId || markers.length === 0}
@@ -1808,6 +1837,13 @@ function Editor() {
           initialAutoTags={exerciseId ? loadedAutoTags : undefined}
           initialSection={exerciseId ? loadedSection : undefined}
           initialMusicCategory={exerciseId ? loadedMusicCategory : undefined}
+          initialFormation={exerciseId ? loadedFormation : undefined}
+          initialGenre={exerciseId ? loadedGenre : undefined}
+          initialComposer={exerciseId ? loadedComposer : undefined}
+          initialWorkTitle={exerciseId ? loadedWorkTitle : undefined}
+          initialMovementTitle={exerciseId ? loadedMovementTitle : undefined}
+          initialExerciseTitle={exerciseId ? loadedExerciseTitle : undefined}
+          initialDifficulty={exerciseId ? loadedDifficulty : undefined}
         />
         
         {/* Modale de confirmation de sortie */}

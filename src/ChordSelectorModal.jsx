@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { FUNCTION_TO_DEGREES, FUNCTION_COLORS, DEGREE_TO_FUNCTIONS } from './utils/riemannFunctions'
 import { ChordLabelFigure } from './components/ChordLabel'
 import ChordLabel from './components/ChordLabel'
-import { getQcmOptions, getFunctionForOptionLabel, formatChordString as formatChordStringQcm } from './utils/qcmOptions'
+import { getQcmOptions, getFunctionForOptionLabel, formatChordString as formatChordStringQcm, chordToParcoursKey, getChordFunction } from './utils/qcmOptions'
 import { parseChordDisplayString } from './utils/chordFormatter'
 
 /* --- 1. CONSTANTES & CONFIGURATION --- */
@@ -395,7 +395,7 @@ const ChordDisplay = ({ data, degreeMode = 'generic', displayAsFunctions = false
     const degreeWithoutSymbol = displayDegree.replace('°', '')
     const isCad64Display = displayDegreeRaw === 'cad'
 
-    return (
+    const accordContent = (
       <div className={`flex items-baseline gap-1 font-chord ${funcColorClass}`}>
         {isBorrowed && <span className="text-5xl text-zinc-500 font-light">(</span>}
         
@@ -412,15 +412,21 @@ const ChordDisplay = ({ data, degreeMode = 'generic', displayAsFunctions = false
             className={`ml-2 relative -top-3 font-chord font-medium ${figureSizeClass}`}
           />
         )}
-        {pedalDegree && (
-          <>
-            <span className="text-zinc-500 mx-1 font-light" style={{ fontSize: '0.6em' }}>/</span>
-            <span className={`${figureSizeClass} font-bold opacity-90`}>{pedalDegree}</span>
-          </>
-        )}
         {isBorrowed && <span className="text-5xl text-zinc-500 font-light">)</span>}
       </div>
     )
+
+    if (pedalDegree) {
+      return (
+        <div className="flex flex-col items-center gap-1 font-chord">
+          {accordContent}
+          <div className="w-full min-w-[1.5em] h-0.5 bg-zinc-500 rounded-full" />
+          <span className={`${figureSizeClass} font-bold opacity-90 ${funcColorClass}`}>{pedalDegree}</span>
+        </div>
+      )
+    }
+
+    return accordContent
   }
 
   return (
@@ -521,6 +527,7 @@ function ChordSelectorModal({
   const [sixFourVariant, setSixFourVariant] = useState(null)
   // Note pédale (accord/basse, ex. II/I) : degré optionnel de la basse
   const [pedalDegree, setPedalDegree] = useState(null)
+  const [pedalModeActive, setPedalModeActive] = useState(false)
   // Initialiser le mode depuis localStorage, avec 'generic' comme défaut
   // En mode élève, utiliser un localStorage séparé et toujours 'generic' par défaut
   const [degreeMode, setDegreeMode] = useState(() => {
@@ -563,6 +570,7 @@ function ChordSelectorModal({
       setCadence(null)
       setSixFourVariant(null)
       setPedalDegree(null)
+      setPedalModeActive(false)
       if (isQcmMode) setSelectedOption(null)
       // Charger le mode sauvegardé pour les nouveaux accords
       // En mode élève, utiliser le localStorage séparé
@@ -653,11 +661,18 @@ function ChordSelectorModal({
 
   // Mode QCM : options et validité
   const useCloseLures = isQcmMode && nodeProgress && (nodeProgress.attempts ?? 0) >= 3 && (nodeProgress.averageScore ?? 0) >= 75
+  const chordKey = isQcmMode && qcmCorrectChord ? chordToParcoursKey(qcmCorrectChord) : null
+  const useGenericFunctionOptions = isQcmMode && !!parcoursContext?.unlockedChordKeys?.length && chordKey != null && !parcoursContext.unlockedChordKeys.includes(chordKey)
   const qcmOptions = useMemo(() => {
     if (!isQcmMode || !qcmCorrectChord) return []
+    if (useGenericFunctionOptions) return [...(parcoursContext?.enabledFunctions ?? ['T', 'SD', 'D'])]
     return getQcmOptions(qcmCorrectChord, qcmAllChords || [], useCloseLures, qcmQuestionId ?? 0)
-  }, [isQcmMode, qcmCorrectChord, qcmAllChords, useCloseLures, qcmQuestionId])
-  const qcmCorrectStr = isQcmMode && qcmCorrectChord ? formatChordStringQcm(qcmCorrectChord) : ''
+  }, [isQcmMode, qcmCorrectChord, qcmAllChords, useCloseLures, qcmQuestionId, useGenericFunctionOptions, parcoursContext?.enabledFunctions])
+  const qcmCorrectStr = useMemo(() => {
+    if (!isQcmMode || !qcmCorrectChord) return ''
+    if (useGenericFunctionOptions) return getChordFunction(qcmCorrectChord) || ''
+    return formatChordStringQcm(qcmCorrectChord)
+  }, [isQcmMode, qcmCorrectChord, useGenericFunctionOptions])
   const qcmIsValidForMode = isQcmMode && (selectedOption !== null || selectedFunction !== null) && (!effectiveExpectedCadence || !!cadence)
 
   // --- RACCOURCIS CLAVIER ---
@@ -980,6 +995,11 @@ function ChordSelectorModal({
   }
 
   const handleDegreeClick = (deg) => {
+    if (pedalModeActive) {
+      setPedalDegree(deg)
+      setPedalModeActive(false)
+      return
+    }
     if (degree === deg) {
       setDegree('')
       setAccidental('')
@@ -1707,7 +1727,7 @@ function ChordSelectorModal({
                       active={degree === deg}
                       highlighted={isFunctionDegree}
                       color={funcColor || 'indigo'}
-                      disabled={degreeDisabledByFunction}
+                      disabled={false}
                       dimmed={degreeDimmed}
                       suppressDefaultHighlight={!!(isFunctionDegree && effectiveDisplayFunction)}
                       onClick={() => handleDegreeClick(deg)}
@@ -1740,6 +1760,21 @@ function ChordSelectorModal({
                   )
                 })}
               </div>
+              {/* Trait horizontal sous le degré sélectionné en mode pédale */}
+              {pedalModeActive && degree && (
+                <div className="grid grid-cols-7 gap-1.5 md:gap-2 mt-1">
+                  {DEGREES.map((d, i) => (
+                    <div key={d} className="flex items-center justify-center min-h-[6px]">
+                      {degree === d ? (
+                        <div className="w-full h-0.5 bg-amber-400 rounded-full" title="Cliquez sur le degré de la basse" />
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {pedalModeActive && degree && (
+                <p className="text-[10px] text-zinc-500 mt-1 text-center">Cliquez sur le degré de la basse</p>
+              )}
               
               {/* SPECIAL ROOTS + Cad. 6/4 (à côté des sixtes augmentées et napolitaine) */}
               <div className="grid grid-cols-4 sm:grid-cols-5 gap-2 mt-2 pt-2 border-t border-white/5">
@@ -1762,7 +1797,7 @@ function ChordSelectorModal({
                       stackedBottom={spec.value === 'N' ? '♭6' : spec.sup}
                       active={specialRoot === spec.value}
                       highlighted={isHighlighted}
-                      disabled={specDisabledByFunction}
+                      disabled={false}
                       dimmed={specDimmed}
                       suppressDefaultHighlight={!!(isHighlighted && effectiveDisplayFunction)}
                       onClick={() => handleSpecialRootClick(spec.value)}
@@ -1891,9 +1926,17 @@ function ChordSelectorModal({
               {/* ALTERATIONS - 2/5 de la largeur - En deuxième sur mobile */}
               <div className="md:col-span-2 order-2 md:order-1 bg-zinc-950/50 p-3 md:p-4 rounded-xl border border-white/5">
                 <label className="text-xs font-bold text-zinc-500 uppercase mb-2 block">Altérations</label>
-                {/* EMPRUNT - En haut, plus important */}
-                <div className="mb-3">
-                   <Pad label="Emprunt" active={isBorrowed} disabled={(!degree && !selectedFunction) || !!specialRoot} onClick={() => setIsBorrowed(!isBorrowed)} className="w-full h-12 text-sm font-semibold" color="gray" />
+                {/* EMPRUNT + PÉDALE - même ligne */}
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <Pad label="Emprunt" active={isBorrowed} disabled={(!degree && !selectedFunction) || !!specialRoot} onClick={() => setIsBorrowed(!isBorrowed)} className="h-12 text-sm font-semibold" color="gray" />
+                  <Pad
+                    label={<><span className="hidden md:inline">Pédale</span><span className="md:hidden">Ped.</span></>}
+                    active={pedalModeActive}
+                    disabled={(!degree && !selectedFunction) || !!specialRoot}
+                    onClick={() => setPedalModeActive(prev => (prev ? false : !!degree))}
+                    className="h-12 text-sm font-semibold"
+                    color="gray"
+                  />
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   {ACCIDENTALS.map(acc => (
@@ -1911,29 +1954,6 @@ function ChordSelectorModal({
                 <div className="grid grid-cols-2 gap-2 mt-2">
                     <Pad label="o" active={quality === '°'} disabled={!!specialRoot || !!selectedFunction} onClick={() => setQuality(quality === '°' ? '' : '°')} className="h-12 text-2xl" />
                     <Pad label="+" active={quality === '+'} disabled={!!specialRoot || !!selectedFunction} onClick={() => setQuality(quality === '+' ? '' : '+')} className="h-12" />
-                </div>
-                {/* Note pédale (accord/basse, ex. II/I) */}
-                <div className="mt-3 pt-3 border-t border-white/10">
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase mb-1.5 block">Note pédale</label>
-                  <div className="flex flex-wrap gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setPedalDegree(null)}
-                      className={`px-2 py-1.5 rounded text-xs font-bold transition-all ${pedalDegree === null ? 'bg-zinc-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}
-                    >
-                      —
-                    </button>
-                    {DEGREES.map(d => (
-                      <button
-                        key={d}
-                        type="button"
-                        onClick={() => setPedalDegree(pedalDegree === d ? null : d)}
-                        className={`px-2 py-1.5 rounded text-xs font-bold transition-all ${pedalDegree === d ? 'bg-amber-500 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}
-                      >
-                        {d}
-                      </button>
-                    ))}
-                  </div>
                 </div>
               </div>
             </div>

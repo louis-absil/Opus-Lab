@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { searchPublicExercises, getLatestPublicExercises } from '../services/exerciseService'
 import { formatTagForDisplay } from '../utils/tagFormatter'
+import { CLASSICAL_FORMATIONS, CLASSICAL_GENRES, inferFormationsFromWorkTitle, inferGenreFromWorkTitle } from '../data/formations'
 import ExerciseCard from '../components/ExerciseCard'
 import './FreeMode.css'
 
@@ -14,7 +15,8 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
   const [selectedComposer, setSelectedComposer] = useState('')
   const [selectedDifficulty, setSelectedDifficulty] = useState('')
   const [selectedTags, setSelectedTags] = useState([])
-  const [selectedGenre, setSelectedGenre] = useState('')
+  const [selectedGenre, setSelectedGenre] = useState('') // genre id (type d'œuvre : concerto, trio, etc.)
+  const [selectedFormations, setSelectedFormations] = useState([]) // instrumentation (multi-select)
   const [selectedDoneStatus, setSelectedDoneStatus] = useState('all') // 'all' | 'done' | 'not-done'
   
   // États des données
@@ -34,9 +36,13 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
     fonctionsHarmoniques: [],
     progressions: [],
     contexteModal: [],
-    styles: []
+    styles: [],
+    formations: [],
+    genres: [] // GenreConcerto, etc.
   })
-  const [genres, setGenres] = useState([])
+  const [genres, setGenres] = useState([]) // mots-clés workTitle (legacy)
+  const [genreOptions, setGenreOptions] = useState([]) // { id, label } type d'œuvre (concerto, trio, etc.)
+  const [formations, setFormations] = useState([]) // { id, label } instrumentation pour le filtre
   const [loading, setLoading] = useState(true)
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false)
   const [latestExercises, setLatestExercises] = useState([])
@@ -114,17 +120,24 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
     }
     if (selectedGenre) {
       filtered = filtered.filter(ex => {
-        const workTitle = ex.metadata?.workTitle || ''
-        return workTitle.toLowerCase().includes(selectedGenre.toLowerCase())
+        const genreId = ex.metadata?.genre || inferGenreFromWorkTitle(ex.metadata?.workTitle || '')
+        return genreId === selectedGenre
+      })
+    }
+    if (selectedFormations.length > 0) {
+      filtered = filtered.filter(ex => {
+        const formationRaw = ex.metadata?.formation
+        const exFormations = Array.isArray(formationRaw) ? formationRaw : (formationRaw ? [formationRaw] : inferFormationsFromWorkTitle(ex.metadata?.workTitle || '', null))
+        return selectedFormations.every(s => exFormations.includes(s))
       })
     }
     setFilteredExercises(filtered)
-  }, [debouncedSearchText, selectedComposer, selectedDifficulty, selectedTags, selectedGenre, selectedDoneStatus, exercises, doneSet])
+  }, [debouncedSearchText, selectedComposer, selectedDifficulty, selectedTags, selectedGenre, selectedFormations, selectedDoneStatus, exercises, doneSet])
 
   // Filtrer les exercices quand les filtres changent
   useEffect(() => {
     filterExercises()
-  }, [debouncedSearchText, selectedComposer, selectedDifficulty, selectedTags, selectedGenre, selectedDoneStatus, exercises, doneSet, filterExercises])
+  }, [debouncedSearchText, selectedComposer, selectedDifficulty, selectedTags, selectedGenre, selectedFormations, selectedDoneStatus, exercises, doneSet, filterExercises])
 
   // Appliquer le filtre initial (clic pastille depuis le dashboard élève)
   useEffect(() => {
@@ -171,6 +184,20 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
       // Extraire les genres depuis workTitle
       const uniqueGenres = extractGenres(allExercises)
       setGenres(uniqueGenres)
+      
+      // Extraire les formations (instrumentation) et genres (type d'œuvre) — classique uniquement
+      const formationIds = new Set()
+      const genreIds = new Set()
+      allExercises.forEach(ex => {
+        if (ex.metadata?.section === 'horizons') return
+        const formationRaw = ex.metadata?.formation
+        const exFormations = Array.isArray(formationRaw) ? formationRaw : (formationRaw ? [formationRaw] : inferFormationsFromWorkTitle(ex.metadata?.workTitle || '', null))
+        exFormations.forEach(id => formationIds.add(id))
+        const genreId = ex.metadata?.genre || inferGenreFromWorkTitle(ex.metadata?.workTitle || '')
+        if (genreId) genreIds.add(genreId)
+      })
+      setFormations(CLASSICAL_FORMATIONS.filter(f => formationIds.has(f.id)))
+      setGenreOptions(CLASSICAL_GENRES.filter(g => genreIds.has(g.id)))
     } catch (error) {
       console.error('Erreur lors du chargement des exercices:', error)
     } finally {
@@ -204,6 +231,9 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
   
   // Catégoriser les tags selon la théorie musicale
   const categorizeTags = (tags) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'FreeMode.jsx:categorizeTags',message:'categorizeTags entry',data:{tagsLength:tags?.length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     const categories = {
       renversements: [],
       extensions: [],
@@ -216,7 +246,9 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
       fonctionsHarmoniques: [],
       progressions: [],
       contexteModal: [],
-      styles: []
+      styles: [],
+      formations: [],
+      genres: []
     }
     
     // Tags à exclure de l'affichage (mais conservés dans les métadonnées)
@@ -260,6 +292,10 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
         categories.contexteModal.push(tag)
       } else if (['baroque', 'classique', 'romantique', 'moderne'].some(s => tagLower === s)) {
         categories.styles.push(tag)
+      } else if (tag.startsWith('Formation')) {
+        categories.formations.push(tag)
+      } else if (tag.startsWith('Genre')) {
+        categories.genres.push(tag)
       }
     })
     
@@ -267,7 +303,9 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
     Object.keys(categories).forEach(key => {
       categories[key].sort()
     })
-    
+    // #region agent log
+    fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'FreeMode.jsx:categorizeTags-return',message:'categorizeTags return keys',data:{keys:Object.keys(categories),hasGenres:'genres' in categories},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     return categories
   }
   
@@ -285,7 +323,12 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
     setSelectedDifficulty('')
     setSelectedTags([])
     setSelectedGenre('')
+    setSelectedFormations([])
     setSelectedDoneStatus('all')
+  }
+
+  const toggleFormation = (formationId) => {
+    setSelectedFormations(prev => prev.includes(formationId) ? prev.filter(id => id !== formationId) : [...prev, formationId])
   }
   
   const handleExerciseClick = (exerciseId) => {
@@ -355,8 +398,8 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
             <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
           </svg>
           <span>Filtrer</span>
-          {(selectedComposer || selectedDifficulty || selectedTags.length > 0 || selectedGenre || selectedDoneStatus !== 'all') && (
-            <span className="free-mode-filter-badge">{[selectedComposer, selectedDifficulty, selectedTags.length, selectedGenre, selectedDoneStatus !== 'all' ? 1 : 0].filter(Boolean).length}</span>
+          {(selectedComposer || selectedDifficulty || selectedTags.length > 0 || selectedGenre || selectedFormations.length > 0 || selectedDoneStatus !== 'all') && (
+            <span className="free-mode-filter-badge">{[selectedComposer, selectedDifficulty, selectedTags.length, selectedGenre, selectedFormations.length, selectedDoneStatus !== 'all' ? 1 : 0].filter(Boolean).length}</span>
           )}
         </button>
         {/* Bouton Nouveaux Horizons */}
@@ -393,7 +436,7 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
         <aside className="free-mode-filters">
           <div className="free-mode-filters-header">
             <h3>Filtres</h3>
-            {(selectedComposer || selectedDifficulty || selectedTags.length > 0 || selectedGenre || selectedDoneStatus !== 'all') && (
+            {(selectedComposer || selectedDifficulty || selectedTags.length > 0 || selectedGenre || selectedFormations.length > 0 || selectedDoneStatus !== 'all') && (
               <button className="free-mode-clear-filters" onClick={clearAllFilters}>
                 Réinitialiser
               </button>
@@ -495,26 +538,50 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
                 ))}
               </div>
             </div>
-            <div className="free-mode-filter-group">
-              <label className="free-mode-filter-label">Genre</label>
-              <div className="free-mode-chips-container">
-                <button
-                  className={`free-mode-chip ${selectedGenre === '' ? 'free-mode-chip-active' : ''}`}
-                  onClick={() => setSelectedGenre('')}
-                >
-                  Tous
-                </button>
-                {genres.map(genre => (
+            {genreOptions.length > 0 && (
+              <div className="free-mode-filter-group">
+                <label className="free-mode-filter-label">Genre (type d&apos;œuvre)</label>
+                <div className="free-mode-chips-container">
                   <button
-                    key={genre}
-                    className={`free-mode-chip ${selectedGenre === genre ? 'free-mode-chip-active' : ''}`}
-                    onClick={() => setSelectedGenre(genre)}
+                    className={`free-mode-chip ${selectedGenre === '' ? 'free-mode-chip-active' : ''}`}
+                    onClick={() => setSelectedGenre('')}
                   >
-                    {genre}
+                    Tous
                   </button>
-                ))}
+                  {genreOptions.map(g => (
+                    <button
+                      key={g.id}
+                      className={`free-mode-chip ${selectedGenre === g.id ? 'free-mode-chip-active' : ''}`}
+                      onClick={() => setSelectedGenre(selectedGenre === g.id ? '' : g.id)}
+                    >
+                      {g.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
+            {formations.length > 0 && (
+              <div className="free-mode-filter-group">
+                <label className="free-mode-filter-label">Formation (instrumentation)</label>
+                <div className="free-mode-chips-container">
+                  <button
+                    className={`free-mode-chip ${selectedFormations.length === 0 ? 'free-mode-chip-active' : ''}`}
+                    onClick={() => setSelectedFormations([])}
+                  >
+                    Toutes
+                  </button>
+                  {formations.map(f => (
+                    <button
+                      key={f.id}
+                      className={`free-mode-chip ${selectedFormations.includes(f.id) ? 'free-mode-chip-active' : ''}`}
+                      onClick={() => toggleFormation(f.id)}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Bloc Détails techniques : tags par catégorie */}
@@ -522,12 +589,12 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
             <h4 className="free-mode-filter-block-title">Détails techniques</h4>
           
           {/* Section Harmonie - Structure des accords */}
-          {(tagCategories.renversements.length > 0 || tagCategories.extensions.length > 0 || tagCategories.qualites.length > 0) && (
+          {(tagCategories.renversements?.length > 0 || tagCategories.extensions?.length > 0 || tagCategories.qualites?.length > 0) && (
             <div className="free-mode-filter-section">
               <h4 className="free-mode-filter-section-title">Structure des accords</h4>
               
               {/* Renversements */}
-              {tagCategories.renversements.length > 0 && (
+              {tagCategories.renversements?.length > 0 && (
                 <div className="free-mode-filter-subsection">
                   <label className="free-mode-filter-subsection-label">Renversements</label>
                   <div className="free-mode-tags-container">
@@ -548,7 +615,7 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
               )}
               
               {/* Extensions */}
-              {tagCategories.extensions.length > 0 && (
+              {tagCategories.extensions?.length > 0 && (
                 <div className="free-mode-filter-subsection">
                   <label className="free-mode-filter-subsection-label">Extensions</label>
                   <div className="free-mode-tags-container">
@@ -569,7 +636,7 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
               )}
               
               {/* Qualités */}
-              {tagCategories.qualites.length > 0 && (
+              {tagCategories.qualites?.length > 0 && (
                 <div className="free-mode-filter-subsection">
                   <label className="free-mode-filter-subsection-label">Qualités</label>
                   <div className="free-mode-tags-container">
@@ -592,7 +659,7 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
           )}
 
           {/* Section Harmonie - Accords spéciaux */}
-          {tagCategories.accordsSpeciaux.length > 0 && (
+          {tagCategories.accordsSpeciaux?.length > 0 && (
             <div className="free-mode-filter-section">
               <h4 className="free-mode-filter-section-title">Accords spéciaux</h4>
               <div className="free-mode-tags-container">
@@ -613,12 +680,12 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
           )}
 
           {/* Section Harmonie - Fonctions et cadences */}
-          {(tagCategories.cadences.length > 0 || tagCategories.retards.length > 0) && (
+          {(tagCategories.cadences?.length > 0 || tagCategories.retards?.length > 0) && (
             <div className="free-mode-filter-section">
               <h4 className="free-mode-filter-section-title">Cadences et retards</h4>
               
               {/* Cadences */}
-              {tagCategories.cadences.length > 0 && (
+              {tagCategories.cadences?.length > 0 && (
                 <div className="free-mode-filter-subsection">
                   <label className="free-mode-filter-subsection-label">Cadences</label>
                   <div className="free-mode-tags-container">
@@ -639,7 +706,7 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
               )}
               
               {/* Retards */}
-              {tagCategories.retards.length > 0 && (
+              {tagCategories.retards?.length > 0 && (
                 <div className="free-mode-filter-subsection">
                   <label className="free-mode-filter-subsection-label">Retards</label>
                   <div className="free-mode-tags-container">
@@ -662,12 +729,12 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
           )}
 
           {/* Section Structure et degrés */}
-          {(tagCategories.degres.length > 0 || tagCategories.structure.length > 0) && (
+          {(tagCategories.degres?.length > 0 || tagCategories.structure?.length > 0) && (
             <div className="free-mode-filter-section">
               <h4 className="free-mode-filter-section-title">Structure et degrés</h4>
               
               {/* Degrés */}
-              {tagCategories.degres.length > 0 && (
+              {tagCategories.degres?.length > 0 && (
                 <div className="free-mode-filter-subsection">
                   <label className="free-mode-filter-subsection-label">Degrés</label>
                   <div className="free-mode-tags-container">
@@ -688,7 +755,7 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
               )}
               
               {/* Structure */}
-              {tagCategories.structure.length > 0 && (
+              {tagCategories.structure?.length > 0 && (
                 <div className="free-mode-filter-subsection">
                   <label className="free-mode-filter-subsection-label">Structure</label>
                   <div className="free-mode-tags-container">
@@ -711,7 +778,7 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
           )}
 
           {/* Section Fonctions harmoniques */}
-          {tagCategories.fonctionsHarmoniques.length > 0 && (
+          {tagCategories.fonctionsHarmoniques?.length > 0 && (
             <div className="free-mode-filter-section">
               <h4 className="free-mode-filter-section-title">Fonctions harmoniques</h4>
               <div className="free-mode-tags-container">
@@ -732,7 +799,7 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
           )}
 
           {/* Section Progressions */}
-          {tagCategories.progressions.length > 0 && (
+          {tagCategories.progressions?.length > 0 && (
             <div className="free-mode-filter-section">
               <h4 className="free-mode-filter-section-title">Progressions harmoniques</h4>
               <div className="free-mode-tags-container">
@@ -753,7 +820,7 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
           )}
 
           {/* Section Contexte modal */}
-          {tagCategories.contexteModal.length > 0 && (
+          {tagCategories.contexteModal?.length > 0 && (
             <div className="free-mode-filter-section">
               <h4 className="free-mode-filter-section-title">Contexte modal</h4>
               <div className="free-mode-tags-container">
@@ -774,11 +841,56 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
           )}
 
           {/* Section Styles */}
-          {tagCategories.styles.length > 0 && (
+          {tagCategories.styles?.length > 0 && (
             <div className="free-mode-filter-section">
               <h4 className="free-mode-filter-section-title">Période stylistique</h4>
               <div className="free-mode-tags-container">
                 {tagCategories.styles.map(tag => {
+                  const formatted = formatTagForDisplay(tag);
+                  return (
+                    <button
+                      key={tag}
+                      className={`free-mode-tag-chip ${selectedTags.includes(tag) ? 'free-mode-tag-chip-active' : ''}`}
+                      onClick={() => toggleTag(tag)}
+                    >
+                      {formatted}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Section Formations (tags instrumentation) */}
+          {tagCategories.formations?.length > 0 && (
+            <div className="free-mode-filter-section">
+              <h4 className="free-mode-filter-section-title">Formation (instrumentation)</h4>
+              <div className="free-mode-tags-container">
+                {tagCategories.formations.map(tag => {
+                  const formatted = formatTagForDisplay(tag);
+                  return (
+                    <button
+                      key={tag}
+                      className={`free-mode-tag-chip ${selectedTags.includes(tag) ? 'free-mode-tag-chip-active' : ''}`}
+                      onClick={() => toggleTag(tag)}
+                    >
+                      {formatted}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Section Genres (tags type d'œuvre) */}
+          {/* #region agent log */}
+          {(() => { fetch('http://127.0.0.1:7245/ingest/f58eaead-9d56-4c47-b431-17d92bc2da43',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'FreeMode.jsx:880',message:'before genres.length',data:{tagCategoriesKeys:tagCategories?Object.keys(tagCategories):null,genresType:typeof tagCategories?.genres,genresIsArray:Array.isArray(tagCategories?.genres)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,B'})}).catch(()=>{}); return null; })()}
+          {/* #endregion */}
+          {tagCategories.genres?.length > 0 && (
+            <div className="free-mode-filter-section">
+              <h4 className="free-mode-filter-section-title">Genre (type d&apos;œuvre)</h4>
+              <div className="free-mode-tags-container">
+                {tagCategories.genres.map(tag => {
                   const formatted = formatTagForDisplay(tag);
                   return (
                     <button
@@ -802,12 +914,13 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
           {latestExercises.length > 0 && (
             <div className="free-mode-latest-section">
               <h3 className="free-mode-latest-title">Derniers exercices ajoutés</h3>
-              {!selectedComposer && !selectedDifficulty && selectedTags.length === 0 && !selectedGenre && selectedDoneStatus === 'all' && !debouncedSearchText ? (
+              {!selectedComposer && !selectedDifficulty && selectedTags.length === 0 && !selectedGenre && selectedFormations.length === 0 && selectedDoneStatus === 'all' && !debouncedSearchText ? (
                 <div className="free-mode-latest-grid">
                   {latestExercises.map((exercise) => (
                     <ExerciseCard
                       key={exercise.id}
                       exercise={exercise}
+                      allExercises={latestExercises}
                       onClick={(id) => handleExerciseClick(id)}
                       onPillClick={(payload) => {
                         if (payload.type === 'difficulty') setSelectedDifficulty((prev) => (prev === payload.value ? '' : payload.value))
@@ -839,7 +952,7 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
               <p className="free-mode-empty-text">
                 Essaye de modifier tes critères de recherche ou tes filtres pour trouver plus d'exercices.
               </p>
-              {(selectedComposer || selectedDifficulty || selectedTags.length > 0 || selectedGenre || selectedDoneStatus !== 'all' || debouncedSearchText) && (
+              {(selectedComposer || selectedDifficulty || selectedTags.length > 0 || selectedGenre || selectedFormations.length > 0 || selectedDoneStatus !== 'all' || debouncedSearchText) && (
                 <button className="free-mode-empty-cta" onClick={clearAllFilters}>
                   Réinitialiser les filtres
                 </button>
@@ -857,6 +970,7 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
                   <ExerciseCard
                     key={exercise.id}
                     exercise={exercise}
+                    allExercises={filteredExercises}
                     onClick={(id) => handleExerciseClick(id)}
                     onPillClick={(payload) => {
                       if (payload.type === 'difficulty') setSelectedDifficulty((prev) => (prev === payload.value ? '' : payload.value))
@@ -988,26 +1102,50 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
                     ))}
                   </div>
                 </div>
-                <div className="free-mode-filter-group">
-                  <label className="free-mode-filter-label">Genre</label>
-                  <div className="free-mode-chips-container">
-                    <button
-                      className={`free-mode-chip ${selectedGenre === '' ? 'free-mode-chip-active' : ''}`}
-                      onClick={() => setSelectedGenre('')}
-                    >
-                      Tous
-                    </button>
-                    {genres.map(genre => (
+                {genreOptions.length > 0 && (
+                  <div className="free-mode-filter-group">
+                    <label className="free-mode-filter-label">Genre (type d&apos;œuvre)</label>
+                    <div className="free-mode-chips-container">
                       <button
-                        key={genre}
-                        className={`free-mode-chip ${selectedGenre === genre ? 'free-mode-chip-active' : ''}`}
-                        onClick={() => setSelectedGenre(genre)}
+                        className={`free-mode-chip ${selectedGenre === '' ? 'free-mode-chip-active' : ''}`}
+                        onClick={() => setSelectedGenre('')}
                       >
-                        {genre}
+                        Tous
                       </button>
-                    ))}
+                      {genreOptions.map(g => (
+                        <button
+                          key={g.id}
+                          className={`free-mode-chip ${selectedGenre === g.id ? 'free-mode-chip-active' : ''}`}
+                          onClick={() => setSelectedGenre(selectedGenre === g.id ? '' : g.id)}
+                        >
+                          {g.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
+                {formations.length > 0 && (
+                  <div className="free-mode-filter-group">
+                    <label className="free-mode-filter-label">Formation (instrumentation)</label>
+                    <div className="free-mode-chips-container">
+                      <button
+                        className={`free-mode-chip ${selectedFormations.length === 0 ? 'free-mode-chip-active' : ''}`}
+                        onClick={() => setSelectedFormations([])}
+                      >
+                        Toutes
+                      </button>
+                      {formations.map(f => (
+                        <button
+                          key={f.id}
+                          className={`free-mode-chip ${selectedFormations.includes(f.id) ? 'free-mode-chip-active' : ''}`}
+                          onClick={() => toggleFormation(f.id)}
+                        >
+                          {f.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Détails techniques */}
@@ -1015,12 +1153,12 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
                 <h4 className="free-mode-filter-block-title">Détails techniques</h4>
               
               {/* Section Harmonie - Structure des accords */}
-              {(tagCategories.renversements.length > 0 || tagCategories.extensions.length > 0 || tagCategories.qualites.length > 0) && (
+              {(tagCategories.renversements?.length > 0 || tagCategories.extensions?.length > 0 || tagCategories.qualites?.length > 0) && (
                 <div className="free-mode-filter-section">
                   <h4 className="free-mode-filter-section-title">Structure des accords</h4>
                   
                   {/* Renversements */}
-                  {tagCategories.renversements.length > 0 && (
+                  {tagCategories.renversements?.length > 0 && (
                     <div className="free-mode-filter-subsection">
                       <label className="free-mode-filter-subsection-label">Renversements</label>
                       <div className="free-mode-tags-container">
@@ -1041,7 +1179,7 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
                   )}
                   
                   {/* Extensions */}
-                  {tagCategories.extensions.length > 0 && (
+                  {tagCategories.extensions?.length > 0 && (
                     <div className="free-mode-filter-subsection">
                       <label className="free-mode-filter-subsection-label">Extensions</label>
                       <div className="free-mode-tags-container">
@@ -1062,7 +1200,7 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
                   )}
                   
                   {/* Qualités */}
-                  {tagCategories.qualites.length > 0 && (
+                  {tagCategories.qualites?.length > 0 && (
                     <div className="free-mode-filter-subsection">
                       <label className="free-mode-filter-subsection-label">Qualités</label>
                       <div className="free-mode-tags-container">
@@ -1085,7 +1223,7 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
               )}
 
               {/* Section Harmonie - Accords spéciaux */}
-              {tagCategories.accordsSpeciaux.length > 0 && (
+              {tagCategories.accordsSpeciaux?.length > 0 && (
                 <div className="free-mode-filter-section">
                   <h4 className="free-mode-filter-section-title">Accords spéciaux</h4>
                   <div className="free-mode-tags-container">
@@ -1106,12 +1244,12 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
               )}
 
               {/* Section Harmonie - Fonctions et cadences */}
-              {(tagCategories.cadences.length > 0 || tagCategories.retards.length > 0) && (
+              {(tagCategories.cadences?.length > 0 || tagCategories.retards?.length > 0) && (
                 <div className="free-mode-filter-section">
                   <h4 className="free-mode-filter-section-title">Cadences et retards</h4>
                   
                   {/* Cadences */}
-                  {tagCategories.cadences.length > 0 && (
+                  {tagCategories.cadences?.length > 0 && (
                     <div className="free-mode-filter-subsection">
                       <label className="free-mode-filter-subsection-label">Cadences</label>
                       <div className="free-mode-tags-container">
@@ -1132,7 +1270,7 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
                   )}
                   
                   {/* Retards */}
-                  {tagCategories.retards.length > 0 && (
+                  {tagCategories.retards?.length > 0 && (
                     <div className="free-mode-filter-subsection">
                       <label className="free-mode-filter-subsection-label">Retards</label>
                       <div className="free-mode-tags-container">
@@ -1155,12 +1293,12 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
               )}
 
               {/* Section Structure et degrés */}
-              {(tagCategories.degres.length > 0 || tagCategories.structure.length > 0) && (
+              {(tagCategories.degres?.length > 0 || tagCategories.structure?.length > 0) && (
                 <div className="free-mode-filter-section">
                   <h4 className="free-mode-filter-section-title">Structure et degrés</h4>
                   
                   {/* Degrés */}
-                  {tagCategories.degres.length > 0 && (
+                  {tagCategories.degres?.length > 0 && (
                     <div className="free-mode-filter-subsection">
                       <label className="free-mode-filter-subsection-label">Degrés</label>
                       <div className="free-mode-tags-container">
@@ -1181,7 +1319,7 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
                   )}
                   
                   {/* Structure */}
-                  {tagCategories.structure.length > 0 && (
+                  {tagCategories.structure?.length > 0 && (
                     <div className="free-mode-filter-subsection">
                       <label className="free-mode-filter-subsection-label">Structure</label>
                       <div className="free-mode-tags-container">
@@ -1204,7 +1342,7 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
               )}
 
               {/* Section Fonctions harmoniques */}
-              {tagCategories.fonctionsHarmoniques.length > 0 && (
+              {tagCategories.fonctionsHarmoniques?.length > 0 && (
                 <div className="free-mode-filter-section">
                   <h4 className="free-mode-filter-section-title">Fonctions harmoniques</h4>
                   <div className="free-mode-tags-container">
@@ -1225,7 +1363,7 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
               )}
 
               {/* Section Progressions */}
-              {tagCategories.progressions.length > 0 && (
+              {tagCategories.progressions?.length > 0 && (
                 <div className="free-mode-filter-section">
                   <h4 className="free-mode-filter-section-title">Progressions harmoniques</h4>
                   <div className="free-mode-tags-container">
@@ -1246,7 +1384,7 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
               )}
 
               {/* Section Contexte modal */}
-              {tagCategories.contexteModal.length > 0 && (
+              {tagCategories.contexteModal?.length > 0 && (
                 <div className="free-mode-filter-section">
                   <h4 className="free-mode-filter-section-title">Contexte modal</h4>
                   <div className="free-mode-tags-container">
@@ -1267,7 +1405,7 @@ function FreeMode({ doneExerciseIds = [], initialFilter = null, onInitialFilterC
               )}
 
               {/* Section Styles */}
-              {tagCategories.styles.length > 0 && (
+              {tagCategories.styles?.length > 0 && (
                 <div className="free-mode-filter-section">
                   <h4 className="free-mode-filter-section-title">Période stylistique</h4>
                   <div className="free-mode-tags-container">

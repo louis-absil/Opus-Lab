@@ -4,6 +4,7 @@ import { searchPublicExercises, getRandomPublicExercise } from '../services/exer
 import { getUnlockedHorizonsStyles } from '../services/badgeService'
 import { HORIZONS_MUSIC_CATEGORIES, HORIZONS_STYLE_ORDER } from '../utils/tagGenerator'
 import { HORIZONS_IMAGE_URLS } from '../data/horizonsIllustrations'
+import { HORIZONS_FORMATIONS, inferFormationsFromWorkTitle } from '../data/formations'
 import ExerciseCard from './ExerciseCard'
 import './HorizonsMap.css'
 
@@ -34,6 +35,7 @@ function HorizonsMap({
   const [styleExercises, setStyleExercises] = useState([])
   const [loadingExercises, setLoadingExercises] = useState(false)
   const [loadingRandom, setLoadingRandom] = useState(false)
+  const [selectedFormations, setSelectedFormations] = useState([])
 
   const unlockedStyles = useMemo(
     () => (Array.isArray(previewUnlockedHorizonsStyles) && previewUnlockedHorizonsStyles.length > 0
@@ -46,10 +48,12 @@ function HorizonsMap({
   useEffect(() => {
     if (!selectedStyleId || !hasAnyUnlocked) {
       setStyleExercises([])
+      setSelectedFormations([])
       return
     }
     let cancelled = false
     setLoadingExercises(true)
+    setSelectedFormations([])
     searchPublicExercises({ onlyHorizons: true, musicCategory: selectedStyleId })
       .then((list) => {
         if (!cancelled) setStyleExercises(list)
@@ -75,7 +79,9 @@ function HorizonsMap({
     if (!selectedStyleId) return
     setLoadingRandom(true)
     try {
-      const exercise = await getRandomPublicExercise({ onlyHorizons: true, musicCategory: selectedStyleId })
+      const filters = { onlyHorizons: true, musicCategory: selectedStyleId }
+      if (selectedFormations.length > 0) filters.formation = selectedFormations
+      const exercise = await getRandomPublicExercise(filters)
       if (exercise?.id) {
         navigate(`/play/${exercise.id}`)
       }
@@ -112,6 +118,23 @@ function HorizonsMap({
 
   if (selectedStyleId) {
     const cat = HORIZONS_MUSIC_CATEGORIES[selectedStyleId]
+    const formationIdsInList = (() => {
+      const ids = new Set()
+      styleExercises.forEach(ex => {
+        const formationRaw = ex.metadata?.formation
+        const arr = Array.isArray(formationRaw) ? formationRaw : (formationRaw ? [formationRaw] : inferFormationsFromWorkTitle(ex.metadata?.workTitle || '', 'horizons'))
+        arr.forEach(id => { if (id) ids.add(id) })
+      })
+      return ids
+    })()
+    const formationsInList = HORIZONS_FORMATIONS.filter(f => formationIdsInList.has(f.id))
+    const filteredByFormation = selectedFormations.length > 0
+      ? styleExercises.filter(ex => {
+          const formationRaw = ex.metadata?.formation
+          const exFormations = Array.isArray(formationRaw) ? formationRaw : (formationRaw ? [formationRaw] : inferFormationsFromWorkTitle(ex.metadata?.workTitle || '', 'horizons'))
+          return selectedFormations.every(s => exFormations.includes(s))
+        })
+      : styleExercises
     return (
       <div className="horizons-map">
         <div className={`horizons-map-header horizons-map-header-with-back ${hideInternalBack ? 'horizons-map-header-back-hidden' : ''}`}>
@@ -135,22 +158,46 @@ function HorizonsMap({
             type="button"
             className="horizons-map-random-btn"
             onClick={handleLaunchRandom}
-            disabled={loadingRandom || styleExercises.length === 0}
+            disabled={loadingRandom || filteredByFormation.length === 0}
           >
             {loadingRandom ? 'Chargement…' : 'Lancer un exercice au hasard'}
           </button>
         </div>
+        {formationsInList.length > 0 && (
+          <div className="horizons-map-formation-filters">
+            <span className="horizons-map-formation-label">Formation (instrumentation) :</span>
+            <div className="horizons-map-formation-chips">
+              <button
+                type="button"
+                className={`horizons-map-formation-chip ${selectedFormations.length === 0 ? 'horizons-map-formation-chip-active' : ''}`}
+                onClick={() => setSelectedFormations([])}
+              >
+                Toutes
+              </button>
+              {formationsInList.map(f => (
+                <button
+                  key={f.id}
+                  type="button"
+                  className={`horizons-map-formation-chip ${selectedFormations.includes(f.id) ? 'horizons-map-formation-chip-active' : ''}`}
+                  onClick={() => setSelectedFormations(prev => prev.includes(f.id) ? prev.filter(id => id !== f.id) : [...prev, f.id])}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {loadingExercises ? (
           <div className="horizons-map-loading">
             <div className="spinner-small" />
           </div>
-        ) : styleExercises.length === 0 ? (
+        ) : filteredByFormation.length === 0 ? (
           <div className="horizons-map-empty horizons-map-empty-inline">
-            <p>Aucun exercice dans ce style pour l&apos;instant.</p>
+            <p>{selectedFormations.length > 0 ? 'Aucun exercice pour cette formation.' : 'Aucun exercice dans ce style pour l&apos;instant.'}</p>
           </div>
         ) : (
           <div className="horizons-map-exercise-list">
-            {styleExercises.map((ex) => (
+            {filteredByFormation.map((ex) => (
               <ExerciseCard
                 key={ex.id}
                 exercise={ex}

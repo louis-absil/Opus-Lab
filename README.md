@@ -2,7 +2,7 @@
 
 **L'entraînement harmonique intelligent**
 
-**Version** : 1.1.1 — Dernières mises à jour : [CHANGELOG.md](./CHANGELOG.md)
+**Version** : 1.2.0 — Dernières mises à jour : [CHANGELOG.md](./CHANGELOG.md) · Détail v1.2.0 : [UPDATE_v1.2.0.md](./UPDATE_v1.2.0.md)
 
 Opus Lab est une plateforme web d'entraînement pour les musiciens qui souhaitent perfectionner leur oreille harmonique. Analysez des extraits musicaux depuis YouTube, identifiez les accords avec une notation académique professionnelle, et progressez à votre rythme.
 
@@ -17,6 +17,7 @@ Opus Lab est une plateforme web d'entraînement pour les musiciens qui souhaiten
 - **Catalogues** : Catalogue professeurs (TeacherCatalogue), classes (TeacherClasses), devoirs (TeacherAssignments)
 - **Modales** : Détail professeur/élève, affectation à une classe, demande d'établissement (RequestEstablishmentModal)
 - **Prévisualisation parcours** : Scénarios simulés pour voir le point de vue élève
+- **Éditeur d’images du parcours** : Gestion des illustrations des nœuds (ParcoursImagesEditor, route `/parcours-images`, accès admin)
 
 ### 👨‍🎓 Pour les élèves
 - **Parcours guidé** : Carte de progression par étages (Intuition → Précision → Couleur SD → Chromatisme) avec nœuds d'apprentissage et points de contrôle (cadences)
@@ -181,16 +182,19 @@ opus-lab/
 │   │   └── ...
 │   ├── contexts/          # Contextes React
 │   │   ├── AuthContext.jsx
-│   │   └── NetworkContext.jsx
+│   │   ├── NetworkContext.jsx
+│   │   └── ParcoursImagesContext.jsx
+│   ├── config/            # Configuration (ex. adminAllowlist.js)
 │   ├── data/              # Données parcours et références
 │   │   ├── parcoursTree.js, parcoursIllustrations.js
+│   │   ├── chordDifficulties.js, formations.js
 │   │   ├── codexEntries.js, codexMusicalExamples.js, codexIllustrations.js
 │   │   ├── horizonsIllustrations.js
 │   │   ├── knownTags.js, pedagogicalTips.js, classes.js, establishments.js, teacherSubjects.js
 │   │   └── ...
 │   ├── pages/
 │   │   ├── Dashboard.jsx, Editor.jsx, LandingPage.jsx, Player.jsx
-│   │   ├── FreeMode.jsx, StudentDashboard.jsx
+│   │   ├── ParcoursImagesEditor.jsx, FreeMode.jsx, StudentDashboard.jsx
 │   │   ├── TeacherCatalogue.jsx, TeacherClasses.jsx, TeacherAssignments.jsx
 │   │   ├── StudentCatalogue.jsx
 │   │   └── ...
@@ -198,7 +202,7 @@ opus-lab/
 │   │   ├── attemptService.js, badgeService.js, exerciseService.js
 │   │   ├── objectiveService.js, progressionService.js, userService.js
 │   │   ├── teacherClassService.js, assignmentService.js, referenceDataService.js
-│   │   ├── avatarService.js
+│   │   ├── avatarService.js, parcoursImagesService.js
 │   │   └── ...
 │   ├── utils/             # Utilitaires (Riemann, tags, difficulté, codex, etc.)
 │   ├── App.jsx, AppRouter.jsx, firebase.js, main.jsx
@@ -207,6 +211,7 @@ opus-lab/
 ├── firebase.json, firestore.rules, firestore.indexes.json
 ├── .gitattributes         # Fins de ligne LF, encodage cohérent
 ├── CHANGELOG.md           # Notes de mise à jour
+├── UPDATE_v1.2.0.md      # Détail de la mise à jour v1.2.0
 └── package.json
 ```
 
@@ -263,6 +268,7 @@ Consultez [`FIRESTORE_SETUP.md`](./FIRESTORE_SETUP.md) pour plus de détails sur
 ## 📚 Documentation complémentaire
 
 - [`CHANGELOG.md`](./CHANGELOG.md) : Notes de mise à jour (versions et nouveautés)
+- [`UPDATE_v1.2.0.md`](./UPDATE_v1.2.0.md) : Détail de la mise à jour v1.2.0 (éditeur d’images parcours, données, composants)
 - [`FIRESTORE_SETUP.md`](./FIRESTORE_SETUP.md) : Configuration des règles Firestore
 - [`SETUP_TEACHERS.md`](./SETUP_TEACHERS.md) : Configuration des professeurs autorisés
 - [`GITHUB_PAGES_SETUP.md`](./GITHUB_PAGES_SETUP.md) : Déploiement sur GitHub Pages

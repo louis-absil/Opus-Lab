@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { getTeacherClasses } from '../services/teacherClassService'
 import { createAssignment } from '../services/assignmentService'
+import { getExerciseDisplayTitle } from '../utils/exerciseDisplay'
 import './AssignToClassModal.css'
 
 function getYouTubeThumbnail(videoId) {
@@ -37,7 +38,7 @@ function AssignToClassModal({ isOpen, onClose, exercise, teacherId, onSuccess })
     if (!selectedClassId || !exercise?.id || !teacherId) return
     setSubmitting(true)
     try {
-      const exerciseTitle = exercise.metadata?.workTitle || exercise.metadata?.exerciseTitle || exercise.video?.title || 'Exercice'
+      const exerciseTitle = getExerciseDisplayTitle(exercise, []) || exercise.video?.title || 'Exercice'
       const exerciseThumbnail = getYouTubeThumbnail(exercise.video?.id) || null
       await createAssignment(teacherId, selectedClassId, exercise.id, {
         title: title.trim() || null,
@@ -64,7 +65,7 @@ function AssignToClassModal({ isOpen, onClose, exercise, teacherId, onSuccess })
           <button type="button" className="assign-to-class-modal-close" onClick={onClose} aria-label="Fermer">×</button>
         </div>
         <p className="assign-to-class-modal-exercise">
-          {exercise?.metadata?.workTitle || exercise?.metadata?.exerciseTitle || exercise?.video?.title || 'Exercice'}
+          {exercise ? (getExerciseDisplayTitle(exercise, []) || exercise.video?.title || 'Exercice') : 'Exercice'}
         </p>
         <form onSubmit={handleSubmit} className="assign-to-class-modal-form">
           <label>
