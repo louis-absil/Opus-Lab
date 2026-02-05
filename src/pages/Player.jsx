@@ -1,10 +1,8 @@
-import { useState, useRef, useEffect, useCallback, useMemo, Component } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import YouTube from 'react-youtube'
 import ChordSelectorModal, { CADENCES } from '../ChordSelectorModal'
 import VideoCockpit from '../VideoCockpit'
-import ReviewDashboard from '../components/ReviewDashboard'
-import ReviewDetailPanel from '../components/ReviewDetailPanel'
 import { getExerciseById } from '../services/exerciseService'
 import { saveAttempt, getAllUserAttempts } from '../services/attemptService'
 import { checkAndUnlockBadges } from '../services/badgeService'
@@ -20,31 +18,6 @@ import { getCodexEntriesForCorrection } from '../utils/codexHelpers'
 import { getExerciseDisplayTitle } from '../utils/exerciseDisplay'
 import { Play, Pause, SkipBack, SkipForward, Pencil, RotateCcw, Home } from 'lucide-react'
 import './Player.css'
-
-// Error boundary pour le panneau de feedback (évite page noire si le lecteur YouTube plante)
-class ReviewDetailErrorBoundary extends Component {
-  state = { hasError: false }
-
-  static getDerivedStateFromError() {
-    return { hasError: true }
-  }
-
-  componentDidCatch(error, info) {
-    console.warn('ReviewDetailPanel error boundary:', error?.message, info?.componentStack)
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="review-detail-panel review-detail-panel-fallback" style={{ padding: '1rem', color: 'var(--text-secondary, #94a3b8)', textAlign: 'center' }}>
-          <p>Le détail de correction n&apos;a pas pu s&apos;afficher (lecteur vidéo indisponible ou bloqué).</p>
-          <p style={{ fontSize: '0.9rem', marginTop: '0.5rem' }}>Vous pouvez consulter vos réponses dans la timeline ci-dessus.</p>
-        </div>
-      )
-    }
-    return this.props.children
-  }
-}
 
 function Player() {
   const { exerciseId } = useParams()
@@ -1806,8 +1779,8 @@ function Player() {
     }
   }
 
-  // Mode Review intégré (mode libre) : même layout que l'exercice, vidéo en fond flou + carte feedback
-  if (mode === 'review' && exerciseMode === 'libre') {
+  // Mode Review : un seul layout pour libre et parcours (vidéo floutée, overlay, carte feedback, timeline)
+  if (mode === 'review') {
     const segIdx = selectedSegmentIndex != null && chordSegments[selectedSegmentIndex] ? selectedSegmentIndex : 0
     const validation = answerValidations[segIdx]
     const userAnswer = userAnswers[segIdx]
@@ -1815,6 +1788,7 @@ function Player() {
     const correctAnswer = markerSeg && typeof markerSeg === 'object' && markerSeg.chord ? markerSeg.chord : null
     const codexEntriesSeg = (validation?.level === 0 || validation?.level === 0.5 || validation?.level === 2 || validation?.level === 3) && correctAnswer ? getCodexEntriesForCorrection(correctAnswer, nodeId) : []
     const codexEntrySeg = codexEntriesSeg.length > 0 ? codexEntriesSeg[0] : null
+    const isSegLocked = exerciseMode === 'parcours' && isSegmentLockedByParcours(segIdx)
 
     return (
       <div className="player-immersive player-review-integrated">
@@ -1854,38 +1828,44 @@ function Player() {
               {calculateScores.perfectCount + calculateScores.partialCount}/{calculateScores.totalCount} • {calculateScores.scorePercentage}%
             </div>
             {chordSegments[segIdx] && (
-              <div className={`player-feedback-card player-feedback-card--level-${validation?.level ?? 0}`}>
-                <p className="player-feedback-card-message">{validation?.feedback ?? '—'}</p>
-                <div className="player-feedback-card-comparison">
-                  <div className="player-feedback-card-row">
-                    <span className="player-feedback-card-label">Votre réponse</span>
-                    <span className="player-feedback-card-value">
-                      {userAnswer ? <ChordLabel chord={userAnswer} /> : 'Non répondu'}
-                    </span>
-                  </div>
-                  <div className="player-feedback-card-row">
-                    <span className="player-feedback-card-label">Solution</span>
-                    <span className="player-feedback-card-value">
-                      {correctAnswer ? <ChordLabel chord={correctAnswer} /> : '—'}
-                    </span>
-                  </div>
+              isSegLocked && !userAnswer ? (
+                <div className="player-feedback-card player-feedback-card--level-0">
+                  <p className="player-feedback-card-message">Cet accord n&apos;était pas à remplir dans ce niveau.</p>
                 </div>
-                {correctAnswer?.cadence && userAnswer?.cadence && normalizeCadence(userAnswer.cadence) !== normalizeCadence(correctAnswer.cadence) && (
-                  <p className="player-feedback-card-cadence">
-                    Cadence : vous avez indiqué <strong>{cadenceLabelsMap[userAnswer.cadence] || userAnswer.cadence}</strong>, la solution est <strong>{cadenceLabelsMap[correctAnswer.cadence] || correctAnswer.cadence}</strong>.
-                  </p>
-                )}
-                {(validation?.score != null) && (
-                  <p className="player-feedback-card-xp">
-                    {validation.score}% XP{validation.cadenceBonus > 0 ? ` + ${validation.cadenceBonus}% bonus cadence` : ''}
-                  </p>
-                )}
-                {codexEntrySeg && (
-                  <button type="button" className="player-feedback-card-codex" onClick={() => navigate(`/student-dashboard?tab=codex&fiche=${codexEntrySeg.id}`)}>
-                    Revoir la fiche : {codexEntrySeg.title}
-                  </button>
-                )}
-              </div>
+              ) : (
+                <div className={`player-feedback-card player-feedback-card--level-${validation?.level ?? 0}`}>
+                  <p className="player-feedback-card-message">{validation?.feedback ?? '—'}</p>
+                  <div className="player-feedback-card-comparison">
+                    <div className="player-feedback-card-row">
+                      <span className="player-feedback-card-label">Votre réponse</span>
+                      <span className="player-feedback-card-value">
+                        {userAnswer ? <ChordLabel chord={userAnswer} /> : 'Non répondu'}
+                      </span>
+                    </div>
+                    <div className="player-feedback-card-row">
+                      <span className="player-feedback-card-label">Solution</span>
+                      <span className="player-feedback-card-value">
+                        {correctAnswer ? <ChordLabel chord={correctAnswer} /> : '—'}
+                      </span>
+                    </div>
+                  </div>
+                  {correctAnswer?.cadence && userAnswer?.cadence && normalizeCadence(userAnswer.cadence) !== normalizeCadence(correctAnswer.cadence) && (
+                    <p className="player-feedback-card-cadence">
+                      Cadence : vous avez indiqué <strong>{cadenceLabelsMap[userAnswer.cadence] || userAnswer.cadence}</strong>, la solution est <strong>{cadenceLabelsMap[correctAnswer.cadence] || correctAnswer.cadence}</strong>.
+                    </p>
+                  )}
+                  {(validation?.score != null) && (
+                    <p className="player-feedback-card-xp">
+                      {validation.score}% XP{validation.cadenceBonus > 0 ? ` + ${validation.cadenceBonus}% bonus cadence` : ''}
+                    </p>
+                  )}
+                  {codexEntrySeg && (
+                    <button type="button" className="player-feedback-card-codex" onClick={() => navigate(`/student-dashboard?tab=codex&fiche=${codexEntrySeg.id}`)}>
+                      Revoir la fiche : {codexEntrySeg.title}
+                    </button>
+                  )}
+                </div>
+              )
             )}
           </div>
           <div className={`player-timeline-overlay player-review-integrated-timeline ${getCadencesForBrace.length > 0 ? 'player-timeline-overlay-has-cadences' : ''}`}>
@@ -2001,289 +1981,16 @@ function Player() {
             <button onClick={handleReplay} className="player-review-integrated-btn-replay rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold shadow-lg shadow-indigo-500/40 hover:shadow-indigo-500/60 transition-all duration-200 active:scale-95 flex items-center justify-center" aria-label="Rejouer l'exercice" title="Rejouer l'exercice">
               {isMobile ? <RotateCcw className="w-6 h-6" /> : 'Rejouer'}
             </button>
+            {exerciseMode === 'parcours' && (
+              <button onClick={handleNextLevel} className="player-review-integrated-btn-next rounded-xl bg-zinc-800 border border-white/10 hover:border-white/20 hover:bg-zinc-700 text-white font-semibold transition-all duration-200 active:scale-95 flex items-center justify-center" aria-label="Niveau suivant" title="Niveau suivant">
+                {isMobile ? <SkipForward className="w-6 h-6" /> : 'Niveau suivant'}
+              </button>
+            )}
             <button onClick={handleBackToDashboard} className="player-review-integrated-btn-back rounded-xl bg-zinc-800 border border-white/10 hover:border-white/20 hover:bg-zinc-700 text-white font-semibold transition-all duration-200 active:scale-95 flex items-center justify-center" aria-label="Retour au tableau de bord" title="Retour au tableau de bord">
               {isMobile ? <Home className="w-6 h-6" /> : 'Retour Dashboard'}
             </button>
           </div>
         </div>
-      </div>
-    )
-  }
-
-  // Mode Review : Interface de correction contextuelle
-  if (mode === 'review') {
-    return (
-      <div className="player-immersive player-review-mode">
-        {/* Bannière badges débloqués */}
-        {newlyUnlockedBadges.length > 0 && (
-          <div className="player-badge-unlocked-banner" role="alert">
-            <div className="player-badge-unlocked-content">
-              <span className="player-badge-unlocked-title">
-                {newlyUnlockedBadges.length === 1
-                  ? 'Badge débloqué'
-                  : `${newlyUnlockedBadges.length} badges débloqués`}
-              </span>
-              <div className="player-badge-unlocked-list">
-                {newlyUnlockedBadges.map((b) => (
-                  <span key={b.id} className="player-badge-unlocked-item">
-                    <span className="player-badge-unlocked-emoji">{b.emoji}</span>
-                    <span>{b.name}</span>
-                  </span>
-                ))}
-              </div>
-            </div>
-            <button
-              type="button"
-              className="player-badge-unlocked-dismiss"
-              onClick={() => setNewlyUnlockedBadges([])}
-              aria-label="Fermer"
-            >
-              ×
-            </button>
-          </div>
-        )}
-        {/* Zone Supérieure : Dashboard de Scores */}
-        <div 
-          className="player-review-upper-zone"
-          ref={(el) => {
-            // Dimensions tracking removed
-          }}
-        >
-          <div className="player-video-wrapper player-video-blurred">
-            <YouTube
-              videoId={videoId}
-              opts={opts}
-              onReady={handleReady}
-              onStateChange={handleStateChange}
-              className="player-youtube"
-            />
-          </div>
-          <ReviewDashboard
-            perfectCount={calculateScores.perfectCount}
-            partialCount={calculateScores.partialCount}
-            totalCount={calculateScores.totalCount}
-            scorePercentage={calculateScores.scorePercentage}
-            cadenceCorrectCount={calculateScores.cadenceCorrectCount}
-            cadenceTotalCount={calculateScores.cadenceTotalCount}
-            onReplay={handleReplay}
-            onNext={handleNextLevel}
-            onBack={handleBackToDashboard}
-          />
-        </div>
-
-              {/* Zone Milieu : Timeline Interactive */}
-              <div 
-                className="player-review-timeline-zone"
-                ref={(el) => {
-                  // Dimensions tracking removed
-                }}
-              >
-          <div className="player-review-timeline-container">
-            <div 
-              ref={timelineRef}
-              className={`player-timeline-with-segments player-review-timeline${isMobile ? ' player-timeline-equal-width' : ''}`}
-              style={chordSegments.length && !isMobile ? { minWidth: `max(100%, ${chordSegments.length * 72}px)` } : undefined}
-            >
-              {/* Accolades de cadences au-dessus de la timeline (correction / feedback) */}
-              {getCadencesForBrace.length > 0 && (
-                <div className="player-timeline-cadence-braces player-timeline-cadence-braces-review">
-                  {getCadencesForBrace.map((cadence, idx) => {
-                    if (cadence.startMarker === null || cadence.endMarker === null) return null
-                    const startSegment = chordSegments[cadence.startMarker]
-                    const endSegment = chordSegments[cadence.endMarker]
-                    if (!startSegment || !endSegment) return null
-                    const X = chordSegments.length
-                    const leftPos = isMobile ? (cadence.startMarker / X) * 100 : startSegment.startPos
-                    const width = isMobile ? ((cadence.endMarker - cadence.startMarker + 1) / X) * 100 : (endSegment.endPos - startSegment.startPos)
-                    const braceClass = cadence.cadenceExpected && cadence.cadenceCorrect === true
-                      ? 'player-timeline-cadence-brace player-cadence-brace-correct'
-                      : cadence.cadenceExpected && cadence.cadenceCorrect === false
-                        ? 'player-timeline-cadence-brace player-cadence-brace-incorrect'
-                        : 'player-timeline-cadence-brace'
-                    return (
-                      <div
-                        key={idx}
-                        className={braceClass}
-                        style={{ left: `${leftPos}%`, width: `${width}%` }}
-                      >
-                        <div className="player-timeline-cadence-brace-bar" />
-                        <div className="player-timeline-cadence-brace-label">
-                          {cadence.cadenceLabel}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-
-              {/* Curseur de lecture */}
-              {currentTime >= startTime && currentTime <= endTime && playheadPositionPercent != null && (
-                <div
-                  className="player-timeline-playhead"
-                  style={{ 
-                    left: `${playheadPositionPercent}%`,
-                    willChange: 'left'
-                  }}
-                >
-                  <div className="player-timeline-playhead-indicator"></div>
-                </div>
-              )}
-
-              {chordSegments.map((segment) => {
-                const validation = answerValidations[segment.index]
-                const isCorrect = validation && validation.level === 1
-                const isIncorrect = validation && validation.level === 0
-                const isPartial = validation && (validation.level === 0.5 || validation.level === 2 || validation.level === 3)
-                const isSelected = selectedSegmentIndex === segment.index
-                const segLocked = isSegmentLockedByParcours(segment.index)
-                // En mode review, afficher la correction (solution) au lieu de la mauvaise réponse
-                let chordToDisplay = segment.chord
-                const marker = exercise.markers[segment.index]
-                const correctAnswer = typeof marker === 'object' && marker.chord ? marker.chord : null
-                if (isIncorrect || isPartial) {
-                  if (correctAnswer) {
-                    chordToDisplay = correctAnswer
-                  }
-                } else if (segLocked && correctAnswer) {
-                  // Accord qui n'était pas à remplir : afficher la bonne réponse en grisé
-                  chordToDisplay = correctAnswer
-                }
-                const chordLabel = formatChordLabel(chordToDisplay)
-                // En mode QCM, afficher la réponse : accord (qcmAnswer) ou fonction (T/SD/D) si seule
-                const qcmAnswerText = (progressionMode === 'qcm' && chordToDisplay && ('qcmAnswer' in chordToDisplay || 'function' in chordToDisplay))
-                  ? (chordToDisplay.qcmAnswer ?? chordToDisplay.function ?? null)
-                  : null
-                // En mode intuition : timeline avec lettre (T/SD/D) en principal + accord complet en petit
-                const showIntuitionInTimeline = progressionMode === 'functions'
-                const timelineFunction = showIntuitionInTimeline && chordToDisplay ? getChordFunction(chordToDisplay) : null
-                const _detailed = chordToDisplay ? formatChordDetailed(chordToDisplay) : ''
-                const fullChordText = chordToDisplay
-                  ? (chordToDisplay.degree || chordToDisplay.specialRoot
-                      ? _detailed
-                      : (chordToDisplay.selectedFunction && PRIMARY_DEGREES[chordToDisplay.selectedFunction]
-                          ? (PRIMARY_DEGREES[chordToDisplay.selectedFunction][0] || _detailed)
-                          : _detailed))
-                  : ''
-
-                // Classes de validation
-                let validationClass = ''
-                if (isCorrect) {
-                  validationClass = 'player-chord-segment-correct'
-                } else if (isIncorrect) {
-                  validationClass = 'player-chord-segment-incorrect'
-                } else if (isPartial) {
-                  validationClass = 'player-chord-segment-partial'
-                }
-
-                const isLastSegment = segment.index === markers.length - 1
-                const isGivenNotToFill = segLocked && (chordLabel || qcmAnswerText)
-                const reviewSegmentWidthPercent = isMobile && chordSegments.length > 0 ? (100 / chordSegments.length) : segment.width
-                const reviewSegmentLeftPercent = isMobile && chordSegments.length > 0 ? (segment.index / chordSegments.length) * 100 : segment.startPos
-                return (
-                  <div
-                    key={segment.index}
-                    className={`player-chord-segment player-review-segment ${validationClass} ${isSelected ? 'player-segment-selected' : ''} ${isLastSegment && !isMobile ? 'player-chord-segment-last' : ''} ${isGivenNotToFill ? 'player-chord-segment-given' : ''} ${showIntuitionInTimeline ? 'player-chord-segment-intuition' : ''}`}
-                    style={{
-                      left: `${reviewSegmentLeftPercent}%`,
-                      ...(isLastSegment && !isMobile ? {} : { width: `${reviewSegmentWidthPercent}%` })
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleSegmentClick(segment.index)
-                      setSegmentTooltipIndex((prev) => (prev === segment.index ? null : segment.index))
-                    }}
-                  >
-                    <div className="player-chord-segment-content">
-                      {showIntuitionInTimeline && timelineFunction ? (
-                        <>
-                          <span className={`player-chord-function ${
-                            timelineFunction === 'T' ? 'player-chord-function-t' :
-                            timelineFunction === 'SD' ? 'player-chord-function-sd' :
-                            'player-chord-function-d'
-                          }`}>
-                            {timelineFunction}
-                          </span>
-                          {fullChordText && (
-                            <span className="player-chord-segment-full-hint">{fullChordText}</span>
-                          )}
-                        </>
-                      ) : qcmAnswerText ? (
-                        ['T', 'SD', 'D'].includes(qcmAnswerText) ? (
-                          <span className={`player-chord-function ${
-                            qcmAnswerText === 'T' ? 'player-chord-function-t' :
-                            qcmAnswerText === 'SD' ? 'player-chord-function-sd' :
-                            'player-chord-function-d'
-                          }`}>
-                            {qcmAnswerText}
-                          </span>
-                        ) : (
-                          <div className="player-chord-label">
-                            <span className="player-chord-degree">{qcmAnswerText}</span>
-                          </div>
-                        )
-                      ) : chordLabel ? (
-                        <>
-                          {chordLabel.isFunctionOnly ? (
-                            <span className={`player-chord-function ${
-                              chordLabel.function === 'T' ? 'player-chord-function-t' :
-                              chordLabel.function === 'SD' ? 'player-chord-function-sd' :
-                              'player-chord-function-d'
-                            }`}>
-                              {chordLabel.function}
-                            </span>
-                          ) : (
-                            <div className="player-chord-label">
-                              <ChordLabel chord={chordToDisplay} />
-                            </div>
-                          )}
-                        </>
-                    ) : (
-                      <div className="player-chord-empty">
-                        <span className="player-chord-empty-icon">?</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-            </div>
-          </div>
-        </div>
-
-        {/* Zone Inférieure : Panneau de Correction Détaillée */}
-        {selectedSegmentIndex !== null && chordSegments[selectedSegmentIndex] && (
-          <div
-            ref={(el) => {
-              // Dimensions tracking removed
-            }}
-            style={{ flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}
-          >
-          <ReviewDetailErrorBoundary>
-            <ReviewDetailPanel
-              segmentIndex={selectedSegmentIndex}
-              userAnswer={userAnswers[selectedSegmentIndex]}
-              correctAnswer={(() => {
-                const marker = exercise.markers[selectedSegmentIndex]
-                return typeof marker === 'object' && marker.chord ? marker.chord : null
-              })()}
-              validation={answerValidations[selectedSegmentIndex]}
-              isSegmentLocked={exerciseMode === 'parcours' && isSegmentLockedByParcours(selectedSegmentIndex)}
-              segmentStartTime={chordSegments[selectedSegmentIndex].startTime}
-              segmentEndTime={chordSegments[selectedSegmentIndex].endTime}
-              playerRef={playerRef}
-              exerciseStartTime={startTime}
-              exerciseEndTime={endTime}
-              codexEntry={(() => {
-                const val = answerValidations[selectedSegmentIndex]
-                const correct = exercise.markers[selectedSegmentIndex]?.chord ?? null
-                if (!correct || (val?.level !== 0 && val?.level !== 0.5 && val?.level !== 2 && val?.level !== 3)) return null
-                const entries = getCodexEntriesForCorrection(correct, nodeId)
-                return entries.length > 0 ? entries[0] : null
-              })()}
-            />
-          </ReviewDetailErrorBoundary>
-          </div>
-        )}
       </div>
     )
   }
@@ -2726,76 +2433,49 @@ function Player() {
         nodeProgress={progressionMode === 'qcm' ? nodeStatsForQCM : null}
       />
       
-      {/* Tooltip au tap sur un segment : accord complet + feedback (lisible sur mobile quand les cases sont étroites) */}
+      {/* Tooltip au tap sur un segment : même carte feedback que mode libre (message, comparaison, cadence, XP, codex) */}
       {segmentTooltipIndex !== null && chordSegments[segmentTooltipIndex] && exercise?.markers?.[segmentTooltipIndex] && (() => {
         const validation = answerValidations[segmentTooltipIndex]
         const marker = exercise.markers[segmentTooltipIndex]
         const correctChord = typeof marker === 'object' && marker.chord ? marker.chord : null
+        const userAnswerSeg = userAnswers[segmentTooltipIndex]
         if (!validation) return null
-        const revelation = correctChord
-          ? (!correctChord.degree && !correctChord.specialRoot && correctChord.selectedFunction && PRIMARY_DEGREES[correctChord.selectedFunction])
-            ? `${correctChord.selectedFunction} (${PRIMARY_DEGREES[correctChord.selectedFunction][0]})`
-            : formatChordDetailed(correctChord)
-          : null
-        const showCodexLink = (validation.level === 0 || validation.level === 0.5 || validation.level === 2 || validation.level === 3) && correctChord
-        const codexEntries = showCodexLink ? getCodexEntriesForCorrection(correctChord, nodeId) : []
-        const firstCodex = codexEntries.length > 0 ? codexEntries[0] : null
+        const codexEntriesSeg = (validation.level === 0 || validation.level === 0.5 || validation.level === 2 || validation.level === 3) && correctChord ? getCodexEntriesForCorrection(correctChord, nodeId) : []
+        const codexEntrySeg = codexEntriesSeg.length > 0 ? codexEntriesSeg[0] : null
         return (
-          <div
-            className={`player-segment-tooltip player-validation-feedback--level-${validation.level ?? 0}`}
-            role="tooltip"
-            aria-live="polite"
-          >
-            <p className="player-validation-feedback-main">{validation.feedback}</p>
-            {revelation && (
-              <p className="player-validation-feedback-revelation">En réalité, c&apos;était précisément un {revelation}.</p>
-            )}
-            {firstCodex && (
-              <p className="player-validation-feedback-codex">
-                <button
-                  type="button"
-                  className="player-codex-link"
-                  onClick={() => navigate(`/student-dashboard?tab=codex&fiche=${firstCodex.id}`)}
-                >
-                  Revoir la fiche : {firstCodex.title}
+          <div className="player-segment-tooltip" role="tooltip" aria-live="polite">
+            <div className={`player-feedback-card player-feedback-card--level-${validation.level ?? 0}`}>
+              <p className="player-feedback-card-message">{validation.feedback ?? '—'}</p>
+              <div className="player-feedback-card-comparison">
+                <div className="player-feedback-card-row">
+                  <span className="player-feedback-card-label">Votre réponse</span>
+                  <span className="player-feedback-card-value">
+                    {userAnswerSeg ? <ChordLabel chord={userAnswerSeg} /> : 'Non répondu'}
+                  </span>
+                </div>
+                <div className="player-feedback-card-row">
+                  <span className="player-feedback-card-label">Solution</span>
+                  <span className="player-feedback-card-value">
+                    {correctChord ? <ChordLabel chord={correctChord} /> : '—'}
+                  </span>
+                </div>
+              </div>
+              {correctChord?.cadence && userAnswerSeg?.cadence && normalizeCadence(userAnswerSeg.cadence) !== normalizeCadence(correctChord.cadence) && (
+                <p className="player-feedback-card-cadence">
+                  Cadence : vous avez indiqué <strong>{cadenceLabelsMap[userAnswerSeg.cadence] || userAnswerSeg.cadence}</strong>, la solution est <strong>{cadenceLabelsMap[correctChord.cadence] || correctChord.cadence}</strong>.
+                </p>
+              )}
+              {(validation.score != null) && (
+                <p className="player-feedback-card-xp">
+                  {validation.score}% XP{validation.cadenceBonus > 0 ? ` + ${validation.cadenceBonus}% bonus cadence` : ''}
+                </p>
+              )}
+              {codexEntrySeg && (
+                <button type="button" className="player-feedback-card-codex" onClick={() => navigate(`/student-dashboard?tab=codex&fiche=${codexEntrySeg.id}`)}>
+                  Revoir la fiche : {codexEntrySeg.title}
                 </button>
-              </p>
-            )}
-          </div>
-        )
-      })()}
-      
-      {/* Double correction : validation fonctionnelle + révélation accord précis (en parcours : feedback uniquement en fin de séquence, dans le panneau de relecture) */}
-      {answerValidations[currentMarkerIndex] && exercise?.markers?.[currentMarkerIndex] && exerciseMode !== 'parcours' && exerciseMode !== 'libre' && (() => {
-        const validation = answerValidations[currentMarkerIndex]
-        const marker = exercise.markers[currentMarkerIndex]
-        const correctChord = typeof marker === 'object' && marker.chord ? marker.chord : null
-        const showCodexLink = (validation.level === 0 || validation.level === 0.5 || validation.level === 2 || validation.level === 3) && correctChord
-        const codexEntries = showCodexLink ? getCodexEntriesForCorrection(correctChord, nodeId) : []
-        const firstCodex = codexEntries.length > 0 ? codexEntries[0] : null
-        return (
-          <div className={`player-validation-feedback player-validation-feedback--level-${validation.level ?? 0}`}>
-            <p className="player-validation-feedback-main">{validation.feedback}</p>
-            {correctChord && (
-              <p className="player-validation-feedback-revelation">
-                En réalité, c&apos;était précisément un {
-                  (!correctChord.degree && !correctChord.specialRoot && correctChord.selectedFunction && PRIMARY_DEGREES[correctChord.selectedFunction])
-                    ? `${correctChord.selectedFunction} (${PRIMARY_DEGREES[correctChord.selectedFunction][0]})`
-                    : formatChordDetailed(correctChord)
-                }.
-              </p>
-            )}
-            {firstCodex && (
-              <p className="player-validation-feedback-codex">
-                <button
-                  type="button"
-                  className="player-codex-link"
-                  onClick={() => navigate(`/student-dashboard?tab=codex&fiche=${firstCodex.id}`)}
-                >
-                  Revoir la fiche : {firstCodex.title}
-                </button>
-              </p>
-            )}
+              )}
+            </div>
           </div>
         )
       })()}

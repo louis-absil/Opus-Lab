@@ -1683,6 +1683,7 @@ body.player-active {
 
 /* Boutons Rejouer / Retour : en mobile, icônes seules pour éviter le débordement */
 .player-review-integrated-btn-replay,
+.player-review-integrated-btn-next,
 .player-review-integrated-btn-back {
   min-width: 2.5rem;
   min-height: 2.5rem;
@@ -1690,6 +1691,7 @@ body.player-active {
 }
 @media (min-width: 769px) {
   .player-review-integrated-btn-replay,
+  .player-review-integrated-btn-next,
   .player-review-integrated-btn-back {
     min-width: auto;
     padding: 0.5rem 1rem;

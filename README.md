@@ -2,7 +2,7 @@
 
 **L'entraînement harmonique intelligent**
 
-**Version** : 1.2.0 — Dernières mises à jour : [CHANGELOG.md](./CHANGELOG.md) · Détail v1.2.0 : [UPDATE_v1.2.0.md](./UPDATE_v1.2.0.md)
+**Version** : 1.2.1 — Dernières mises à jour : [CHANGELOG.md](./CHANGELOG.md) · Détail v1.2.1 : [UPDATE_v1.2.1.md](./UPDATE_v1.2.1.md)
 
 Opus Lab est une plateforme web d'entraînement pour les musiciens qui souhaitent perfectionner leur oreille harmonique. Analysez des extraits musicaux depuis YouTube, identifiez les accords avec une notation académique professionnelle, et progressez à votre rythme.
 
@@ -211,7 +211,7 @@ opus-lab/
 ├── firebase.json, firestore.rules, firestore.indexes.json
 ├── .gitattributes         # Fins de ligne LF, encodage cohérent
 ├── CHANGELOG.md           # Notes de mise à jour
-├── UPDATE_v1.2.0.md      # Détail de la mise à jour v1.2.0
+├── UPDATE_v1.2.1.md      # Détail de la mise à jour v1.2.1
 └── package.json
 ```
 
@@ -268,7 +268,8 @@ Consultez [`FIRESTORE_SETUP.md`](./FIRESTORE_SETUP.md) pour plus de détails sur
 ## 📚 Documentation complémentaire
 
 - [`CHANGELOG.md`](./CHANGELOG.md) : Notes de mise à jour (versions et nouveautés)
-- [`UPDATE_v1.2.0.md`](./UPDATE_v1.2.0.md) : Détail de la mise à jour v1.2.0 (éditeur d’images parcours, données, composants)
+- [`UPDATE_v1.2.1.md`](./UPDATE_v1.2.1.md) : Détail de la mise à jour v1.2.1 (Player, panneau de correction, feedback unifié)
+- [`UPDATE_v1.2.0.md`](./UPDATE_v1.2.0.md) : Détail de la mise à jour v1.2.0 (éditeur d'images parcours, données, composants)
 - [`FIRESTORE_SETUP.md`](./FIRESTORE_SETUP.md) : Configuration des règles Firestore
 - [`SETUP_TEACHERS.md`](./SETUP_TEACHERS.md) : Configuration des professeurs autorisés
 - [`GITHUB_PAGES_SETUP.md`](./GITHUB_PAGES_SETUP.md) : Déploiement sur GitHub Pages

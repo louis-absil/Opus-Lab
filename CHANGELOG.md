@@ -4,6 +4,19 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ---
 
+## [1.2.1] – 2026-02-05
+
+### Modifié
+
+#### Player et panneau de correction (mode review)
+- **ReviewDetailPanel** : carte de feedback unifiée avec le mode libre (`player-feedback-card`), mini‑player (Jouer / Pause, Boucle, Début), affichage cadence / XP / lien Codex ; message pour accord verrouillé ; appels sécurisés au lecteur YouTube et nettoyage des intervalles.
+- **Player** : mode review (split et intégré), timeline avec segments et accolades de cadences, cartes de feedback cohérentes, responsive (mobile / desktop).
+- **Player.css**, **ReviewDetailPanel.css** : styles zone vidéo, timeline, mode review, cartes feedback, mini‑player, responsive.
+
+Détail : [UPDATE_v1.2.1.md](./UPDATE_v1.2.1.md).
+
+---
+
 ## [1.2.0] – 2026-02-05
 
 ### Ajouté
